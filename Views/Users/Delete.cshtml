@@ -1,10 +1,29 @@
 @model ShipmentFinishGood.Models.User
 @{
-    ViewData["Title"] = "Delete User";
+    ViewData["Title"] = "Hapus User";
 }
-<h2>Hapus User</h2>
-<p>Yakin ingin menghapus user <strong>@Model.Username</strong>?</p>
-<form method="post">
-    <button class="btn btn-danger" type="submit">Hapus</button>
-    <a asp-action="Index" class="btn btn-secondary">Batal</a>
-</form>
+@section Styles {<link rel="stylesheet" href="~/css/user.css" asp-append-version="true" />}
+
+<div id="userPage">
+<div class="d-flex align-items-center mb-4">
+    <h1 class="h3 fw-bold text-danger mb-0"><i class="fas fa-user-times me-2"></i>Hapus User</h1>
+    <div class="ms-auto"><a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Kembali</a></div>
+<div class="accessibility-toolbar d-flex mb-3">
+    <button type="button" class="btn btn-outline-secondary btn-toggle" data-toggle="large-text"><i class="fas fa-text-height me-1"></i>Font+</button>
+    <button type="button" class="btn btn-outline-secondary btn-toggle" data-toggle="high-contrast"><i class="fas fa-adjust me-1"></i>Kontras</button>
+</div>
+
+</div>
+@section Scripts { <script src="~/js/user.js" asp-append-version="true"></script> }
+
+<div class="card border-danger shadow-sm">
+    <div class="card-body">
+        <p class="lead mb-1">Anda yakin ingin menghapus user:</p>
+        <h3 class="h5 fw-bold text-danger">@Model.Username</h3>
+        <p class="mb-3 text-muted">Aksi ini tidak dapat dibatalkan.</p>
+        <form method="post" class="d-flex gap-2">
+            <button class="btn btn-danger" type="submit"><i class="fas fa-trash me-2"></i>Hapus</button>
+            <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-times me-2"></i>Batal</a>
+        </form>
+    </div>
+</div>

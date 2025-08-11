@@ -1,32 +1,66 @@
+@model ShipmentFinishGood.DTOs.CreateUserRequest
 @using ShipmentFinishGood.Domain;
 @{
-    ViewData["Title"] = "Create User";
+    ViewData["Title"] = "Tambah User";
 }
-<h2>Create User</h2>
-<form method="post">
-    <div class="mb-3">
-        <label class="form-label">Username</label>
-        <input name="username" class="form-control" />
+@section Styles {<link rel="stylesheet" href="~/css/user.css" asp-append-version="true" />}
+
+<div id="userPage">
+<div class="d-flex align-items-center mb-4">
+    <h1 class="h3 fw-bold text-primary mb-0"><i class="fas fa-user-plus me-2"></i>Tambah User</h1>
+    <div class="ms-auto"><a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Kembali</a></div>
+<div class="accessibility-toolbar d-flex mb-3">
+    <button type="button" class="btn btn-outline-secondary btn-toggle" data-toggle="large-text"><i class="fas fa-text-height me-1"></i>Font+</button>
+    <button type="button" class="btn btn-outline-secondary btn-toggle" data-toggle="high-contrast"><i class="fas fa-adjust me-1"></i>Kontras</button>
+</div>
+
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form asp-action="Create" method="post" novalidate>
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Username" class="form-label fw-semibold"></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-at"></i></span>
+                        <input asp-for="Username" class="form-control" autocomplete="off" />
+                    </div>
+                    <span asp-validation-for="Username" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label fw-semibold"></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                        <input asp-for="Name" class="form-control" />
+                    </div>
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Password" class="form-label fw-semibold"></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                        <input asp-for="Password" class="form-control" />
+                        <button type="button" class="btn btn-outline-secondary" id="togglePwd" tabindex="-1" aria-label="Tampilkan / sembunyikan password"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Role" class="form-label fw-semibold"></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-key"></i></span>
+                        <select asp-for="Role" class="form-select" asp-items="Html.GetEnumSelectList<UserRole>()"></select>
+                    </div>
+                    <span asp-validation-for="Role" class="text-danger small"></span>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-save me-2"></i>Simpan</button>
+                <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-times me-2"></i>Batal</a>
+            </div>
+        </form>
     </div>
-    <div class="mb-3">
-        <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Nama</label>
-        <input name="name" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Role</label>
-        <select name="role" class="form-select">
-            @foreach(var r in Enum.GetValues(typeof(UserRole))){
-                <option value="@r">@r</option>
-            }
-        </select>
-    </div>
-    <button class="btn btn-primary" type="submit">Simpan</button>
-    <a asp-action="Index" class="btn btn-secondary">Batal</a>
-</form>
-@if(!ViewData.ModelState.IsValid){
-    <div class="text-danger mt-2">@string.Join("; ", ViewData.ModelState.Values.SelectMany(v=>v.Errors).Select(e=>e.ErrorMessage))</div>
-}
+</div>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /><script src="~/js/user.js" asp-append-version="true"></script> }

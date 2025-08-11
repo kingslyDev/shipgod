@@ -63,6 +63,23 @@ public class UserService : IUserService
         return Result<IEnumerable<UserDto>>.Success(userDtos);
     }
 
+    public async Task<Result<(IEnumerable<UserDto> Users,int Total,int Page,int PageSize,string? Search)>> GetPagedAsync(int page,int pageSize,string? search)
+    {
+        if(page < 1) page = 1;
+        if(pageSize < 1 || pageSize > 100) pageSize = 10;
+        var (users,total) = await _repo.GetPagedAsync(page,pageSize,search);
+        var dtos = users.Select(u => new UserDto
+        {
+            UserId = u.UserId,
+            Username = u.Username,
+            Name = u.Name,
+            Role = u.Role,
+            CreatedAt = u.CreatedAt,
+            UpdatedAt = u.UpdatedAt
+        });
+        return Result<(IEnumerable<UserDto>, int, int, int, string?)>.Success((dtos,total,page,pageSize,search));
+    }
+
     public async Task<Result<User>> GetAsync(int id)
     {
         var user = await _repo.GetByIdAsync(id);

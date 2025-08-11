@@ -1,0 +1,32 @@
+/* User management specific styles (scoped) */
+#userPage .table-hover tbody tr:hover {
+  background-color: rgba(25, 118, 210, 0.05);
+}
+#userPage #userSearch {
+  border-left: none;
+}
+#userPage #userSearch:focus {
+  box-shadow: none;
+}
+#userPage #usersTable td,
+#usersTable th {
+  vertical-align: middle;
+}
+#userPage .badge.bg-primary-light {
+  background-color: rgba(25, 118, 210, 0.15) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #userPage .btn,
+  #userPage .form-control,
+  #userPage .table-hover tbody tr {
+    transition: none !important;
+  }
+}
+
+/* Slight size for readability without toggle */
+#userPage {
+  font-size: 15px;
+}
+#userPage h1.h4 {
+  font-size: 1.25rem;
+}

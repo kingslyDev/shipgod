@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using ShipmentFinishGood.Services;
 using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Common;
+using ShipmentFinishGood.ViewModels;
 
 namespace ShipmentFinishGood.Controllers;
 
@@ -18,13 +19,23 @@ public class UsersController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var result = await _userService.GetAllAsync();
-        if (!result.IsSuccess)
+        int page = 1;
+        int pageSize = 10;
+        string? search = Request.Query["search"].FirstOrDefault();
+        int.TryParse(Request.Query["page"], out page);
+        int.TryParse(Request.Query["pageSize"], out pageSize);
+        if(page <=0) page = 1;
+        if(pageSize <=0) pageSize = 10;
+
+        var paged = await _userService.GetPagedAsync(page,pageSize,search);
+        if(!paged.IsSuccess)
         {
-            TempData["Error"] = result.Error;
-            return View(Enumerable.Empty<UserDto>());
+            TempData["Error"] = paged.Error;
+            return View(new ViewModels.PagedResultViewModel<UserDto>());
         }
-        return View(result.Value);
+        var (users,total,p,ps,s) = paged.Value;
+        var vm = new ViewModels.PagedResultViewModel<UserDto>{ Items = users, Page = p, PageSize = ps, Total = total, Search = s };
+        return View(vm);
     }
 
     public IActionResult Create() => View(new CreateUserRequest());
@@ -54,8 +65,10 @@ public class UsersController : Controller
             return NotFound();
 
         var user = result.Value!;
-        var model = new UpdateUserRequest
+        var model = new EditUserViewModel
         {
+            Id = user.UserId,
+            Username = user.Username,
             Name = user.Name,
             Role = user.Role
         };
@@ -64,16 +77,23 @@ public class UsersController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, UpdateUserRequest request)
+    public async Task<IActionResult> Edit(int id, EditUserViewModel model)
     {
         if (!ModelState.IsValid)
-            return View(request);
+            return View(model);
 
-        var result = await _userService.UpdateAsync(id, request);
+        var updateReq = new UpdateUserRequest
+        {
+            Name = model.Name,
+            Role = model.Role,
+            Password = string.IsNullOrWhiteSpace(model.Password) ? null : model.Password
+        };
+
+        var result = await _userService.UpdateAsync(id, updateReq);
         if (!result.IsSuccess)
         {
             ModelState.AddModelError(string.Empty, result.Error!);
-            return View(request);
+            return View(model);
         }
 
         TempData["Success"] = "User updated successfully";
