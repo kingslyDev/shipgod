@@ -1,0 +1,76 @@
+@using ShipmentFinishGood.ViewModels
+@model (POUploadPreviewViewModel preview, List<ShipmentFinishGood.Models.ExcelUploadItem> sessionItems)
+@if (Model.preview != null && Model.preview.RawRows.Any())
+{
+  <div class="card shadow-sm" id="previewCard" data-session-id="@ViewBag.SessionId">
+    <div class="card-header d-flex flex-wrap gap-3 align-items-center">
+      <div>
+        <strong>Preview Data (@Model.preview.RawRows.Count baris)</strong>
+        @{ var processed = Model.sessionItems.Count(i=>i.IsProcessed); var pending = Model.sessionItems.Count - processed; }
+        @if(processed>0){<span class="badge bg-success ms-2">@processed processed</span>}
+        @if(pending>0){<span class="badge bg-warning ms-1">@pending pending</span>}
+        <div class="small text-muted">File: @Model.preview.FileName</div>
+      </div>
+      <div class="ms-auto d-flex gap-2">
+        <button type="button" class="btn btn-success" id="btnStoreAll">
+          <span class="label-text">Store All to Database</span>
+          <span class="spinner-border spinner-border-sm d-none"></span>
+        </button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-striped table-hover align-middle mb-0" id="previewTable">
+        <thead class="table-dark">
+          <tr>
+            <th style="width:60px">Row</th>
+            <th>No PO</th>
+            <th>Model</th>
+            <th class="text-end" style="width:100px">Qty</th>
+            <th style="width:190px">Method</th>
+            <th style="width:120px">Action</th>
+            <th style="width:130px">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+        @foreach (var rr in Model.preview.RawRows)
+        {
+            var item = Model.sessionItems.FirstOrDefault(x=>x.RowNumber==rr.RowId);
+            if(item==null) { continue; }
+            var method = item.MethodPlanned ?? "";
+            var processedRow = item.IsProcessed;
+            <tr data-item-id="@item.ItemId" data-row-id="@rr.RowId" data-method="@method" class="@(processedRow?"table-success":"")">
+              <td>@rr.RowId</td>
+              <td>@rr.NoPO</td>
+              <td>@rr.ModelCode</td>
+              <td class="text-end">@rr.Quantity</td>
+              <td>
+                @if(processedRow){<span class="badge bg-success">Processed</span>} else {
+                  <div class="btn-group btn-group-sm method-group" role="group">
+                    <button type="button" class="btn @(method=="LOOSE"?"btn-primary":"btn-outline-primary") method-btn" data-method="LOOSE">LOOSE</button>
+                    <button type="button" class="btn @(method=="PALLET"?"btn-warning":"btn-outline-warning") method-btn" data-method="PALLET">PALLET</button>
+                  </div>
+                }
+              </td>
+              <td class="action-cell">
+                @if(processedRow){<span class="text-success small">Done</span>} else if(!string.IsNullOrEmpty(method)){
+                  <button type="button" class="btn btn-success btn-sm btn-commit">Commit</button>
+                } else {
+                  <span class="text-muted small">Pick method</span>
+                }
+              </td>
+              <td>
+                <span class="status-badge">
+                  @if(processedRow){<span class="badge bg-success">Processed</span>} else if(!string.IsNullOrEmpty(method)){<span class="badge bg-info">@method Selected</span>} else {<span class="badge bg-secondary">Pending</span>}
+                </span>
+              </td>
+            </tr>
+        }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+else
+{
+  <div class="alert alert-info mt-4" id="emptyPreview">Belum ada data, upload file untuk preview.</div>
+}

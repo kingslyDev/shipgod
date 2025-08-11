@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShipmentFinishGood.Repositories;
 
@@ -11,9 +12,11 @@ using ShipmentFinishGood.Repositories;
 namespace ShipmentFinishGood.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250811081320_AddMethodPlannedAndSheetName")]
+    partial class AddMethodPlannedAndSheetName
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -210,8 +213,17 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.Property<DateTime>("EffectiveFrom")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<int>("LoosePcsPerBox")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LoosePcsPerPallet")
+                        .HasColumnType("int");
 
                     b.Property<string>("Method")
                         .IsRequired()
@@ -222,6 +234,12 @@ namespace ShipmentFinishGood.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("PalletPcsPerBox")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PalletPcsPerPallet")
+                        .HasColumnType("int");
 
                     b.Property<int>("PcsPerBox")
                         .HasColumnType("int");

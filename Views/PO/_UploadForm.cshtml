@@ -1,0 +1,20 @@
+@model ShipmentFinishGood.ViewModels.POUploadViewModel
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form asp-action="Create" method="post" enctype="multipart/form-data" class="row g-3" id="uploadForm">
+      @Html.AntiForgeryToken()
+      <input type="hidden" name="submit" value="preview" />
+      <div class="col-md-5">
+        <label class="form-label">File (Excel)</label>
+        <input asp-for="File" type="file" class="form-control" />
+        <span asp-validation-for="File" class="text-danger"></span>
+      </div>
+      <div class="col-md-3 align-self-end">
+        <button class="btn btn-primary w-100" id="btnPreview">Preview</button>
+      </div>
+      <div class="col-md-3 align-self-end">
+        <a asp-action="Template" class="btn btn-outline-secondary w-100">Download Template</a>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,671 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ShipmentFinishGood.Services;
+using ShipmentFinishGood.ViewModels;
+using ClosedXML.Excel;
+using ShipmentFinishGood.Repositories;
+using Microsoft.EntityFrameworkCore;
+using ShipmentFinishGood.Models;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using ShipmentFinishGood.Data;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+
+namespace ShipmentFinishGood.Controllers;
+
+[Authorize(Policy = "RequireInputer")]
+public class POController : Controller
+{
+    private readonly IGroupingService _groupingService;
+    private readonly AppDbContext _ctx;
+    private readonly IModelConfigService _modelConfigService;
+
+    public POController(IGroupingService groupingService, AppDbContext ctx, IModelConfigService modelConfigService)
+    {
+        _groupingService = groupingService;
+        _ctx = ctx;
+        _modelConfigService = modelConfigService;
+    }
+
+    [HttpGet]
+    public IActionResult Create(int? sessionId = null)
+    {
+        var vm = new POUploadViewModel { SessionId = sessionId };
+        if (sessionId.HasValue)
+        {
+            // View akan fetch via GET Ajax (bisa ditambahkan nanti) atau langsung di sini setelah improvement service
+        }
+        return View(vm);
+    }
+
+    [HttpGet]
+    public IActionResult Template()
+    {
+        using var wb = new XLWorkbook();
+    var ws = wb.Worksheets.Add("DEST-A");
+    ws.Cell(1,1).Value = "NoPO";
+    ws.Cell(1,2).Value = "Model";
+    ws.Cell(1,3).Value = "Qty";
+    ws.Cell(2,1).Value = "4502195897";
+    ws.Cell(2,2).Value = "RF-2400DEG-K";
+    ws.Cell(2,3).Value = 3486;
+    ws.Cell(3,1).Value = ""; // model tambahan PO sama
+    ws.Cell(3,2).Value = "RF-D10EG-K";
+    ws.Cell(3,3).Value = 108;
+    var ws2 = wb.Worksheets.Add("DEST-B");
+    ws2.Cell(1,1).Value = "NoPO";
+    ws2.Cell(1,2).Value = "Model";
+    ws2.Cell(1,3).Value = "Qty";
+    ws2.Cell(2,1).Value = "4502195898";
+    ws2.Cell(2,2).Value = "RF-2400DEG-K";
+    ws2.Cell(2,3).Value = 561;
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        ms.Position = 0;
+        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return File(ms.ToArray(), contentType, "TemplatePO.xlsx");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(POUploadViewModel vm, string? submit)
+    {
+        // MODE BARU: Preview selalu diambil dari tabel ExcelUploadItems berdasarkan SessionId.
+        POUploadPreviewViewModel? preview = null;
+        if (vm.SessionId.HasValue)
+        {
+            preview = await _groupingService.LoadSessionPreviewAsync(vm.SessionId.Value);
+            
+            // Pass session items with MethodPlanned to ViewBag
+            var sessionItems = await _ctx.ExcelUploadItems
+                .Where(i => i.SessionId == vm.SessionId.Value)
+                .Select(i => new { i.ItemId, i.RowNumber, i.MethodPlanned, i.IsProcessed })
+                .ToListAsync();
+            ViewBag.SessionItems = sessionItems;
+        }
+
+        if (submit == "preview")
+        {
+            if (vm.File == null || vm.File.Length == 0)
+            {
+                ModelState.AddModelError("File","File wajib diupload.");
+                return View(vm);
+            }
+            using var ms = new MemoryStream();
+            await vm.File.CopyToAsync(ms);
+            ms.Position = 0;
+            // Parse dan simpan langsung ke DB (session + items)
+            var sessionId = await _groupingService.ParseAndStoreAsync(ms, vm.File.FileName, User.Identity?.Name ?? "system");
+            vm.SessionId = sessionId;
+            preview = await _groupingService.LoadSessionPreviewAsync(sessionId);
+        }
+        else if (submit == "applyRowMethods" && preview != null)
+        {
+            // Ambil method per row
+            preview.RowMethods.Clear();
+            foreach (var rr in preview.RawRows)
+            {
+                var m = Request.Form[$"rowmethod_{rr.RowId}"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(m)) preview.RowMethods[rr.RowId] = m;
+            }
+            // Bangun grouping: setiap row digroup sesuai method -> kumpul per (method, Model, Destination) tapi tidak mencampur PO yang berbeda kecuali method LOOSE mempersilahkan merge (tetap mengikuti logika ApplyMethod?)
+            preview.Items.Clear();
+            // LOOSE: boleh merge baris dengan model+dest yang sama walau PO beda jika semua memilih LOOSE
+            var looseRows = preview.RawRows.Where(r=>preview.RowMethods.TryGetValue(r.RowId, out var mv) && mv=="LOOSE").ToList();
+            var palletRows = preview.RawRows.Where(r=>preview.RowMethods.TryGetValue(r.RowId, out var mv2) && mv2=="PALLET").ToList();
+            // Gunakan helper grouping service secara terpisah
+            if (looseRows.Any())
+            {
+                var temp = new POUploadPreviewViewModel { RawRows = looseRows, FileName = preview.FileName };
+                await _groupingService.ApplyMethodAndGroupAsync(temp, "LOOSE");
+                preview.Items.AddRange(temp.Items);
+            }
+            if (palletRows.Any())
+            {
+                var temp = new POUploadPreviewViewModel { RawRows = palletRows, FileName = preview.FileName };
+                await _groupingService.ApplyMethodAndGroupAsync(temp, "PALLET");
+                preview.Items.AddRange(temp.Items);
+            }
+            // Simpan method row ke DB (optional future)
+        }
+        else if (submit == "processSelected" && preview != null)
+        {
+            var selectedIds = Request.Form["selectedRows"].Select(x => int.TryParse(x, out var id) ? id : 0).Where(x => x > 0).ToHashSet();
+            var method = Request.Form["SelectedMethod"].FirstOrDefault() ?? "LOOSE";
+            
+            if (selectedIds.Any())
+            {
+                // Simpan method untuk baris yang dipilih
+                var selectedMethods = selectedIds.ToDictionary(id => id, id => method);
+                await _groupingService.SaveRowMethodsAsync(vm.SessionId!.Value, selectedMethods);
+                
+                // Filter selected rows yang belum processed
+                var selectedRows = preview.RawRows.Where(r => selectedIds.Contains(r.RowId) && !r.Processed).ToList();
+                
+                if (selectedRows.Any())
+                {
+                    // Tandai processed lebih dulu
+                    foreach (var rr in selectedRows) rr.Processed = true;
+                    
+                    // Build grouping hanya untuk baris baru dipilih
+                    var tempPreview = new POUploadPreviewViewModel { RawRows = selectedRows, FileName = preview.FileName };
+                    await _groupingService.ApplyMethodAndGroupAsync(tempPreview, method);
+                    preview.Items = tempPreview.Items; // tampilkan hasil batch ini
+                    
+                    // Commit ke DB
+                    var success = await _groupingService.CommitAsync(preview, User.Identity?.Name ?? "system");
+                    if (success)
+                    {
+                        TempData["Success"] = $"{selectedRows.Count} baris berhasil disimpan ke database dengan method {method}.";
+                    }
+                    else
+                    {
+                        TempData["Error"] = "Gagal menyimpan data ke database. Periksa log untuk detail.";
+                        // Rollback processed flag jika gagal
+                        foreach (var rr in selectedRows) rr.Processed = false;
+                    }
+                }
+                else
+                {
+                    TempData["Warning"] = "Semua baris yang dipilih sudah pernah diproses.";
+                }
+            }
+            else
+            {
+                TempData["Warning"] = "Tidak ada baris yang dipilih.";
+            }
+            
+            // reload preview from DB to reflect processed flags
+            if (vm.SessionId.HasValue)
+                preview = await _groupingService.LoadSessionPreviewAsync(vm.SessionId.Value);
+        }
+        else if (submit == "applyMethod" && preview != null && !string.IsNullOrEmpty(vm.SelectedMethod))
+        {
+            // Simpan method ke semua baris yang belum diproses
+            var pendingRows = preview.RawRows.Where(r => !r.Processed).ToDictionary(r => r.RowId, r => vm.SelectedMethod);
+            await _groupingService.SaveRowMethodsAsync(vm.SessionId!.Value, pendingRows);
+            
+            // apply sheet filter first (if selected)
+            if (!string.IsNullOrEmpty(vm.SelectedSheet) && vm.SelectedSheet != "ALL")
+            {
+                preview.SelectedSheet = vm.SelectedSheet;
+            }
+            else
+            {
+                preview.SelectedSheet = null; // ALL
+            }
+            // Simpan semua rows lalu filter sementara
+            var allRows = preview.RawRows;
+            if (!string.IsNullOrEmpty(preview.SelectedSheet))
+            {
+                preview.RawRows = allRows.Where(r=>r.SheetName==preview.SelectedSheet).ToList();
+            }
+            await _groupingService.ApplyMethodAndGroupAsync(preview, vm.SelectedMethod);
+            // Kembalikan RawRows ke full dataset agar state tersimpan lengkap
+            preview.RawRows = allRows;
+            // pagination values
+            if (int.TryParse(Request.Form["Page"], out var page)) preview.Page = page;
+            if (int.TryParse(Request.Form["PageSize"], out var pageSize)) preview.PageSize = pageSize;
+            
+            TempData["Success"] = $"Method {vm.SelectedMethod} diterapkan ke {pendingRows.Count} baris pending.";
+        }
+        ViewBag.Preview = preview;
+        return View(vm);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Queue(string? status, string? search, int? sessionId, int page = 1, int pageSize = 50)
+    {
+        var q = _ctx.ExcelUploadItems
+            .Select(i => new {
+                i.ItemId, i.RowNumber, i.NoPO, i.ModelProduk, i.Destination, i.QtyTotal, i.IsProcessed, i.SessionId,
+                i.Session.FileName, i.Session.CreatedDate, i.MethodPlanned, i.SheetName
+            });
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (status.Equals("pending", StringComparison.OrdinalIgnoreCase)) q = q.Where(x => !x.IsProcessed);
+            else if (status.Equals("processed", StringComparison.OrdinalIgnoreCase)) q = q.Where(x => x.IsProcessed);
+        }
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            search = search.Trim();
+            q = q.Where(x => x.NoPO.Contains(search) || x.ModelProduk.Contains(search) || x.Destination.Contains(search));
+        }
+        if (sessionId.HasValue)
+        {
+            q = q.Where(x => x.SessionId == sessionId.Value);
+        }
+        int total = await q.CountAsync();
+        var items = await q
+            .OrderByDescending(x => x.CreatedDate)
+            .ThenBy(x => x.RowNumber)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var vmQueue = new POQueueViewModel
+        {
+            Items = items.Select(x => new POQueueItemViewModel
+            {
+                ItemId = x.ItemId,
+                RowNumber = x.RowNumber,
+                NoPO = x.NoPO,
+                ModelCode = x.ModelProduk,
+                Destination = x.Destination,
+                Quantity = x.QtyTotal,
+                IsProcessed = x.IsProcessed,
+                MethodPlanned = x.MethodPlanned,
+                SessionId = x.SessionId,
+                FileName = x.FileName,
+                UploadedAt = x.CreatedDate,
+                SheetName = x.SheetName
+            }).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = total,
+            StatusFilter = status,
+            Search = search,
+            SessionFilter = sessionId
+        };
+        return View(vmQueue);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SetRowMethod(int itemId, string method)
+    {
+        // Debug logging
+        Console.WriteLine($"SetRowMethod called with itemId: {itemId}, method: {method}");
+        
+        if (itemId <= 0)
+        {
+            return Json(new { success = false, message = "ItemId tidak valid." });
+        }
+        
+        var item = await _ctx.ExcelUploadItems.FindAsync(itemId);
+        if (item == null)
+        {
+            Console.WriteLine($"Item not found for itemId: {itemId}");
+            return Json(new { success = false, message = "Item tidak ditemukan." });
+        }
+        
+        if (item.IsProcessed)
+        {
+            return Json(new { success = false, message = "Item sudah diproses sebelumnya." });
+        }
+
+        // Validate method
+        if (method != "LOOSE" && method != "PALLET")
+        {
+            return Json(new { success = false, message = "Method harus LOOSE atau PALLET." });
+        }
+
+        // Validate model supports the method
+        var isSupported = await _modelConfigService.ValidateModelSupportAsync(item.ModelProduk, method);
+        if (!isSupported)
+        {
+            return Json(new { success = false, message = $"Model {item.ModelProduk} tidak mendukung method {method}." });
+        }
+
+        item.MethodPlanned = method;
+        await _ctx.SaveChangesAsync();
+
+        return Json(new { success = true, method = method });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CommitSingleRow(int itemId)
+    {
+        var item = await _ctx.ExcelUploadItems.FindAsync(itemId);
+        if (item == null)
+        {
+            return Json(new { success = false, message = "Item tidak ditemukan." });
+        }
+
+        if (item.IsProcessed)
+        {
+            return Json(new { success = false, message = "Item sudah diproses sebelumnya." });
+        }
+
+        if (string.IsNullOrEmpty(item.MethodPlanned))
+        {
+            return Json(new { success = false, message = "Method belum dipilih untuk item ini." });
+        }
+
+        try
+        {
+            // Create preview with single item using correct field names
+            var tempPreview = new POUploadPreviewViewModel
+            {
+                FileName = "Single Row Commit",
+                RawRows = new List<RawRow>
+                {
+                    new RawRow
+                    {
+                        RowId = item.RowNumber,
+                        SheetName = item.SheetName,
+                        ModelCode = item.ModelProduk,
+                        NoPO = item.NoPO,
+                        Destination = item.Destination,
+                        Quantity = item.QtyTotal,
+                        Processed = true // tandai processed agar CommitAsync dapat mengenali baris ini
+                    }
+                }
+            };
+
+            // Apply method and group
+            await _groupingService.ApplyMethodAndGroupAsync(tempPreview, item.MethodPlanned);
+            
+            // Commit to database
+            var success = await _groupingService.CommitAsync(tempPreview, User.Identity?.Name ?? "system");
+            
+            if (success)
+            {
+                // Mark as processed
+                item.IsProcessed = true;
+                await _ctx.SaveChangesAsync();
+
+                return Json(new { 
+                    success = true, 
+                    message = "Item berhasil diproses ke database." 
+                });
+            }
+            else
+            {
+                return Json(new { 
+                    success = false, 
+                    message = "Gagal memproses item ke database." 
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            return Json(new { 
+                success = false, 
+                message = $"Error: {ex.Message}" 
+            });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> StoreAllToDatabase(Guid sessionId)
+    {
+        try
+        {
+            // Get all unprocessed items with method selected
+            var items = await _ctx.ExcelUploadItems
+                .Where(x => x.SessionId == sessionId && !x.IsProcessed && !string.IsNullOrEmpty(x.MethodPlanned))
+                .ToListAsync();
+
+            if (!items.Any())
+            {
+                return Json(new { success = false, message = "Tidak ada item yang siap untuk disimpan ke database." });
+            }
+
+            // Group items by method for batch processing
+            var looseItems = items.Where(i => i.MethodPlanned == "LOOSE").ToList();
+            var palletItems = items.Where(i => i.MethodPlanned == "PALLET").ToList();
+
+            int processedCount = 0;
+
+            // Process LOOSE items
+            if (looseItems.Any())
+            {
+                var loosePreview = new POUploadPreviewViewModel
+                {
+                    FileName = "Batch LOOSE Processing",
+                    RawRows = looseItems.Select(item => new RawRow
+                    {
+                        RowId = item.RowNumber,
+                        SheetName = item.SheetName,
+                        ModelCode = item.ModelProduk,
+                        NoPO = item.NoPO,
+                        Destination = item.Destination,
+                        Quantity = item.QtyTotal,
+                        Processed = false
+                    }).ToList()
+                };
+
+                await _groupingService.ApplyMethodAndGroupAsync(loosePreview, "LOOSE");
+                var looseSuccess = await _groupingService.CommitAsync(loosePreview, User.Identity?.Name ?? "system");
+                
+                if (looseSuccess)
+                {
+                    foreach (var item in looseItems)
+                    {
+                        item.IsProcessed = true;
+                        processedCount++;
+                    }
+                }
+            }
+
+            // Process PALLET items
+            if (palletItems.Any())
+            {
+                var palletPreview = new POUploadPreviewViewModel
+                {
+                    FileName = "Batch PALLET Processing",
+                    RawRows = palletItems.Select(item => new RawRow
+                    {
+                        RowId = item.RowNumber,
+                        SheetName = item.SheetName,
+                        ModelCode = item.ModelProduk,
+                        NoPO = item.NoPO,
+                        Destination = item.Destination,
+                        Quantity = item.QtyTotal,
+                        Processed = false
+                    }).ToList()
+                };
+
+                await _groupingService.ApplyMethodAndGroupAsync(palletPreview, "PALLET");
+                var palletSuccess = await _groupingService.CommitAsync(palletPreview, User.Identity?.Name ?? "system");
+                
+                if (palletSuccess)
+                {
+                    foreach (var item in palletItems)
+                    {
+                        item.IsProcessed = true;
+                        processedCount++;
+                    }
+                }
+            }
+
+            await _ctx.SaveChangesAsync();
+
+            return Json(new { 
+                success = true, 
+                message = $"{processedCount} dari {items.Count} item berhasil disimpan ke database.",
+                processedCount = processedCount,
+                totalItems = items.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = $"Error: {ex.Message}" });
+        }
+    }
+}"Error: {ex.Message}" 
+            });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> StoreAllToDatabase(Guid sessionId)
+    {
+        try
+        {
+            // Get all unprocessed items with method selected
+            var items = await _ctx.ExcelUploadItems
+                .Where(x => x.SessionId == sessionId && !x.IsProcessed && !string.IsNullOrEmpty(x.MethodPlanned))
+                .ToListAsync();
+
+            if (!items.Any())
+            {
+                return Json(new { success = false, message = "Tidak ada item yang siap untuk disimpan ke database." });
+            }
+
+            // Validate all items have valid methods
+            foreach (var item in items)
+            {
+                var isSupported = await _modelConfigService.ValidateModelSupportAsync(item.ModelProduk, item.MethodPlanned);
+                if (!isSupported)
+                {
+                    return Json(new { success = false, message = $"Model {item.ModelProduk} tidak mendukung method {item.MethodPlanned}." });
+                }
+            }
+
+            // Group items by method for batch processing
+            var looseItems = items.Where(i => i.MethodPlanned == "LOOSE").ToList();
+            var palletItems = items.Where(i => i.MethodPlanned == "PALLET").ToList();
+
+            int processedCount = 0;
+
+            // Process LOOSE items
+            if (looseItems.Any())
+            {
+                var loosePreview = new POUploadPreviewViewModel
+                {
+                    FileName = "Batch LOOSE Processing",
+                    RawRows = looseItems.Select(item => new RawRow
+                    {
+                        RowId = item.RowNumber,
+                        SheetName = item.SheetName,
+                        ModelCode = item.ModelProduk,
+                        NoPO = item.NoPO,
+                        Destination = item.Destination,
+                        Quantity = item.QtyTotal,
+                        Processed = false
+                    }).ToList()
+                };
+
+                await _groupingService.ApplyMethodAndGroupAsync(loosePreview, "LOOSE");
+                var looseSuccess = await _groupingService.CommitAsync(loosePreview, User.Identity?.Name ?? "system");
+                
+                if (looseSuccess)
+                {
+                    foreach (var item in looseItems)
+                    {
+                        item.IsProcessed = true;
+                        processedCount++;
+                    }
+                }
+            }
+
+            // Process PALLET items
+            if (palletItems.Any())
+            {
+                var palletPreview = new POUploadPreviewViewModel
+                {
+                    FileName = "Batch PALLET Processing",
+                    RawRows = palletItems.Select(item => new RawRow
+                    {
+                        RowId = item.RowNumber,
+                        SheetName = item.SheetName,
+                        ModelCode = item.ModelProduk,
+                        NoPO = item.NoPO,
+                        Destination = item.Destination,
+                        Quantity = item.QtyTotal,
+                        Processed = false
+                    }).ToList()
+                };
+
+                await _groupingService.ApplyMethodAndGroupAsync(palletPreview, "PALLET");
+                var palletSuccess = await _groupingService.CommitAsync(palletPreview, User.Identity?.Name ?? "system");
+                
+                if (palletSuccess)
+                {
+                    foreach (var item in palletItems)
+                    {
+                        item.IsProcessed = true;
+                        processedCount++;
+                    }
+                }
+            }
+
+            await _ctx.SaveChangesAsync();
+
+            return Json(new { 
+                success = true, 
+                message = $"{processedCount} dari {items.Count} item berhasil disimpan ke database.",
+                processedCount = processedCount,
+                totalItems = items.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = $"Error: {ex.Message}" });
+        }
+    }
+    {
+        var session = await _ctx.ExcelUploadSessions
+            .Include(s => s.Items)
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        
+        if (session == null)
+        {
+            return Json(new { success = false, message = "Session tidak ditemukan." });
+        }
+
+        var plannedItems = session.Items
+            .Where(i => !i.IsProcessed && !string.IsNullOrEmpty(i.MethodPlanned))
+            .ToList();
+
+        if (!plannedItems.Any())
+        {
+            return Json(new { success = false, message = "Tidak ada item yang siap diproses." });
+        }
+
+        // Convert to RawRows for processing
+        var rawRows = plannedItems.Select(i => new RawRow
+        {
+            RowId = i.RowNumber,
+            NoPO = i.NoPO,
+            ModelCode = i.ModelProduk,
+            Destination = i.Destination,
+            Quantity = i.QtyTotal,
+            SheetName = i.SheetName, // perbaiki: gunakan sheet name asli, bukan destination
+            Processed = true // Mark as processed for commit
+        }).ToList();
+
+        var preview = new POUploadPreviewViewModel
+        {
+            FileName = session.FileName,
+            RawRows = rawRows
+        };
+
+        // Group by method and process
+        var groupedByMethod = plannedItems.GroupBy(i => i.MethodPlanned);
+        var processedCount = 0;
+
+        foreach (var methodGroup in groupedByMethod)
+        {
+            var methodRows = rawRows.Where(r => plannedItems
+                .Where(i => i.MethodPlanned == methodGroup.Key)
+                .Any(i => i.RowNumber == r.RowId)).ToList();
+
+            var tempPreview = new POUploadPreviewViewModel
+            {
+                FileName = session.FileName,
+                RawRows = methodRows
+            };
+
+            await _groupingService.ApplyMethodAndGroupAsync(tempPreview, methodGroup.Key!);
+            var success = await _groupingService.CommitAsync(tempPreview, User.Identity?.Name ?? "system");
+            
+            if (success)
+            {
+                processedCount += methodRows.Count;
+            }
+        }
+
+        return Json(new { 
+            success = true, 
+            message = $"{processedCount} item berhasil diproses.",
+            processedCount = processedCount
+        });
+    }
+}

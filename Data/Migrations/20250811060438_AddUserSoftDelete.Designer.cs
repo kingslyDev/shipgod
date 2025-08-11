@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShipmentFinishGood.Repositories;
 
@@ -11,9 +12,11 @@ using ShipmentFinishGood.Repositories;
 namespace ShipmentFinishGood.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250811060438_AddUserSoftDelete")]
+    partial class AddUserSoftDelete
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -69,105 +72,6 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.ToTable("BarcodeUnits");
                 });
 
-            modelBuilder.Entity("ShipmentFinishGood.Models.ExcelUploadItem", b =>
-                {
-                    b.Property<int>("ItemId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ItemId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Destination")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<bool>("IsProcessed")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsSelected")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("MethodPlanned")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("ModelProduk")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("NoPO")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int?>("ProcessedPOId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("QtyTotal")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RowNumber")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SessionId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SheetName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.HasKey("ItemId");
-
-                    b.HasIndex("SessionId");
-
-                    b.ToTable("ExcelUploadItems");
-                });
-
-            modelBuilder.Entity("ShipmentFinishGood.Models.ExcelUploadSession", b =>
-                {
-                    b.Property<int>("SessionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SessionId"));
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("ProcessedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ProcessedItems")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("TotalItems")
-                        .HasColumnType("int");
-
-                    b.HasKey("SessionId");
-
-                    b.ToTable("ExcelUploadSessions");
-                });
-
             modelBuilder.Entity("ShipmentFinishGood.Models.GroupBreakdown", b =>
                 {
                     b.Property<int>("ShipmentGroupId")
@@ -208,6 +112,9 @@ namespace ShipmentFinishGood.Data.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
                         .HasColumnType("datetime2");
 
                     b.Property<bool>("IsActive")
@@ -403,17 +310,6 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.Navigation("ShipmentGroup");
                 });
 
-            modelBuilder.Entity("ShipmentFinishGood.Models.ExcelUploadItem", b =>
-                {
-                    b.HasOne("ShipmentFinishGood.Models.ExcelUploadSession", "Session")
-                        .WithMany("Items")
-                        .HasForeignKey("SessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Session");
-                });
-
             modelBuilder.Entity("ShipmentFinishGood.Models.GroupBreakdown", b =>
                 {
                     b.HasOne("ShipmentFinishGood.Models.ShipmentGroup", "ShipmentGroup")
@@ -442,11 +338,6 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.Navigation("PO");
 
                     b.Navigation("ShipmentGroup");
-                });
-
-            modelBuilder.Entity("ShipmentFinishGood.Models.ExcelUploadSession", b =>
-                {
-                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("ShipmentFinishGood.Models.ShipmentGroup", b =>

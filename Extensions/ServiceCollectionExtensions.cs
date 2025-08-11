@@ -29,6 +29,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserService, UserService>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
+    services.AddScoped<IModelConfigService, ModelConfigService>();
+    services.AddScoped<IGroupingService, GroupingService>();
         return services;
     }
 

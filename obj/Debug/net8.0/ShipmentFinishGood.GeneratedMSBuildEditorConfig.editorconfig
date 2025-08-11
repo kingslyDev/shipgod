@@ -34,6 +34,22 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3MvSG9tZS9Qcml2YWN5LmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
+[/Users/ghalyabr/Documents/Projek/shipinggood/shipgod/Views/PO/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUE8vQ3JlYXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipinggood/shipgod/Views/PO/Queue.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUE8vUXVldWUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipinggood/shipgod/Views/PO/_PreviewTable.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUE8vX1ByZXZpZXdUYWJsZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipinggood/shipgod/Views/PO/_UploadForm.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUE8vX1VwbG9hZEZvcm0uY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
 [/Users/ghalyabr/Documents/Projek/shipinggood/shipgod/Views/Shared/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hhcmVkL0Vycm9yLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 

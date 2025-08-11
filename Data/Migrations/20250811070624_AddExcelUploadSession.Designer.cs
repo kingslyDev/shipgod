@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShipmentFinishGood.Repositories;
 
@@ -11,9 +12,11 @@ using ShipmentFinishGood.Repositories;
 namespace ShipmentFinishGood.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250811070624_AddExcelUploadSession")]
+    partial class AddExcelUploadSession
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -77,9 +80,6 @@ namespace ShipmentFinishGood.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ItemId"));
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("Destination")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -90,10 +90,6 @@ namespace ShipmentFinishGood.Data.Migrations
 
                     b.Property<bool>("IsSelected")
                         .HasColumnType("bit");
-
-                    b.Property<string>("MethodPlanned")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("ModelProduk")
                         .IsRequired()
@@ -116,11 +112,6 @@ namespace ShipmentFinishGood.Data.Migrations
 
                     b.Property<int>("SessionId")
                         .HasColumnType("int");
-
-                    b.Property<string>("SheetName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("ItemId");
 
@@ -208,6 +199,9 @@ namespace ShipmentFinishGood.Data.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
                         .HasColumnType("datetime2");
 
                     b.Property<bool>("IsActive")

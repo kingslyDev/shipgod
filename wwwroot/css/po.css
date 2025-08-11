@@ -1,0 +1,19 @@
+#poUpload h2 {
+  font-weight: 600;
+}
+#poUpload table tbody tr:hover {
+  background: #f8f9fa;
+}
+#previewTable .method-group .btn {
+  min-width: 70px;
+}
+#previewTable td,
+#previewTable th {
+  vertical-align: middle;
+}
+#previewCard .card-header {
+  background: #f7f9fb;
+}
+#previewCard .badge {
+  font-size: 0.7rem;
+}

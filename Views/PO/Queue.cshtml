@@ -1,0 +1,103 @@
+@model ShipmentFinishGood.ViewModels.POQueueViewModel
+@{
+    ViewData["Title"] = "Antrian PO Upload";
+}
+<h2 class="mt-3 mb-3">Antrian Upload PO</h2>
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input type="text" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="Cari PO / Model / Dest" />
+    </div>
+    <div class="col-auto">
+        <select name="status" class="form-select form-select-sm">
+            <option value="">Semua Status</option>
+            <option value="pending" selected="@(Model.StatusFilter=="pending"?"selected":null)">Pending</option>
+            <option value="processed" selected="@(Model.StatusFilter=="processed"?"selected":null)">Processed</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <input type="number" name="sessionId" value="@Model.SessionFilter" class="form-control form-control-sm" placeholder="Session" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-sm btn-primary">Filter</button>
+        <a asp-action="Queue" class="btn btn-sm btn-outline-secondary">Reset</a>
+        <a asp-action="Create" class="btn btn-sm btn-success">Upload Baru</a>
+    </div>
+</form>
+<div class="table-responsive">
+<table class="table table-sm table-bordered align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>Session</th>
+            <th>Row</th>
+            <th>No PO</th>
+            <th>Model</th>
+            <th>Dest</th>
+            <th>Sheet</th>
+            <th class="text-end">Qty</th>
+            <th>Method</th>
+            <th>Status</th>
+            <th>File</th>
+            <th>Uploaded</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @if (Model.Items.Any())
+    {
+        foreach (var it in Model.Items)
+        {
+            <tr class="@(it.IsProcessed?"table-success":"")">
+                <td>@it.SessionId</td>
+                <td>@it.RowNumber</td>
+                <td>@it.NoPO</td>
+                <td>@it.ModelCode</td>
+                <td>@it.Destination</td>
+                <td>@it.SheetName</td>
+                <td class="text-end">@it.Quantity</td>
+                <td>
+                    @if (!string.IsNullOrEmpty(it.MethodPlanned))
+                    {
+                        <span class="badge bg-info">@it.MethodPlanned</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">-</span>
+                    }
+                </td>
+                <td>
+                    @if (it.IsProcessed)
+                    {
+                        <span class="badge bg-success">✓ Processed</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning">Pending</span>
+                    }
+                </td>
+                <td>@it.FileName</td>
+                <td>@it.UploadedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                <td><a asp-action="Create" asp-route-sessionId="@it.SessionId" class="btn btn-sm btn-outline-primary">Preview</a></td>
+            </tr>
+        }
+    }
+    else
+    {
+        <tr><td colspan="12" class="text-center text-muted">Tidak ada data.</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+@if (Model.TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination pagination-sm">
+            @for (int p=1; p<=Model.TotalPages; p++)
+            {
+                var active = p==Model.Page?"active":"";
+                <li class="page-item @active">
+                    <a class="page-link" href="?page=@p&pageSize=@Model.PageSize&status=@Model.StatusFilter&search=@Model.Search&sessionId=@Model.SessionFilter">@p</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}

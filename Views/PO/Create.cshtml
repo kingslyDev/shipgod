@@ -1,0 +1,17 @@
+@using ShipmentFinishGood.ViewModels
+@model POUploadViewModel
+@{
+  ViewData["Title"] = "Upload PO";
+  var preview = ViewBag.Preview as POUploadPreviewViewModel;
+  var sessionItems = ViewBag.SessionItems as List<ShipmentFinishGood.Models.ExcelUploadItem> ?? new List<ShipmentFinishGood.Models.ExcelUploadItem>();
+  if(ViewBag.SessionId==null && Model.SessionId!=null){ ViewBag.SessionId = Model.SessionId; }
+}
+<div id="poUpload" class="container mt-4">
+  <h2 class="mb-3">Upload PO</h2>
+  @await Html.PartialAsync("_UploadForm", Model)
+  @if(preview!=null){ @await Html.PartialAsync("_PreviewTable", (preview, sessionItems)) }
+</div>
+
+@section Scripts {
+  <script src="~/js/po-upload.js"></script>
+}
