@@ -1,0 +1,32 @@
+@using ShipmentFinishGood.Domain;
+@{
+    ViewData["Title"] = "Create User";
+}
+<h2>Create User</h2>
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input name="username" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Nama</label>
+        <input name="name" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Role</label>
+        <select name="role" class="form-select">
+            @foreach(var r in Enum.GetValues(typeof(UserRole))){
+                <option value="@r">@r</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Simpan</button>
+    <a asp-action="Index" class="btn btn-secondary">Batal</a>
+</form>
+@if(!ViewData.ModelState.IsValid){
+    <div class="text-danger mt-2">@string.Join("; ", ViewData.ModelState.Values.SelectMany(v=>v.Errors).Select(e=>e.ErrorMessage))</div>
+}

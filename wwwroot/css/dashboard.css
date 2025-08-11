@@ -1,0 +1,388 @@
+/* Dashboard Styles - Formal Design for Baby Boomers & Millennials */
+.dashboard-wrapper {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%);
+  min-height: calc(100vh - 120px);
+  padding: 2rem 0 3rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Welcome Section */
+.welcome-section {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border: 2px solid #e3f2fd;
+  border-radius: 15px;
+  padding: 2.5rem;
+  box-shadow: 0 8px 25px rgba(0, 123, 255, 0.15);
+  margin-bottom: 2rem;
+  transition: all 0.3s ease;
+}
+
+.welcome-section:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(0, 123, 255, 0.2);
+}
+
+.welcome-title {
+  color: #2c3e50;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-title i {
+  color: #007bff;
+  font-size: 2rem;
+}
+
+.welcome-subtitle {
+  color: #6c757d;
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.role-badge {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 25px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+}
+
+.welcome-clock {
+  background: rgba(0, 123, 255, 0.1);
+  border: 2px solid #007bff;
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  text-align: center;
+  box-shadow: inset 0 2px 8px rgba(0, 123, 255, 0.1);
+}
+
+.clock-time {
+  font-family: 'Courier New', monospace;
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #007bff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Section Headers */
+.section-title {
+  color: #2c3e50;
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.section-title i {
+  color: #007bff;
+  margin-right: 0.5rem;
+}
+
+.section-divider {
+  width: 100px;
+  height: 3px;
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  border: none;
+  border-radius: 3px;
+  margin: 0 auto 2rem;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+/* Action Cards - Centered and Formal */
+.action-card {
+  background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+  border: 2px solid #e3f2fd;
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  min-height: 380px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.08);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.action-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.action-card:hover::before {
+  transform: scaleX(1);
+}
+
+.action-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 123, 255, 0.15);
+  border-color: #007bff;
+}
+
+.action-card:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+/* Card Icons */
+.card-icon-wrapper {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.card-icon {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.card-icon i {
+  font-size: 2.5rem;
+  color: white;
+  z-index: 3;
+  position: relative;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.card-icon::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: inherit;
+  border-radius: 50%;
+  transform: scale(0);
+  transition: transform 0.2s ease;
+  z-index: 1;
+}
+
+.action-card:hover .card-icon::before {
+  transform: scale(1.05);
+}
+
+.scan-icon {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.input-icon {
+  background: linear-gradient(135deg, #17a2b8 0%, #007bff 100%);
+}
+
+.list-icon {
+  background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);
+}
+
+/* Admin Section Icons */
+.admin-card .card-icon {
+  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+}
+
+.user-card .card-icon {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+/* Card Content */
+.card-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.5rem;
+}
+
+.card-title {
+  color: #2c3e50;
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+}
+
+.card-text {
+  color: #6c757d;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  font-weight: 400;
+  text-align: center;
+}
+
+/* Buttons */
+.btn-vibrant {
+  padding: 0.9rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 50px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  min-width: 160px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.btn-vibrant::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: left 0.3s;
+}
+
+.btn-vibrant:hover::before {
+  left: 100%;
+}
+
+.btn-vibrant:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary.btn-vibrant {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: white;
+}
+
+.btn-success.btn-vibrant {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+}
+
+.btn-info.btn-vibrant {
+  background: linear-gradient(135deg, #17a2b8 0%, #007bff 100%);
+  color: white;
+}
+
+/* Responsive Design for Accessibility */
+@media (max-width: 1200px) {
+  .action-card {
+    min-height: 350px;
+    padding: 2rem 1.5rem;
+  }
+
+  .welcome-title {
+    font-size: 1.9rem;
+  }
+
+  .card-icon {
+    width: 80px;
+    height: 80px;
+    font-size: 2.2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-wrapper {
+    padding: 1.5rem 0;
+  }
+
+  .welcome-section {
+    padding: 2rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .welcome-title {
+    font-size: 1.6rem;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .welcome-subtitle {
+    text-align: center;
+    font-size: 1rem;
+  }
+
+  .welcome-clock {
+    margin-top: 1rem;
+  }
+
+  .action-card {
+    min-height: 320px;
+    padding: 1.8rem 1.2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-title {
+    font-size: 1.2rem;
+  }
+
+  .card-text {
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn-vibrant {
+    padding: 0.8rem 1.5rem;
+    font-size: 0.9rem;
+    min-width: 140px;
+  }
+}
+
+/* High Contrast Mode for Accessibility */
+@media (prefers-contrast: high) {
+  .action-card {
+    border: 3px solid #000;
+    background: #fff;
+  }
+
+  .card-title,
+  .welcome-title {
+    color: #000;
+  }
+
+  .card-text,
+  .welcome-subtitle {
+    color: #333;
+  }
+}
+
+/* Reduced Motion for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .action-card,
+  .btn-vibrant,
+  .card-icon,
+  .welcome-section {
+    transition: none;
+  }
+
+  .action-card:hover {
+    transform: none;
+  }
+}

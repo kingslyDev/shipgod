@@ -1,0 +1,64 @@
+using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using ShipmentFinishGood.Repositories;
+using ShipmentFinishGood.Services;
+
+namespace ShipmentFinishGood.Extensions;
+
+public static class ServiceCollectionExtensions
+{
+    private const string CookieScheme = "app_cookie";
+
+    public static IServiceCollection AddPresentationLayer(this IServiceCollection services)
+    {
+        services.AddControllersWithViews();
+        return services;
+    }
+
+    public static IServiceCollection AddPersistenceLayer(this IServiceCollection services, IConfiguration config)
+    {
+        services.AddDbContext<AppDbContext>(opt =>
+            opt.UseSqlServer(config.GetConnectionString("DefaultConnection")));
+        return services;
+    }
+
+    public static IServiceCollection AddDomainServices(this IServiceCollection services)
+    {
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        return services;
+    }
+
+    public static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration config)
+    {
+        var key = config["Jwt:Key"] ?? "dev-secret-key-change"; // TODO secure
+        services.AddAuthentication(CookieScheme)
+            .AddCookie(CookieScheme, opt =>
+            {
+                opt.LoginPath = "/Auth/Login";
+                opt.AccessDeniedPath = "/Auth/Denied";
+            })
+            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+                    ClockSkew = TimeSpan.FromMinutes(2)
+                };
+            });
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy("RequireAdmin", p => p.RequireRole("Admin"));
+            options.AddPolicy("RequireScanner", p => p.RequireRole("Scanner","Admin","Manajemen"));
+            options.AddPolicy("RequireInputer", p => p.RequireRole("Inputer","Admin","Manajemen"));
+            options.AddPolicy("RequireManajemen", p => p.RequireRole("Manajemen","Admin"));
+        });
+        return services;
+    }
+}

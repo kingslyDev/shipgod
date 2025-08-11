@@ -1,0 +1,236 @@
+﻿@model ShipmentFinishGood.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard - Sistem Informasi Pengiriman";
+    var role = Model.Role?.ToLowerInvariant();
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
+    <style>
+        /* Icon Fix untuk memastikan FontAwesome icons terlihat */
+        .card-icon i.fas {
+            font-family: "Font Awesome 6 Free" !important;
+            font-weight: 900 !important;
+            font-size: 2.5rem !important;
+            color: white !important;
+            display: inline-block !important;
+            text-rendering: auto !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            z-index: 10 !important;
+            position: relative !important;
+        }
+        
+        .card-icon i.fas::before {
+            display: inline-block !important;
+            text-decoration: inherit !important;
+            width: auto !important;
+            margin: 0 !important;
+        }
+        
+        /* Fallback jika FontAwesome tidak load */
+        .card-icon i.fas:not([class*="fa-"]):before {
+            content: "⚡" !important;
+            font-family: system-ui !important;
+        }
+    </style>
+}
+
+<div class="dashboard-wrapper">
+    <div class="container">
+        <!-- Welcome Section -->
+        <div class="row justify-content-center mb-5">
+            <div class="col-lg-10">
+                <div class="welcome-section">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="welcome-title mb-2">
+                                <i class="fas fa-tachometer-alt me-3"></i>
+                                Selamat Datang, @Model.Username
+                            </h2>
+                            <p class="welcome-subtitle mb-0">
+                                <span class="badge role-badge me-3">@Model.Role</span>
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                @DateTime.Now.ToString("dddd, dd MMMM yyyy", new System.Globalization.CultureInfo("id-ID"))
+                            </p>
+                        </div>
+                        <div class="welcome-clock">
+                            <i class="fas fa-clock me-2"></i>
+                            <span id="welcomeClockDisplay" class="clock-time">00:00:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @await Html.PartialAsync("_Alerts", Model)
+
+        @* Main Action Cards *@
+        @if (new[]{"admin","scanner","inputer","manajemen"}.Contains(role)) 
+        {
+            <div class="row justify-content-center mb-5">
+                <div class="col-12 text-center mb-4">
+                    <h3 class="section-title">
+                        <i class="fas fa-tasks me-2"></i>Menu Utama
+                    </h3>
+                    <hr class="section-divider">
+                </div>
+                
+                <div class="col-lg-10">
+                    <div class="row justify-content-center">
+                        @if (new[]{"admin","scanner","manajemen"}.Contains(role)) 
+                        {
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="action-card scan-card">
+                                    <div class="card-icon-wrapper">
+                                        <div class="card-icon scan-icon">
+                                            <i class="fas fa-barcode" style="font-size: 2.5rem; color: white; font-weight: 900;"></i>
+                                        </div>
+                                    </div>
+                                    <div class="card-content">
+                                        <h5 class="card-title">
+                                            <i class="fas fa-qrcode me-2"></i>Scan Barang
+                                        </h5>
+                                        <p class="card-text">Lacak dan verifikasi pengiriman dengan memindai barcode barang secara real-time untuk monitoring yang akurat.</p>
+                                        <a asp-controller="Scan" asp-action="Index" class="btn btn-primary btn-vibrant">
+                                            <i class="fas fa-play me-2"></i>Mulai Scan
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        
+                        @if (new[]{"admin","inputer","manajemen"}.Contains(role)) 
+                        {
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="action-card input-card">
+                                    <div class="card-icon-wrapper">
+                                        <div class="card-icon input-icon">
+                                            <i class="fas fa-file-invoice" style="font-size: 2.5rem; color: white; font-weight: 900;"></i>
+                                        </div>
+                                    </div>
+                                    <div class="card-content">
+                                        <h5 class="card-title">
+                                            <i class="fas fa-plus-circle me-2"></i>Input PO Manual
+                                        </h5>
+                                        <p class="card-text">Tambahkan Purchase Order baru ke sistem secara manual dengan validasi lengkap dan sistem tracking terintegrasi.</p>
+                                        <a asp-controller="PO" asp-action="Create" class="btn btn-success btn-vibrant">
+                                            <i class="fas fa-plus me-2"></i>Input PO
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="action-card list-card">
+                                    <div class="card-icon-wrapper">
+                                        <div class="card-icon list-icon">
+                                            <i class="fas fa-shipping-fast" style="font-size: 2.5rem; color: white; font-weight: 900;"></i>
+                                        </div>
+                                    </div>
+                                    <div class="card-content">
+                                        <h5 class="card-title">
+                                            <i class="fas fa-list-ul me-2"></i>Kelola Shipping
+                                        </h5>
+                                        <p class="card-text">Tinjau, kelola, dan monitor status semua Purchase Order dalam sistem dengan dashboard komprehensif.</p>
+                                        <a asp-controller="PO" asp-action="Index" class="btn btn-info btn-vibrant">
+                                            <i class="fas fa-list me-2"></i>Lihat Shipping
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* Admin Special Section *@
+        @if (role == "admin") 
+        {
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h4 class="text-primary mb-3">
+                        <i class="fas fa-crown me-2"></i>Panel Administrator
+                    </h4>
+                </div>
+                
+                <div class="col-lg-6 col-md-6 mb-4">
+                    <div class="action-card admin-card h-100">
+                        <div class="card-icon-wrapper">
+                            <div class="card-icon">
+                                <i class="fas fa-cogs" style="font-size: 2.5rem; color: white; font-weight: 900;"></i>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <h5 class="card-title">Panel Admin</h5>
+                            <p class="card-text">Kelola pengaturan sistem, konfigurasi, dan data master aplikasi.</p>
+                            <a asp-controller="Admin" asp-action="Index" class="btn btn-secondary btn-vibrant">
+                                <i class="fas fa-cogs me-2"></i>Panel Admin
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 col-md-6 mb-4">
+                    <div class="action-card user-card h-100">
+                        <div class="card-icon-wrapper">
+                            <div class="card-icon">
+                                <i class="fas fa-user-plus" style="font-size: 2.5rem; color: white; font-weight: 900;"></i>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <h5 class="card-title">Kelola Pengguna</h5>
+                            <p class="card-text">Tambahkan pengguna baru dan kelola akses sistem untuk tim Anda.</p>
+                            <a asp-controller="Users" asp-action="Create" class="btn btn-primary btn-vibrant">
+                                <i class="fas fa-user-plus me-2"></i>Buat Pengguna
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* No Access Message *@
+        @if (string.IsNullOrWhiteSpace(role) || !new[]{"admin","scanner","inputer","manajemen"}.Contains(role))
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                        <h4>Akses Terbatas</h4>
+                        <p class="mb-0">Anda tidak memiliki akses ke fitur dashboard. Silakan hubungi administrator untuk informasi lebih lanjut.</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/dashboard.js" asp-append-version="true"></script>
+    
+    <script>
+        // Initialize welcome clock when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            function updateWelcomeClock() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('id-ID', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                
+                const welcomeClockElement = document.getElementById('welcomeClockDisplay');
+                if (welcomeClockElement) {
+                    welcomeClockElement.textContent = timeString;
+                }
+            }
+            
+            // Update immediately and then every second
+            updateWelcomeClock();
+            setInterval(updateWelcomeClock, 1000);
+        });
+    </script>
+}

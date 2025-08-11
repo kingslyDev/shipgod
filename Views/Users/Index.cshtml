@@ -1,0 +1,30 @@
+@model IEnumerable<ShipmentFinishGood.Models.User>
+@using ShipmentFinishGood.Domain;
+@{
+    ViewData["Title"] = "Users";
+}
+<h2>Users</h2>
+<p><a class="btn btn-sm btn-primary" asp-action="Create">Tambah User</a></p>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Nama</th>
+            <th>Role</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach(var u in Model){
+        <tr>
+            <td>@u.Username</td>
+            <td>@u.Name</td>
+            <td>@u.Role</td>
+            <td>
+                <a asp-action="Edit" asp-route-id="@u.UserId">Edit</a> |
+                <a asp-action="Delete" asp-route-id="@u.UserId">Hapus</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

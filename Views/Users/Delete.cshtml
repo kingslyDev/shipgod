@@ -1,0 +1,10 @@
+@model ShipmentFinishGood.Models.User
+@{
+    ViewData["Title"] = "Delete User";
+}
+<h2>Hapus User</h2>
+<p>Yakin ingin menghapus user <strong>@Model.Username</strong>?</p>
+<form method="post">
+    <button class="btn btn-danger" type="submit">Hapus</button>
+    <a asp-action="Index" class="btn btn-secondary">Batal</a>
+</form>

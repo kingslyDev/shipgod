@@ -1,0 +1,30 @@
+@model ShipmentFinishGood.Models.User
+@using ShipmentFinishGood.Domain;
+@{
+    ViewData["Title"] = "Edit User";
+}
+<h2>Edit User</h2>
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input value="@Model.Username" class="form-control" disabled />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password (kosongkan bila tidak ganti)</label>
+        <input type="password" name="password" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Nama</label>
+        <input name="name" value="@Model.Name" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Role</label>
+        <select name="role" class="form-select">
+            @foreach(var r in Enum.GetValues(typeof(UserRole))){
+                <option value="@r" selected="@(r.Equals(Model.Role) ? "selected" : null)">@r</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Simpan</button>
+    <a asp-action="Index" class="btn btn-secondary">Batal</a>
+</form>
