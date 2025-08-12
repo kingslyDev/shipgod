@@ -6,34 +6,6 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
-    <style>
-        /* Icon Fix untuk memastikan FontAwesome icons terlihat */
-        .card-icon i.fas {
-            font-family: "Font Awesome 6 Free" !important;
-            font-weight: 900 !important;
-            font-size: 2.5rem !important;
-            color: white !important;
-            display: inline-block !important;
-            text-rendering: auto !important;
-            -webkit-font-smoothing: antialiased !important;
-            -moz-osx-font-smoothing: grayscale !important;
-            z-index: 10 !important;
-            position: relative !important;
-        }
-        
-        .card-icon i.fas::before {
-            display: inline-block !important;
-            text-decoration: inherit !important;
-            width: auto !important;
-            margin: 0 !important;
-        }
-        
-        /* Fallback jika FontAwesome tidak load */
-        .card-icon i.fas:not([class*="fa-"]):before {
-            content: "⚡" !important;
-            font-family: system-ui !important;
-        }
-    </style>
 }
 
 <div class="dashboard-wrapper">
@@ -154,8 +126,7 @@
                         <i class="fas fa-crown me-2"></i>Panel Administrator
                     </h4>
                 </div>
-                
-                <div class="col-lg-6 col-md-6 mb-4">
+                <div class="col-lg-4 col-md-6 mb-4">
                     <div class="action-card admin-card h-100">
                         <div class="card-icon-wrapper">
                             <div class="card-icon">
@@ -171,8 +142,7 @@
                         </div>
                     </div>
                 </div>
-                
-                <div class="col-lg-6 col-md-6 mb-4">
+                <div class="col-lg-4 col-md-6 mb-4">
                     <div class="action-card user-card h-100">
                         <div class="card-icon-wrapper">
                             <div class="card-icon">
@@ -184,6 +154,22 @@
                             <p class="card-text">Tambahkan pengguna baru dan kelola akses sistem untuk tim Anda.</p>
                             <a asp-controller="Users" asp-action="Index" class="btn btn-primary btn-vibrant">
                                 <i class="fas fa-user-plus me-2"></i>Buat Pengguna
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="action-card model-card h-100">
+                        <div class="card-icon-wrapper">
+                            <div class="card-icon">
+                                <i class="fas fa-cubes" style="font-size: 2.5rem; color: white; font-weight: 900;"></i>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <h5 class="card-title">Kelola Model</h5>
+                            <p class="card-text">Atur konfigurasi model, jumlah pcs/pallet, dan tipe pengiriman dengan mudah.</p>
+                            <a asp-controller="ModelConfigurations" asp-action="Index" class="btn btn-info btn-vibrant">
+                                <i class="fas fa-cubes me-2"></i>Kelola Model
                             </a>
                         </div>
                     </div>
@@ -209,28 +195,5 @@
 
 @section Scripts {
     <script src="~/js/dashboard.js" asp-append-version="true"></script>
-    
-    <script>
-        // Initialize welcome clock when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            function updateWelcomeClock() {
-                const now = new Date();
-                const timeString = now.toLocaleTimeString('id-ID', {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                });
-                
-                const welcomeClockElement = document.getElementById('welcomeClockDisplay');
-                if (welcomeClockElement) {
-                    welcomeClockElement.textContent = timeString;
-                }
-            }
-            
-            // Update immediately and then every second
-            updateWelcomeClock();
-            setInterval(updateWelcomeClock, 1000);
-        });
-    </script>
+
 }

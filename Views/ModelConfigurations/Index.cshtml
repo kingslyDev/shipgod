@@ -1,0 +1,39 @@
+@model IEnumerable<ShipmentFinishGood.Models.ModelConfiguration>
+@{
+    ViewData["Title"] = "Kelola Model";
+}
+<div class="container py-4">
+    <h2 class="mb-4 text-primary"><i class="fas fa-cubes me-2"></i>Kelola Model Konfigurasi</h2>
+    <a asp-action="Create" class="btn btn-success mb-3"><i class="fas fa-plus me-2"></i>Tambah Model</a>
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle bg-white">
+            <thead class="table-light">
+                <tr>
+                    <th>Model</th>
+                    <th>Pcs/Pallet</th>
+                    <th>Pcs/Box</th>
+                    <th>Type</th>
+                    <th>Deskripsi</th>
+                    <th style="width:160px">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.ModelName</td>
+                    <td>@item.PcsPerPallet</td>
+                    <td>@item.PcsPerBox</td>
+                    <td><span class="badge bg-@((item.Type=="PALLET"?"primary":"secondary"))">@item.Type</span></td>
+                    <td>@item.Description</td>
+                    <td>
+                        <a asp-action="Edit" asp-route-id="@item.ConfigId" class="btn btn-warning btn-sm me-1"><i class="fas fa-edit"></i></a>
+                        <a asp-action="Details" asp-route-id="@item.ConfigId" class="btn btn-info btn-sm me-1"><i class="fas fa-eye"></i></a>
+                        <a asp-action="Delete" asp-route-id="@item.ConfigId" class="btn btn-danger btn-sm" onclick="return confirm('Yakin hapus model ini?')"><i class="fas fa-trash"></i></a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

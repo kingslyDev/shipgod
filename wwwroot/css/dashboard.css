@@ -6,6 +6,33 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* Icon Fix untuk memastikan FontAwesome icons terlihat */
+.card-icon i.fas {
+  font-family: 'Font Awesome 6 Free' !important;
+  font-weight: 900 !important;
+  font-size: 2.5rem !important;
+  color: white !important;
+  display: inline-block !important;
+  text-rendering: auto !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  z-index: 10 !important;
+  position: relative !important;
+}
+
+.card-icon i.fas::before {
+  display: inline-block !important;
+  text-decoration: inherit !important;
+  width: auto !important;
+  margin: 0 !important;
+}
+
+/* Fallback jika FontAwesome tidak load */
+.card-icon i.fas:not([class*='fa-']):before {
+  content: '⚡' !important;
+  font-family: system-ui !important;
+}
+
 /* Welcome Section */
 .welcome-section {
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);

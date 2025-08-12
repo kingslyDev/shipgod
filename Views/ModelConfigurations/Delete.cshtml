@@ -1,0 +1,13 @@
+@model ShipmentFinishGood.Models.ModelConfiguration
+@{
+    ViewData["Title"] = "Hapus Model";
+}
+<div class="container py-4">
+    <h2 class="mb-4 text-danger"><i class="fas fa-trash me-2"></i>Hapus Model Konfigurasi</h2>
+    <form asp-action="Delete" method="post">
+        <input type="hidden" asp-for="ConfigId" />
+        <div class="alert alert-danger">Yakin ingin menghapus model <strong>@Model.ModelName</strong>?</div>
+        <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-2"></i>Hapus</button>
+        <a asp-action="Index" class="btn btn-secondary ms-2">Batal</a>
+    </form>
+</div>

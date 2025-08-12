@@ -1,0 +1,48 @@
+@model ShipmentFinishGood.Models.ModelConfiguration
+@{
+    ViewData["Title"] = "Edit Model";
+}
+<div class="container py-4">
+    <h2 class="mb-4 text-warning"><i class="fas fa-edit me-2"></i>Edit Model Konfigurasi</h2>
+    <form asp-action="Edit" method="post" class="needs-validation" novalidate>
+        <input type="hidden" asp-for="ConfigId" />
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label asp-for="ModelName" class="form-label">Model</label>
+                <input asp-for="ModelName" class="form-control" required />
+                <span asp-validation-for="ModelName" class="text-danger"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="PcsPerPallet" class="form-label">Pcs/Pallet</label>
+                <input asp-for="PcsPerPallet" class="form-control" type="number" min="1" required />
+                <span asp-validation-for="PcsPerPallet" class="text-danger"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="PcsPerBox" class="form-label">Pcs/Box</label>
+                <input asp-for="PcsPerBox" class="form-control" type="number" min="1" required />
+                <span asp-validation-for="PcsPerBox" class="text-danger"></span>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label asp-for="Type" class="form-label">Type</label>
+                <select asp-for="Type" class="form-select" required>
+                    <option value="">- Pilih -</option>
+                    <option value="LOOSE">LOOSE</option>
+                    <option value="PALLET">PALLET</option>
+                </select>
+                <span asp-validation-for="Type" class="text-danger"></span>
+            </div>
+            <div class="col-md-8">
+                <label asp-for="Description" class="form-label">Deskripsi</label>
+                <input asp-for="Description" class="form-control" />
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-warning"><i class="fas fa-save me-2"></i>Update</button>
+        <a asp-action="Index" class="btn btn-secondary ms-2">Batal</a>
+    </form>
+</div>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

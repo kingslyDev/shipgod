@@ -22,6 +22,471 @@ namespace ShipmentFinishGood.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("ShipmentFinishGood.Models.ModelConfiguration", b =>
+                {
+                    b.Property<int>("ConfigId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConfigId"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PcsPerBox")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PcsPerPallet")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ConfigId");
+
+                    b.ToTable("ModelConfigurations");
+
+                    b.HasData(
+                        new
+                        {
+                            ConfigId = 1,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-D10EB-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 192,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 2,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-D10EG-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 192,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 3,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-D10EG-W",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 192,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 4,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-D10GN-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 192,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 5,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "R-2255-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 6,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2450-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 7,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DEB-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 8,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DEE-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 9,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DEG-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 10,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DGN-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 11,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DGT-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 12,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DPC-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 13,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DP-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 14,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DP-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 15,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-2400DLJ-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 240,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 16,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P155-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 800,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 17,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P55-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 800,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 18,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P150DEG-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 800,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 19,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P150DGC-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 800,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 20,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P150DGT-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 800,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 21,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P150DBAGA",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 800,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 22,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P50DGC-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 23,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P50DGC-R",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 24,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P50DEG-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 25,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P50DLJ-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 26,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P50DPR-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 27,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-P50DPP-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 28,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-562DDGC-K",
+                            PcsPerBox = 5,
+                            PcsPerPallet = 350,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 29,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-U156-S",
+                            PcsPerBox = 6,
+                            PcsPerPallet = 450,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 30,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-NA35R-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 31,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-NA35R",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1000,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 32,
+                            Description = "LOOSE (Pengiriman tanpa palet)",
+                            ModelName = "RF-5270LJ-K",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 600,
+                            Type = "LOOSE"
+                        },
+                        new
+                        {
+                            ConfigId = 33,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-562DDGC-K",
+                            PcsPerBox = 5,
+                            PcsPerPallet = 210,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 34,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-P150DGC-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1600,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 35,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-P150DEG-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1600,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 36,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-P50DGC-R",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1600,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 37,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-P50DEG-S",
+                            PcsPerBox = 20,
+                            PcsPerPallet = 1200,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 38,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-D10EG-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 144,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 39,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-D10GN-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 126,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 40,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2450-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 41,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "R-2255-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 42,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2400DPC-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 43,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2400DP-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 44,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2400DP-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 45,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2400DEE-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 46,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2400DEG-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 47,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2400DGN-S",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        },
+                        new
+                        {
+                            ConfigId = 48,
+                            Description = "PALLET (Pengiriman dengan palet)",
+                            ModelName = "RF-2400DEB-K",
+                            PcsPerBox = 3,
+                            PcsPerPallet = 216,
+                            Type = "PALLET"
+                        });
+                });
+
             modelBuilder.Entity("ShipmentFinishGood.Models.User", b =>
                 {
                     b.Property<int>("UserId")

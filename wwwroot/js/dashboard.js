@@ -7,6 +7,27 @@
     addRippleCSS();
   });
 
+  document.addEventListener('DOMContentLoaded', function () {
+    function updateWelcomeClock() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('id-ID', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+
+      const welcomeClockElement = document.getElementById('welcomeClockDisplay');
+      if (welcomeClockElement) {
+        welcomeClockElement.textContent = timeString;
+      }
+    }
+
+    // Update immediately and then every second
+    updateWelcomeClock();
+    setInterval(updateWelcomeClock, 1000);
+  });
+
   function initializeDashboard() {
     initializeAlerts();
     initializeActionCards();

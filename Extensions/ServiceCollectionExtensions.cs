@@ -26,9 +26,11 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddDomainServices(this IServiceCollection services)
     {
-        services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<IUserService, UserService>();
-        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+    services.AddScoped<IUserRepository, UserRepository>();
+    services.AddScoped<IUserService, UserService>();
+    services.AddScoped<IModelConfigurationRepository, ModelConfigurationRepository>();
+    services.AddScoped<IModelConfigurationService, ModelConfigurationService>();
+    services.AddSingleton<IJwtTokenService, JwtTokenService>();
         return services;
     }
 
