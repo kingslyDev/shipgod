@@ -11,5 +11,6 @@ namespace ShipmentFinishGood.Services
         Task<UploadPreviewDto?> GetPreviewAsync(int sessionId);
         Task<bool> UpdatePODataAsync(int poId, ProcessedPOData updatedData);
         Task<List<POMaster>> GetPOMastersBySessionAsync(int sessionId);
+        Task<List<POSessionSummaryDto>> GetAllPOSessionsAsync();
     }
 }

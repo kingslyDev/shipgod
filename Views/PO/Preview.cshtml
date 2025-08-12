@@ -1,55 +1,102 @@
 @model ShipmentFinishGood.DTOs.UploadPreviewDto
 @{
-    ViewData["Title"] = "Preview Data PO";
+    ViewData["Title"] = "Periksa Data PO";
 }
 
-<div class="container-fluid py-4">
-    <h2 class="mb-4 text-info">
-        <i class="fas fa-eye me-2"></i>Preview Data PO - @Model.FileName
-    </h2>
+@section Styles {
+    <link rel="stylesheet" href="~/css/po.css" asp-append-version="true" />
+}
+
+<div class="main-container">
+    <!-- Enhanced Header -->
+    <div class="page-header">
+        <h1>
+            <i class="fas fa-clipboard-check"></i>
+            Periksa Data Sebelum Disimpan
+        </h1>
+        <p class="subtitle">
+            📁 File: <strong>@Model.FileName</strong> | Pastikan semua data sudah benar sebelum melanjutkan
+        </p>
+    </div>
+
+    <!-- Enhanced Breadcrumb -->
+    <nav class="breadcrumb-enhanced" aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="@Url.Action("Index", "Home")">🏠 Beranda</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="@Url.Action("Index", "PO")">📋 Daftar PO</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="@Url.Action("Create", "PO")">📤 Upload Data</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">👀 Periksa Data</li>
+        </ol>
+    </nav>
+
+    <!-- Progress Wizard -->
+    <div class="progress-wizard">
+        <div class="progress-step completed">
+            <div class="step-circle">✓</div>
+            <div class="step-label">Upload File</div>
+        </div>
+        <div class="progress-step active">
+            <div class="step-circle">2</div>
+            <div class="step-label">Periksa Data</div>
+        </div>
+        <div class="progress-step">
+            <div class="step-circle">3</div>
+            <div class="step-label">Selesai</div>
+        </div>
+    </div>
 
     <form id="submitForm" asp-action="Submit" method="post">
         <input type="hidden" name="SessionId" value="@Model.SessionId" />
         
-        <!-- Mode Selection & Settings -->
-        <div class="row mb-4">
+        <!-- Settings Section -->
+        <div class="row">
             <div class="col-lg-6">
-                <div class="card border-primary">
-                    <div class="card-header bg-primary text-white">
-                        <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Pengaturan Shipment</h6>
+                <div class="settings-card">
+                    <div class="card-header-enhanced">
+                        <i class="fas fa-cogs me-2"></i>Pengaturan Shipment
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Mode Shipment</label>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="ShipmentType" id="modeLoose" value="LOOSE" checked>
-                                    <label class="form-check-label" for="modeLoose">
-                                        <i class="fas fa-boxes me-2"></i>LOOSE (Gabung per Model)
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="ShipmentType" id="modePallet" value="PALLET">
-                                    <label class="form-check-label" for="modePallet">
-                                        <i class="fas fa-pallet me-2"></i>PALLET (Gabung per PO + Model)
-                                    </label>
-                                </div>
+                    <div class="card-body-enhanced">
+                        <div class="mb-4">
+                            <label class="form-label-enhanced">Mode Shipment</label>
+                            <div class="radio-option" onclick="selectRadio('modeLoose')">
+                                <input class="form-check-input" type="radio" name="ShipmentType" id="modeLoose" value="LOOSE" checked>
+                                <label for="modeLoose">
+                                    <i class="fas fa-boxes me-2"></i>LOOSE (Gabung per Model)
+                                    <br><small class="text-muted">Menggabungkan produk berdasarkan model yang sama</small>
+                                </label>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Tanggal Shipment</label>
-                                <input type="date" name="ShipmentDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                            <div class="radio-option" onclick="selectRadio('modePallet')">
+                                <input class="form-check-input" type="radio" name="ShipmentType" id="modePallet" value="PALLET">
+                                <label for="modePallet">
+                                    <i class="fas fa-pallet me-2"></i>PALLET (Gabung per PO + Model)
+                                    <br><small class="text-muted">Menggabungkan berdasarkan PO dan model</small>
+                                </label>
                             </div>
                         </div>
+                        
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Prefix Pallet</label>
-                                <input type="text" name="PalletPrefix" class="form-control" placeholder="AA" maxlength="5">
-                                <div class="form-text">Prefix untuk barcode pallet (opsional)</div>
+                                <label class="form-label-enhanced" for="shipmentDate">Tanggal Shipment</label>
+                                <input type="date" id="shipmentDate" name="ShipmentDate" class="form-control-enhanced" value="@DateTime.Today.ToString("yyyy-MM-dd")" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Prefix PCS</label>
-                                <input type="text" name="PcsPrefix" class="form-control" placeholder="AB" maxlength="5">
-                                <div class="form-text">Prefix untuk barcode PCS (opsional)</div>
+                                <label class="form-label-enhanced" for="palletPrefix">Prefix Pallet</label>
+                                <input type="text" id="palletPrefix" name="PalletPrefix" class="form-control-enhanced" placeholder="Contoh: AA" maxlength="5">
+                                <small class="text-muted">Prefix untuk barcode pallet (opsional)</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label-enhanced" for="pcsPrefix">Prefix PCS</label>
+                                <input type="text" id="pcsPrefix" name="PcsPrefix" class="form-control-enhanced" placeholder="Contoh: AB" maxlength="5">
+                                <small class="text-muted">Prefix untuk barcode PCS (opsional)</small>
                             </div>
                         </div>
                     </div>
@@ -57,224 +104,111 @@
             </div>
             
             <div class="col-lg-6">
-                <div class="card border-info">
-                    <div class="card-header bg-info text-white">
-                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informasi Data</h6>
+                <!-- Statistics -->
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalRows">@Model.RawData.Count</div>
+                        <div class="stat-label">Total Baris Excel</div>
                     </div>
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-4">
-                                <div class="border-end">
-                                    <h4 class="text-primary mb-1" id="totalRows">@Model.RawData.Count</h4>
-                                    <small class="text-muted">Total Baris Excel</small>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="border-end">
-                                    <h4 class="text-success mb-1" id="processedRows">@Model.ProcessedData.Count</h4>
-                                    <small class="text-muted">Baris Setelah Diproses</small>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <h4 class="text-warning mb-1" id="totalBoxes">0</h4>
-                                <small class="text-muted">Total BOX yang akan dibuat</small>
-                            </div>
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="processedRows">@Model.ProcessedData.Count</div>
+                        <div class="stat-label">Baris Diproses</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalBoxes">0</div>
+                        <div class="stat-label">Total BOX</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Preview Table -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-light">
-                <h5 class="mb-0"><i class="fas fa-table me-2"></i>Data Setelah Diproses</h5>
+        <!-- Data Table -->
+        <div class="table-container">
+            <div class="table-header">
+                <i class="fas fa-table me-2"></i>Data Setelah Diproses
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0" id="previewTable">
-                        <thead class="table-dark">
-                            <tr>
-                                <th style="width: 120px;">No PO</th>
-                                <th style="width: 150px;">Model</th>
-                                <th style="width: 80px;">Total Qty</th>
-                                <th style="width: 70px;">Pallet</th>
-                                <th style="width: 70px;">Box</th>
-                                <th style="width: 70px;">PCS</th>
-                                <th style="width: 120px;">Invoice</th>
-                                <th style="width: 120px;">Container</th>
-                                <th style="width: 150px;">Shipment Detail</th>
-                                <th style="width: 80px;">Action</th>
+            <div class="table-responsive">
+                <table class="table-enhanced" id="previewTable">
+                    <thead>
+                        <tr>
+                            <th>No PO</th>
+                            <th>Model</th>
+                            <th>Total Qty</th>
+                            <th>Pallet</th>
+                            <th>Box</th>
+                            <th>PCS</th>
+                            <th>Invoice</th>
+                            <th>Container</th>
+                            <th>Shipment Detail</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewTableBody">
+                        @for (int i = 0; i < Model.ProcessedData.Count; i++)
+                        {
+                            <tr data-index="@i">
+                                <td>
+                                    <input type="hidden" name="ProcessedData[@i].NoPO" value="@Model.ProcessedData[i].NoPO" />
+                                    <strong>@Model.ProcessedData[i].NoPO</strong>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="ProcessedData[@i].Model" value="@Model.ProcessedData[i].Model" />
+                                    <span class="badge-enhanced" style="background: var(--primary-color); color: white;">@Model.ProcessedData[i].Model</span>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="ProcessedData[@i].TotalQty" value="@Model.ProcessedData[i].TotalQty" />
+                                    <strong style="color: var(--primary-color);">@Model.ProcessedData[i].TotalQty.ToString("N0")</strong>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="ProcessedData[@i].QtyPallet" value="@Model.ProcessedData[i].QtyPallet" />
+                                    <span class="badge-enhanced" style="background: var(--success-color); color: white;">@Model.ProcessedData[i].QtyPallet</span>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="ProcessedData[@i].QtyBox" value="@Model.ProcessedData[i].QtyBox" />
+                                    <span class="badge-enhanced" style="background: var(--warning-color); color: white;">@Model.ProcessedData[i].QtyBox</span>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="ProcessedData[@i].QtyPcs" value="@Model.ProcessedData[i].QtyPcs" />
+                                    <span class="badge-enhanced" style="background: var(--primary-light); color: white;">@Model.ProcessedData[i].QtyPcs</span>
+                                </td>
+                                <td>
+                                    <input type="text" name="ProcessedData[@i].NoInvoice" class="form-control-enhanced" style="font-size: 0.9rem; padding: 8px;" placeholder="Invoice..." value="@Model.ProcessedData[i].NoInvoice" />
+                                </td>
+                                <td>
+                                    <input type="text" name="ProcessedData[@i].Container" class="form-control-enhanced" style="font-size: 0.9rem; padding: 8px;" placeholder="Container..." value="@Model.ProcessedData[i].Container" />
+                                </td>
+                                <td>
+                                    <input type="text" name="ProcessedData[@i].ShipmentDetail" class="form-control-enhanced" style="font-size: 0.9rem; padding: 8px;" placeholder="Detail..." value="@Model.ProcessedData[i].ShipmentDetail" />
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm" style="background: var(--primary-light); color: white; border: none; padding: 8px 12px; border-radius: var(--border-radius);" onclick="editRow(@i)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody id="previewTableBody">
-                            @for (int i = 0; i < Model.ProcessedData.Count; i++)
-                            {
-                                <tr data-index="@i">
-                                    <td>
-                                        <input type="hidden" name="ProcessedData[@i].NoPO" value="@Model.ProcessedData[i].NoPO" />
-                                        <span class="fw-bold">@Model.ProcessedData[i].NoPO</span>
-                                    </td>
-                                    <td>
-                                        <input type="hidden" name="ProcessedData[@i].Model" value="@Model.ProcessedData[i].Model" />
-                                        <span class="badge bg-primary">@Model.ProcessedData[i].Model</span>
-                                    </td>
-                                    <td>
-                                        <input type="hidden" name="ProcessedData[@i].TotalQty" value="@Model.ProcessedData[i].TotalQty" />
-                                        <span class="fw-bold text-primary">@Model.ProcessedData[i].TotalQty.ToString("N0")</span>
-                                    </td>
-                                    <td>
-                                        <input type="hidden" name="ProcessedData[@i].QtyPallet" value="@Model.ProcessedData[i].QtyPallet" />
-                                        <span class="badge bg-success">@Model.ProcessedData[i].QtyPallet</span>
-                                    </td>
-                                    <td>
-                                        <input type="hidden" name="ProcessedData[@i].QtyBox" value="@Model.ProcessedData[i].QtyBox" />
-                                        <span class="badge bg-warning text-dark">@Model.ProcessedData[i].QtyBox</span>
-                                    </td>
-                                    <td>
-                                        <input type="hidden" name="ProcessedData[@i].QtyPcs" value="@Model.ProcessedData[i].QtyPcs" />
-                                        <span class="badge bg-info">@Model.ProcessedData[i].QtyPcs</span>
-                                    </td>
-                                    <td>
-                                        <input type="text" name="ProcessedData[@i].NoInvoice" class="form-control form-control-sm" placeholder="Invoice..." value="@Model.ProcessedData[i].NoInvoice" />
-                                    </td>
-                                    <td>
-                                        <input type="text" name="ProcessedData[@i].Container" class="form-control form-control-sm" placeholder="Container..." value="@Model.ProcessedData[i].Container" />
-                                    </td>
-                                    <td>
-                                        <input type="text" name="ProcessedData[@i].ShipmentDetail" class="form-control form-control-sm" placeholder="Detail..." value="@Model.ProcessedData[i].ShipmentDetail" />
-                                    </td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="editRow(@i)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
+                        }
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Submit Button -->
-        <div class="row mt-4">
-            <div class="col-12 text-center">
-                <button type="submit" class="btn btn-success btn-lg me-3">
-                    <i class="fas fa-calculator me-2"></i>Submit & Calculate
-                </button>
-                <a asp-action="Create" class="btn btn-secondary btn-lg">
-                    <i class="fas fa-arrow-left me-2"></i>Upload Ulang
-                </a>
-            </div>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button type="submit" class="btn-large btn-primary-large">
+                <i class="fas fa-calculator me-2"></i>Submit & Calculate
+            </button>
+            <a asp-action="Create" class="btn-large btn-secondary-large">
+                <i class="fas fa-arrow-left me-2"></i>Upload Ulang
+            </a>
         </div>
     </form>
 </div>
 
 @section Scripts {
+    <script src="~/js/po.js" asp-append-version="true"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Update calculation when mode changes
-            document.querySelectorAll('input[name="ShipmentType"]').forEach(radio => {
-                radio.addEventListener('change', updateCalculation);
-            });
-            
-            // Initial calculation
-            updateCalculation();
+        document.addEventListener('DOMContentLoaded', function(){
+            if (window.PO && PO.initPreview) PO.initPreview(@Model.SessionId);
         });
-
-        function updateCalculation() {
-            const shipmentType = document.querySelector('input[name="ShipmentType"]:checked').value;
-            const sessionId = @Model.SessionId;
-            
-            fetch('/PO/UpdateMode', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `sessionId=${sessionId}&shipmentType=${shipmentType}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateTable(data.data);
-                    updateStatistics(data.data);
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        }
-
-        function updateTable(data) {
-            const tbody = document.getElementById('previewTableBody');
-            tbody.innerHTML = '';
-            
-            data.forEach((item, index) => {
-                const row = `
-                    <tr data-index="${index}">
-                        <td>
-                            <input type="hidden" name="ProcessedData[${index}].NoPO" value="${item.noPO}" />
-                            <span class="fw-bold">${item.noPO}</span>
-                        </td>
-                        <td>
-                            <input type="hidden" name="ProcessedData[${index}].Model" value="${item.model}" />
-                            <span class="badge bg-primary">${item.model}</span>
-                        </td>
-                        <td>
-                            <input type="hidden" name="ProcessedData[${index}].TotalQty" value="${item.totalQty}" />
-                            <span class="fw-bold text-primary">${item.totalQty.toLocaleString()}</span>
-                        </td>
-                        <td>
-                            <input type="hidden" name="ProcessedData[${index}].QtyPallet" value="${item.qtyPallet}" />
-                            <span class="badge bg-success">${item.qtyPallet}</span>
-                        </td>
-                        <td>
-                            <input type="hidden" name="ProcessedData[${index}].QtyBox" value="${item.qtyBox}" />
-                            <span class="badge bg-warning text-dark">${item.qtyBox}</span>
-                        </td>
-                        <td>
-                            <input type="hidden" name="ProcessedData[${index}].QtyPcs" value="${item.qtyPcs}" />
-                            <span class="badge bg-info">${item.qtyPcs}</span>
-                        </td>
-                        <td>
-                            <input type="text" name="ProcessedData[${index}].NoInvoice" class="form-control form-control-sm" placeholder="Invoice..." />
-                        </td>
-                        <td>
-                            <input type="text" name="ProcessedData[${index}].Container" class="form-control form-control-sm" placeholder="Container..." />
-                        </td>
-                        <td>
-                            <input type="text" name="ProcessedData[${index}].ShipmentDetail" class="form-control form-control-sm" placeholder="Detail..." />
-                        </td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editRow(${index})">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-        }
-
-        function updateStatistics(data) {
-            document.getElementById('processedRows').textContent = data.length;
-            
-            const totalBoxes = data.reduce((sum, item) => sum + item.qtyBox, 0);
-            document.getElementById('totalBoxes').textContent = totalBoxes.toLocaleString();
-        }
-
-        function editRow(index) {
-            // Simple inline editing functionality
-            const row = document.querySelector(`tr[data-index="${index}"]`);
-            const totalQtyInput = row.querySelector(`input[name="ProcessedData[${index}].TotalQty"]`);
-            
-            const newQty = prompt('Enter new quantity:', totalQtyInput.value);
-            if (newQty && !isNaN(newQty) && parseInt(newQty) > 0) {
-                totalQtyInput.value = parseInt(newQty);
-                row.querySelector('td:nth-child(3) span').textContent = parseInt(newQty).toLocaleString();
-                
-                // TODO: Implement recalculation for this row
-                alert('Quantity updated. Note: Automatic recalculation will be implemented.');
-            }
-        }
     </script>
 }

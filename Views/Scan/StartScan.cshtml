@@ -1,0 +1,538 @@
+@model ShipmentFinishGood.DTOs.ScanSessionDto
+@{
+    ViewData["Title"] = "Start Scanning";
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0 text-primary">
+            <i class="fas fa-qrcode me-2"></i>Scanning Session
+        </h2>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" onclick="toggleCamera()">
+                <i class="fas fa-camera me-1"></i>Toggle Camera
+            </button>
+            <a asp-action="Index" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Session Info Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="card-title mb-2">
+                                <i class="fas fa-file-excel me-2"></i>@Model.FileName
+                            </h5>
+                            <p class="mb-1">
+                                <strong>QR Identity:</strong> 
+                                <span class="font-monospace">@Model.QRIdentity</span>
+                                <button class="btn btn-outline-light btn-sm ms-2" onclick="copyToClipboard('@Model.QRIdentity')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </p>
+                            <p class="mb-0">
+                                <span class="badge bg-light text-dark me-2">@Model.ShipmentType</span>
+                                <span class="badge bg-warning text-dark">@Model.TotalBoxes Boxes</span>
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="h3 mb-0">@Model.ProgressPercentage.ToString("F1")%</div>
+                            <div class="small">@Model.ScannedCount / @Model.TotalBarcodes scanned</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanning Interface -->
+    <div class="row">
+        <!-- Camera/Scanner Section -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-camera me-2"></i>Scanner
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Camera Video -->
+                    <div id="camera-container" class="text-center mb-3">
+                        <video id="preview" width="100%" height="300" style="border: 2px solid #dee2e6; border-radius: 8px; display: none;"></video>
+                        <div id="camera-placeholder" class="bg-light d-flex align-items-center justify-content-center" style="height: 300px; border: 2px dashed #dee2e6; border-radius: 8px;">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-camera fa-3x mb-2"></i>
+                                <p>Click "Start Camera" to begin scanning</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Camera Controls -->
+                    <div class="d-flex gap-2 justify-content-center mb-3">
+                        <button id="start-camera" class="btn btn-success" onclick="startCamera()">
+                            <i class="fas fa-play me-1"></i>Start Camera
+                        </button>
+                        <button id="stop-camera" class="btn btn-danger" onclick="stopCamera()" style="display: none;">
+                            <i class="fas fa-stop me-1"></i>Stop Camera
+                        </button>
+                    </div>
+
+                    <!-- Manual Input -->
+                    <div class="border-top pt-3">
+                        <h6 class="mb-2">Manual Input</h6>
+                        <div class="input-group mb-2">
+                            <input type="text" id="manual-barcode" class="form-control" placeholder="Enter barcode manually" autocomplete="off">
+                            <button class="btn btn-primary" onclick="processManualInput()">
+                                <i class="fas fa-check me-1"></i>Scan
+                            </button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-info btn-sm" onclick="debugSession()">
+                                <i class="fas fa-bug me-1"></i>Debug
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="showValidBarcodes()">
+                                <i class="fas fa-list me-1"></i>Valid Barcodes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress and Actions Section -->
+        <div class="col-lg-6">
+            <!-- Progress Card -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Scanning Progress
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Master QR Status -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Master QR Scanned:</span>
+                            <span class="badge bg-@(Model.IsMasterScanned ? "success" : "warning")">
+                                @(Model.IsMasterScanned ? "YES" : "NO")
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small">Box Progress:</span>
+                            <span class="small">@Model.ScannedCount / @Model.TotalBarcodes</span>
+                        </div>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-@(Model.ProgressPercentage >= 100 ? "success" : Model.ProgressPercentage > 0 ? "warning" : "secondary")" 
+                                 role="progressbar" 
+                                 style="width: @Model.ProgressPercentage%" 
+                                 aria-valuenow="@Model.ProgressPercentage" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                @Model.ProgressPercentage.ToString("F1")%
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Area Assignment -->
+                    @if (string.IsNullOrEmpty(Model.AssignedArea))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Assign to Area:</label>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm" onclick="assignArea('A')">Area A</button>
+                                <button class="btn btn-outline-primary btn-sm" onclick="assignArea('B')">Area B</button>
+                                <button class="btn btn-outline-primary btn-sm" onclick="assignArea('C')">Area C</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Assigned Area:</label>
+                            <div>
+                                <span class="badge bg-info">Area @Model.AssignedArea</span>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Complete Button -->
+                    @if (Model.CanComplete)
+                    {
+                        <div class="d-grid">
+                            <button class="btn btn-success btn-lg" onclick="completeScan()">
+                                <i class="fas fa-check-circle me-2"></i>Complete Scanning
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent Scans -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Scans
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="recent-scans" style="max-height: 200px; overflow-y: auto;">
+                        <!-- Recent scans will be populated here -->
+                        <div class="text-muted text-center">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Start scanning to see recent activity
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barcode List Modal -->
+    <div class="modal fade" id="barcodeListModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-list me-2"></i>All Barcodes
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Barcode</th>
+                                    <th>Model</th>
+                                    <th>Box #</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="barcode-list-body">
+                                @foreach (var barcode in Model.BarcodeList)
+                                {
+                                    <tr class="@(Model.ScannedBarcodes.Contains(barcode.BarcodeValue) ? "table-success" : "")">
+                                        <td class="font-monospace small">@barcode.BarcodeValue</td>
+                                        <td><span class="badge bg-primary">@barcode.ModelProduct</span></td>
+                                        <td class="text-center">@barcode.BoxNumber</td>
+                                        <td>
+                                            @if (Model.ScannedBarcodes.Contains(barcode.BarcodeValue))
+                                            {
+                                                <span class="badge bg-success">Scanned</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Pending</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Action Button -->
+<div class="position-fixed bottom-0 end-0 p-3">
+    <button class="btn btn-info btn-lg rounded-circle" onclick="showBarcodeList()" title="View All Barcodes">
+        <i class="fas fa-list"></i>
+    </button>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/scan.js" asp-append-version="true"></script>
+    <!-- Include Instascan library for QR scanning -->
+    <script src="https://rawgit.com/schmich/instascan/master/docs/instascan.min.js"></script>
+    
+    <script>
+        let scanner = null;
+        const sessionId = @Model.SessionId;
+        const qrIdentity = '@Model.QRIdentity';
+
+        // Initialize page
+        $(document).ready(function() {
+            if (window.SCAN && typeof window.SCAN.initStartScan === 'function') {
+                window.SCAN.initStartScan({ sessionId, qrIdentity });
+            }
+            updateProgress();
+            loadRecentScans();
+            setInterval(updateProgress, 10000);
+        });
+
+        // Camera functions
+        function startCamera() {
+            let video = document.getElementById('preview');
+            let placeholder = document.getElementById('camera-placeholder');
+            
+            scanner = new Instascan.Scanner({ video: video });
+            
+            scanner.addListener('scan', function(content) {
+                handleScan(content);
+            });
+
+            Instascan.Camera.getCameras().then(function(cameras) {
+                if (cameras.length > 0) {
+                    scanner.start(cameras[0]);
+                    video.style.display = 'block';
+                    placeholder.style.display = 'none';
+                    document.getElementById('start-camera').style.display = 'none';
+                    document.getElementById('stop-camera').style.display = 'inline-block';
+                } else {
+                    showAlert('No cameras found', 'danger');
+                }
+            }).catch(function(e) {
+                console.error(e);
+                showAlert('Camera access denied or not available', 'danger');
+            });
+        }
+
+        function stopCamera() {
+            if (scanner) {
+                scanner.stop();
+                scanner = null;
+            }
+            
+            let video = document.getElementById('preview');
+            let placeholder = document.getElementById('camera-placeholder');
+            
+            video.style.display = 'none';
+            placeholder.style.display = 'flex';
+            document.getElementById('start-camera').style.display = 'inline-block';
+            document.getElementById('stop-camera').style.display = 'none';
+        }
+
+        function toggleCamera() {
+            if (scanner) {
+                stopCamera();
+            } else {
+                startCamera();
+            }
+        }
+
+        // Scanning functions
+        function handleScan(content) {
+            if (content === qrIdentity) {
+                scanMasterQR(content);
+            } else if (content.startsWith(qrIdentity)) {
+                scanBoxBarcode(content);
+            } else {
+                showAlert('Invalid QR code for this session', 'danger');
+            }
+        }
+
+        function processManualInput() {
+            const input = document.getElementById('manual-barcode');
+            const barcode = input.value.trim();
+            
+            if (barcode) {
+                handleScan(barcode);
+                input.value = '';
+            }
+        }
+
+        function scanMasterQR(qrCode) {
+            $.post('@Url.Action("ScanMasterQR")', {
+                sessionId: sessionId,
+                qrCode: qrCode
+            }, function(response) {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    updateProgress();
+                    addRecentScan(response.data);
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            }).fail(function() {
+                showAlert('Error scanning Master QR', 'danger');
+            });
+        }
+
+        function scanBoxBarcode(barcode) {
+            $.post('@Url.Action("ScanBoxBarcode")', {
+                sessionId: sessionId,
+                barcode: barcode
+            }, function(response) {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    updateProgress();
+                    addRecentScan(response.data);
+                } else {
+                    showAlert(response.message, 'danger');
+                    
+                    // Show debug info if available
+                    if (response.debug) {
+                        console.log('Debug info:', response.debug);
+                        showAlert(`Debug: Session QR: ${response.debug.sessionQR}, Barcode starts with QR: ${response.debug.barcodeStartsWithQR}`, 'info');
+                    }
+                }
+            }).fail(function() {
+                showAlert('Error scanning box barcode', 'danger');
+            });
+        }
+
+        function debugSession() {
+            $.get('@Url.Action("DebugSession")', { sessionId: sessionId }, function(response) {
+                if (response.success) {
+                    console.log('Session Debug Data:', response.data);
+                    alert('Debug data logged to console. Check browser developer tools.');
+                } else {
+                    showAlert('Debug failed: ' + response.message, 'danger');
+                }
+            });
+        }
+
+        function showValidBarcodes() {
+            $.get('@Url.Action("GetBarcodeList")', { sessionId: sessionId }, function(response) {
+                if (response.success && response.data && response.data.length > 0) {
+                    const first10 = response.data.slice(0, 10);
+                    let barcodeText = 'First 10 valid barcodes:\n\n';
+                    first10.forEach((item, index) => {
+                        barcodeText += `${index + 1}. ${item.barcodeValue}\n`;
+                    });
+                    barcodeText += `\nTotal: ${response.data.length} barcodes`;
+                    alert(barcodeText);
+                } else {
+                    showAlert('No valid barcodes found', 'warning');
+                }
+            });
+        }
+
+        function assignArea(area) {
+            $.post('@Url.Action("AssignArea")', {
+                sessionId: sessionId,
+                area: area
+            }, function(response) {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    location.reload(); // Refresh to show assigned area
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            }).fail(function() {
+                showAlert('Error assigning area', 'danger');
+            });
+        }
+
+        function completeScan() {
+            if (confirm('Are you sure you want to complete this scanning session?')) {
+                $.post('@Url.Action("CompleteScan")', {
+                    sessionId: sessionId
+                }, function(response) {
+                    if (response.success) {
+                        showAlert('Scanning completed successfully!', 'success');
+                        setTimeout(() => {
+                            window.location.href = '@Url.Action("Index")';
+                        }, 2000);
+                    } else {
+                        showAlert(response.message, 'danger');
+                    }
+                }).fail(function() {
+                    showAlert('Error completing scan', 'danger');
+                });
+            }
+        }
+
+        // UI update functions
+        function updateProgress() {
+            $.get('@Url.Action("GetScanProgress")', { sessionId: sessionId }, function(response) {
+                if (response.success) {
+                    const progress = response.data;
+                    // Update progress bar and counts
+                    const percentage = progress.progressPercentage;
+                    $('.progress-bar').css('width', percentage + '%').attr('aria-valuenow', percentage);
+                    $('.progress-bar').text(percentage.toFixed(1) + '%');
+                    
+                    // Update master QR status
+                    const masterBadge = progress.isMasterScanned ? 
+                        '<span class="badge bg-success">YES</span>' : 
+                        '<span class="badge bg-warning">NO</span>';
+                    // Update UI elements as needed
+                }
+            });
+        }
+
+        function addRecentScan(scanData) {
+            const recentScans = document.getElementById('recent-scans');
+            const scanElement = document.createElement('div');
+            scanElement.className = 'border-bottom pb-2 mb-2';
+            scanElement.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="small font-monospace">${scanData.barcodeValue}</div>
+                        <div class="text-muted small">${scanData.scanType}</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge bg-success">Scanned</div>
+                        <div class="text-muted small">${new Date().toLocaleTimeString()}</div>
+                    </div>
+                </div>
+            `;
+            
+            recentScans.insertBefore(scanElement, recentScans.firstChild);
+            
+            // Keep only last 5 scans
+            while (recentScans.children.length > 5) {
+                recentScans.removeChild(recentScans.lastChild);
+            }
+        }
+
+        function loadRecentScans() {
+            // Load recent scanning activity for this session
+        }
+
+        function showBarcodeList() {
+            $('#barcodeListModal').modal('show');
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                showAlert('QR Identity copied to clipboard!', 'success');
+            });
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.querySelector('.container');
+            const alertElement = document.createElement('div');
+
+            alertElement.className = `alert alert-${type} alert-dismissible fade show`;
+            alertElement.setAttribute('role', 'alert');
+            alertElement.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            alertContainer.insertBefore(alertElement, alertContainer.children[1]);
+
+            setTimeout(() => {
+                alertElement.remove();
+            }, 4000);
+        }
+
+        // Handle Enter key for manual input
+        document.getElementById('manual-barcode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                processManualInput();
+            }
+        });
+    </script>
+}

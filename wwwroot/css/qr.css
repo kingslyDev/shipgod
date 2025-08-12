@@ -1,0 +1,11 @@
+/* Shared QR styles */
+.qr-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+}
+.qr-header {
+  background: #20c997;
+  color: #fff;
+  border-radius: 12px 12px 0 0;
+  padding: 14px;
+}

@@ -17,9 +17,10 @@ namespace ShipmentFinishGood.Controllers
             _excelService = excelService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            var poSessions = await _excelService.GetAllPOSessionsAsync();
+            return View(poSessions);
         }
 
         public IActionResult Create()
@@ -110,7 +111,7 @@ namespace ShipmentFinishGood.Controllers
                 if (success)
                 {
                     TempData["Success"] = "PO data has been successfully processed and saved.";
-                    return RedirectToAction("Index");
+                    return RedirectToAction("Index", "Final", new { sessionId = request.SessionId });
                 }
                 else
                 {

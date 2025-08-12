@@ -1,0 +1,286 @@
+@model List<ShipmentFinishGood.DTOs.ScanHistoryDto>
+@{
+    ViewData["Title"] = "Scan History";
+}
+@section Styles {<link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0 text-primary">
+            <i class="fas fa-history me-2"></i>Scan History
+        </h2>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" onclick="location.reload()">
+                <i class="fas fa-sync-alt me-1"></i>Refresh
+            </button>
+            <a asp-action="Index" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Scanner
+            </a>
+        </div>
+    </div>
+
+    @if (Model?.Any() == true)
+    {
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="h5 mb-0">@Model.Count</div>
+                                <div class="small">Total Activities</div>
+                            </div>
+                            <i class="fas fa-list fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="h5 mb-0">@Model.Count(h => h.Action == "SCAN_BOX")</div>
+                                <div class="small">Box Scans</div>
+                            </div>
+                            <i class="fas fa-box fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="h5 mb-0">@Model.Count(h => h.Action == "SCAN_MASTER")</div>
+                                <div class="small">Master QR Scans</div>
+                            </div>
+                            <i class="fas fa-qrcode fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="h5 mb-0">@Model.Count(h => h.Action == "AREA_ASSIGN")</div>
+                                <div class="small">Area Assignments</div>
+                            </div>
+                            <i class="fas fa-map-marker-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-table me-2"></i>Scanning Activities
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="historyTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Barcode/QR</th>
+                                <th>User</th>
+                                <th>Area</th>
+                                <th>Result</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var activity in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="small">@activity.Timestamp.ToString("dd/MM/yyyy")</div>
+                                        <div class="text-muted small">@activity.Timestamp.ToString("HH:mm:ss")</div>
+                                    </td>
+                                    <td>
+                                        @switch (activity.Action)
+                                        {
+                                            case "SCAN_MASTER":
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-qrcode me-1"></i>Master QR
+                                                </span>
+                                                break;
+                                            case "SCAN_BOX":
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-box me-1"></i>Box Scan
+                                                </span>
+                                                break;
+                                            case "AREA_ASSIGN":
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="fas fa-map-marker-alt me-1"></i>Area Assign
+                                                </span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-secondary">@activity.Action</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="font-monospace small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
+                                            @activity.BarcodeValue
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(activity.BarcodeValue))
+                                        {
+                                            <button class="btn btn-outline-secondary btn-sm mt-1" onclick="copyToClipboard('@activity.BarcodeValue')" title="Copy">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(activity.UserId))
+                                        {
+                                            <span class="badge bg-info">@activity.UserId</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(activity.AssignedArea))
+                                        {
+                                            <span class="badge bg-primary">Area @activity.AssignedArea</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (activity.Result == "SUCCESS")
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Success
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times me-1"></i>Error
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(activity.ErrorMessage))
+                                        {
+                                            <button class="btn btn-outline-warning btn-sm" 
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="@activity.ErrorMessage">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Empty State -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="text-center py-5">
+                            <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">No Scan History</h4>
+                            <p class="text-muted">No scanning activities have been recorded yet.</p>
+                            <a asp-action="Index" class="btn btn-primary">
+                                <i class="fas fa-qrcode me-2"></i>Start Scanning
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <!-- DataTables for better table functionality -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    
+    <script>
+        $(document).ready(function() {
+            // Initialize DataTable
+            $('#historyTable').DataTable({
+                order: [[0, 'desc']], // Sort by timestamp descending
+                pageLength: 25,
+                responsive: true,
+                language: {
+                    search: "Search activities:",
+                    lengthMenu: "Show _MENU_ activities per page",
+                    info: "Showing _START_ to _END_ of _TOTAL_ activities",
+                    paginate: {
+                        first: "First",
+                        last: "Last",
+                        next: "Next",
+                        previous: "Previous"
+                    }
+                },
+                columnDefs: [
+                    { targets: [2], orderable: false }, // Barcode column
+                    { targets: [6], orderable: false }  // Details column
+                ]
+            });
+
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                showAlert('Barcode copied to clipboard!', 'success');
+            }, function(err) {
+                console.error('Could not copy text: ', err);
+                showAlert('Failed to copy to clipboard', 'danger');
+            });
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.querySelector('.container');
+            const alertElement = document.createElement('div');
+
+            alertElement.className = `alert alert-${type} alert-dismissible fade show`;
+            alertElement.setAttribute('role', 'alert');
+            alertElement.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            alertContainer.insertBefore(alertElement, alertContainer.children[1]);
+
+            setTimeout(() => {
+                alertElement.remove();
+            }, 3000);
+        }
+    </script>
+}

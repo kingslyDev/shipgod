@@ -31,6 +31,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IModelConfigurationRepository, ModelConfigurationRepository>();
         services.AddScoped<IModelConfigurationService, ModelConfigurationService>();
         services.AddScoped<IExcelProcessingService, ExcelProcessingService>();
+        services.AddScoped<IFinalProcessingService, FinalProcessingService>();
+        services.AddScoped<IQRManagementService, QRManagementService>();
+        services.AddScoped<IScanningService, ScanningService>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         return services;
     }    public static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration config)

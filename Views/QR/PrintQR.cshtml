@@ -1,0 +1,132 @@
+@model ShipmentFinishGood.DTOs.QRManagementDto
+@{
+    ViewData["Title"] = "Print QR Identity";
+    Layout = null; // Remove layout for printing
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link href="~/lib/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="~/css/qr.css" rel="stylesheet" asp-append-version="true" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet" />
+    <style>
+        @@media print {
+            .no-print { display: none !important; }
+            .page-break { page-break-after: always; }
+            body { font-size: 12pt; }
+        }
+        .qr-container {
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #000;
+            margin: 20px auto;
+            max-width: 400px;
+        }
+        .qr-image {
+            max-width: 250px;
+            margin: 15px auto;
+        }
+        .qr-text {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14pt;
+            margin: 10px 0;
+        }
+        .print-info {
+            font-size: 10pt;
+            color: #666;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Print Controls -->
+        <div class="no-print mb-3 text-center">
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print me-2"></i>Print QR Code
+            </button>
+            <button class="btn btn-secondary ms-2" onclick="window.close()">
+                <i class="fas fa-times me-2"></i>Close
+            </button>
+        </div>
+
+        <!-- QR Code Print Layout -->
+        <div class="qr-container">
+            <h4 class="text-center mb-3">
+                <i class="fas fa-qrcode me-2"></i>QR Identity Code
+            </h4>
+            
+            <div class="qr-image">
+                @if (!string.IsNullOrEmpty(Model.QRImageBase64))
+                {
+                    <img src="data:image/png;base64,@Model.QRImageBase64" 
+                         alt="QR Code" class="img-fluid border" />
+                }
+                else
+                {
+                    <div class="bg-light border d-flex align-items-center justify-content-center" 
+                         style="width: 250px; height: 250px; margin: 0 auto;">
+                        <i class="fas fa-qrcode fa-5x text-muted"></i>
+                    </div>
+                }
+            </div>
+
+            <div class="qr-text">
+                @Model.QRIdentity
+            </div>
+
+            <hr />
+
+            <div class="print-info">
+                <div><strong>File:</strong> @Model.FileName</div>
+                <div><strong>Generated:</strong> @Model.GeneratedDate.ToString("dd/MM/yyyy HH:mm:ss")</div>
+                <div><strong>By:</strong> @Model.GeneratedBy</div>
+                <div><strong>Total Boxes:</strong> @Model.TotalBoxes</div>
+                <div><strong>Status:</strong> @Model.Status</div>
+            </div>
+        </div>
+
+        <!-- Additional Copy for Backup -->
+        <div class="page-break"></div>
+        
+        <div class="qr-container">
+            <h5 class="text-center mb-3">
+                <i class="fas fa-copy me-2"></i>Backup Copy
+            </h5>
+            
+            <div class="qr-image">
+                @if (!string.IsNullOrEmpty(Model.QRImageBase64))
+                {
+                    <img src="data:image/png;base64,@Model.QRImageBase64" 
+                         alt="QR Code Backup" class="img-fluid border" />
+                }
+            </div>
+
+            <div class="qr-text">
+                @Model.QRIdentity
+            </div>
+
+            <div class="print-info">
+                <div><em>Backup copy for archive</em></div>
+                <div>Printed: @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-print when page loads (optional)
+        // window.onload = function() { window.print(); };
+        
+        // Close window after printing
+        window.onafterprint = function() {
+            // Uncomment if you want to auto-close after printing
+            // window.close();
+        };
+    </script>
+</body>
+</html>

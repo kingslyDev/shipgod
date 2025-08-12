@@ -1,0 +1,47 @@
+/* Shared Scan styles */
+.scan-header {
+  background: #0d6efd;
+  color: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+.scan-card {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+}
+.scan-progress .progress {
+  height: 20px;
+}
+.scan-badge {
+  font-weight: 700;
+}
+
+/* Timeline styles (used in SessionDetail) */
+.timeline {
+  position: relative;
+}
+.timeline-item {
+  position: relative;
+}
+.timeline-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 60px;
+  width: 2px;
+  height: calc(100% - 20px);
+  background: #dee2e6;
+  transform: translateX(-50%);
+}
+@media (max-width: 768px) {
+  .timeline-item:not(:last-child)::after {
+    left: 30px;
+  }
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+}
+.border-left-primary {
+  border-left: 4px solid #007bff;
+}

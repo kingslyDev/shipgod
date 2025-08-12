@@ -111,7 +111,10 @@ namespace ShipmentFinishGood.Services
         public async Task<List<ProcessedPOData>> CalculateProcessedDataAsync(List<ExcelRowData> rawData, string shipmentType)
         {
             var modelConfigs = await _modelConfigService.GetAllAsync();
-            var configDict = modelConfigs.ToDictionary(m => m.ModelName, m => m);
+            // Group by model name because we can have both LOOSE and PALLET configs with the same model name
+            var configDict = modelConfigs
+                .GroupBy(m => m.ModelName)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
             List<ProcessedPOData> groupedData;
 
@@ -148,19 +151,26 @@ namespace ShipmentFinishGood.Services
             return groupedData.OrderBy(x => x.NoPO).ThenBy(x => x.Model).ToList();
         }
 
-        private void CalculateBreakdown(ProcessedPOData item, Dictionary<string, ModelConfiguration> configDict, string shipmentType)
+        private void CalculateBreakdown(ProcessedPOData item, Dictionary<string, List<ModelConfiguration>> configDict, string shipmentType)
         {
-            if (!configDict.TryGetValue(item.Model, out var config))
+            if (!configDict.TryGetValue(item.Model, out var configs) || configs.Count == 0)
             {
+                // No config found for this model: keep everything as loose pieces
                 item.QtyPcs = item.TotalQty;
                 return;
             }
 
-            var pcsPerPallet = shipmentType == "PALLET" ? 
-                configDict.Values.FirstOrDefault(c => c.ModelName == item.Model && c.Type == "PALLET")?.PcsPerPallet ?? config.PcsPerPallet
-                : config.PcsPerPallet;
-            
-            var pcsPerBox = config.PcsPerBox;
+            // Prefer config matching the shipment type; fall back to any available
+            var configForType = configs.FirstOrDefault(c => string.Equals(c.Type, shipmentType, StringComparison.OrdinalIgnoreCase))
+                               ?? configs.First();
+
+            // For pallet calculation, try to use PALLET config when available
+            var palletConfig = configs.FirstOrDefault(c => string.Equals(c.Type, "PALLET", StringComparison.OrdinalIgnoreCase));
+            var pcsPerPallet = string.Equals(shipmentType, "PALLET", StringComparison.OrdinalIgnoreCase)
+                ? (palletConfig?.PcsPerPallet ?? configForType.PcsPerPallet)
+                : configForType.PcsPerPallet;
+
+            var pcsPerBox = configForType.PcsPerBox;
             var remainingQty = item.TotalQty;
 
             if (pcsPerPallet > 0)
@@ -258,7 +268,10 @@ namespace ShipmentFinishGood.Services
                     TotalQty = updatedData.TotalQty
                 };
 
-                CalculateBreakdown(tempData, modelConfigs.ToDictionary(m => m.ModelName, m => m), poMaster.ShipmentMethod ?? "LOOSE");
+                var configDict = modelConfigs
+                    .GroupBy(m => m.ModelName)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+                CalculateBreakdown(tempData, configDict, poMaster.ShipmentMethod ?? "LOOSE");
 
                 poMaster.QtyTotal = tempData.TotalQty;
                 poMaster.QtyPallet = tempData.QtyPallet;
@@ -279,6 +292,67 @@ namespace ShipmentFinishGood.Services
             return await _context.POMasters
                 .Where(p => p.SourceSessionId == sessionId)
                 .ToListAsync();
+        }
+
+        public async Task<List<POSessionSummaryDto>> GetAllPOSessionsAsync()
+        {
+            var sessions = await _context.UploadSessions
+                .Include(s => s.POMasters)
+                .ThenInclude(p => p.Details)
+                .Where(s => s.POMasters.Any()) // Only sessions with processed POs
+                .OrderByDescending(s => s.UploadDate)
+                .ToListAsync();
+
+            return sessions.Select(session => 
+            {
+                var totalItemsToScan = session.POMasters.Sum(p => p.QtyBox + p.QtyPallet + (p.QtyPcs > 0 ? 1 : 0));
+                var scannedItems = session.POMasters.SelectMany(p => p.Details).Count(d => d.ScannedDate != null);
+
+                return new POSessionSummaryDto
+                {
+                    SessionId = session.SessionId,
+                    FileName = session.FileName,
+                    SheetName = session.SheetName,
+                    ShipmentType = session.ShipmentType,
+                    ShipmentDate = session.ShipmentDate,
+                    Status = session.Status,
+                    QRIdentity = session.IdentityQRCode,
+                    CreatedDate = session.UploadDate,
+                    CreatedBy = session.UploadedBy,
+                    
+                    // Summary data
+                    TotalPOs = session.POMasters.Count,
+                    TotalQty = session.POMasters.Sum(p => p.QtyTotal),
+                    TotalBoxes = session.POMasters.Sum(p => p.QtyBox),
+                    TotalPallets = session.POMasters.Sum(p => p.QtyPallet),
+                    
+                    // Progress tracking
+                    TotalItemsToScan = totalItemsToScan,
+                    ScannedItems = scannedItems,
+                    
+                    // Individual POs
+                    POs = session.POMasters.Select(p => new POMasterDto
+                    {
+                        POId = p.POId,
+                        NoPO = p.NoPO,
+                        ModelProduk = p.ModelProduk,
+                        QtyTotal = p.QtyTotal,
+                        QtyPallet = p.QtyPallet,
+                        QtyBox = p.QtyBox,
+                        QtyPcs = p.QtyPcs,
+                        Container = p.Container,
+                        NoInvoice = p.NoInvoice,
+                        ShipmentDetail = p.ShipmentDetail,
+                        Status = p.Status,
+                        ShipmentMethod = p.ShipmentMethod,
+                        CreatedDate = p.CreatedDate,
+                        CreatedBy = p.CreatedBy,
+                        SourceSessionId = p.SourceSessionId,
+                        FileName = session.FileName,
+                        QRIdentity = session.IdentityQRCode
+                    }).ToList()
+                };
+            }).ToList();
         }
 
         private string GenerateSheetIdentifier()

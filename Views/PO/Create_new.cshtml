@@ -1,0 +1,494 @@
+@{
+    ViewData["Title"] = "Upload Data PO";
+}
+
+<style>
+/* Custom CSS untuk UI yang ramah untuk baby boomers & millennials */
+.upload-wizard {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.step-indicator {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 40px;
+}
+
+.step {
+    position: relative;
+    text-align: center;
+    min-width: 120px;
+    margin: 0 10px;
+}
+
+.step-number {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-size: 18px;
+    font-weight: bold;
+    border: 3px solid #e9ecef;
+}
+
+.step.active .step-number {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.step-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.step.active .step-title {
+    color: #28a745;
+}
+
+.upload-area {
+    border: 3px dashed #28a745;
+    border-radius: 15px;
+    padding: 60px 40px;
+    text-align: center;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.upload-area:hover {
+    border-color: #20c997;
+    background: #e8f5e8;
+}
+
+.upload-area.drag-over {
+    border-color: #007bff;
+    background: #e7f3ff;
+}
+
+.upload-icon {
+    font-size: 72px;
+    color: #28a745;
+    margin-bottom: 20px;
+}
+
+.help-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.instruction-step {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 25px;
+    padding: 20px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+}
+
+.instruction-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 20px;
+    flex-shrink: 0;
+}
+
+.large-btn {
+    padding: 20px 40px;
+    font-size: 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    min-height: 70px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.progress-feedback {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 5px solid #28a745;
+}
+
+.tooltip-help {
+    cursor: help;
+    border-bottom: 1px dotted #6c757d;
+}
+
+@@media (max-width: 768px) {
+    .step-indicator {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .step {
+        margin-bottom: 20px;
+    }
+    
+    .upload-area {
+        padding: 40px 20px;
+    }
+    
+    .large-btn {
+        padding: 15px 25px;
+        font-size: 16px;
+    }
+}
+</style>
+
+<div class="container-fluid py-4">
+    <!-- Header dengan breadcrumb yang jelas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb fs-5">
+                    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">🏠 Beranda</a></li>
+                    <li class="breadcrumb-item"><a href="@Url.Action("Index", "PO")">📋 Daftar PO</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">📤 Upload Data Baru</li>
+                </ol>
+            </nav>
+            
+            <h1 class="display-6 text-dark mb-0">
+                <i class="fas fa-cloud-upload-alt text-success me-3"></i>
+                Upload Data Purchase Order
+            </h1>
+            <p class="lead text-muted mt-2">Ikuti langkah-langkah sederhana di bawah ini untuk mengunggah file Excel Anda</p>
+        </div>
+    </div>
+
+    <!-- Alert Messages dengan styling yang lebih jelas -->
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show fs-5" role="alert" style="border-radius: 10px; border-left: 5px solid #dc3545;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                <div>
+                    <strong>❌ Ada yang salah!</strong><br>
+                    @TempData["Error"]
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+        </div>
+    }
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show fs-5" role="alert" style="border-radius: 10px; border-left: 5px solid #28a745;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle fa-2x me-3"></i>
+                <div>
+                    <strong>✅ Berhasil!</strong><br>
+                    @TempData["Success"]
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+        </div>
+    }
+
+    <div class="upload-wizard">
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <div class="step active">
+                <div class="step-number">1</div>
+                <div class="step-title">Pilih File</div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-title">Upload</div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-title">Selesai</div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-7">
+                <!-- Upload Area -->
+                <div class="card shadow-lg border-0" style="border-radius: 15px;">
+                    <div class="card-body p-0">
+                        <form asp-action="Upload" method="post" enctype="multipart/form-data" id="uploadForm">
+                            <div class="upload-area" id="uploadArea">
+                                <div class="upload-icon">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <h3 class="mb-3 text-dark">Pilih File Excel Anda</h3>
+                                <p class="text-muted fs-5 mb-4">
+                                    Klik di sini atau seret file ke area ini<br>
+                                    <span class="tooltip-help" data-bs-toggle="tooltip" title="File yang didukung: .xlsx dan .xls dengan ukuran maksimal 10MB">
+                                        📄 Mendukung: .xlsx, .xls (maks. 10MB)
+                                    </span>
+                                </p>
+                                <input type="file" name="excelFile" id="fileInput" class="d-none" accept=".xlsx,.xls" required>
+                                <button type="button" class="btn btn-success large-btn" onclick="document.getElementById('fileInput').click()">
+                                    <i class="fas fa-folder-open me-2"></i>Pilih File dari Komputer
+                                </button>
+                            </div>
+                            
+                            <!-- File Info & Submit -->
+                            <div id="fileInfo" class="progress-feedback d-none">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <h5 class="mb-1">
+                                            <i class="fas fa-file-excel text-success me-2"></i>
+                                            <span id="fileName"></span>
+                                        </h5>
+                                        <p class="text-muted mb-0">
+                                            <i class="fas fa-weight me-2"></i>Ukuran: <span id="fileSize"></span>
+                                        </p>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="clearFile()">
+                                        <i class="fas fa-times"></i> Ganti File
+                                    </button>
+                                </div>
+                                
+                                <div class="d-grid mt-4">
+                                    <button type="submit" class="btn btn-success large-btn" id="submitBtn">
+                                        <i class="fas fa-rocket me-2"></i>Proses File Sekarang
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-5">
+                <!-- Help Panel -->
+                <div class="help-card">
+                    <h4 class="mb-4">
+                        <i class="fas fa-question-circle me-2"></i>
+                        Panduan Mudah
+                    </h4>
+                    
+                    <div class="instruction-step">
+                        <div class="instruction-number">1</div>
+                        <div>
+                            <h6 class="mb-2">Siapkan File Excel</h6>
+                            <p class="mb-0">Pastikan file Excel Anda sudah siap dengan format yang benar</p>
+                        </div>
+                    </div>
+                    
+                    <div class="instruction-step">
+                        <div class="instruction-number">2</div>
+                        <div>
+                            <h6 class="mb-2">Pilih File</h6>
+                            <p class="mb-0">Klik tombol "Pilih File" atau seret file langsung ke kotak upload</p>
+                        </div>
+                    </div>
+                    
+                    <div class="instruction-step">
+                        <div class="instruction-number">3</div>
+                        <div>
+                            <h6 class="mb-2">Upload & Proses</h6>
+                            <p class="mb-0">Klik "Proses File Sekarang" dan tunggu hingga selesai</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 p-3" style="background: rgba(255,255,255,0.1); border-radius: 10px;">
+                        <h6><i class="fas fa-lightbulb me-2"></i>Tips:</h6>
+                        <ul class="mb-0 ps-3">
+                            <li>Gunakan template Excel yang disediakan</li>
+                            <li>Periksa format data sebelum upload</li>
+                            <li>Jangan tutup halaman saat proses upload</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Format Guide -->
+                <div class="card mt-4" style="border-radius: 15px;">
+                    <div class="card-header bg-info text-white text-center" style="border-radius: 15px 15px 0 0;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Format Excel yang Benar
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered text-center">
+                                <thead class="table-light">
+                                    <tr style="font-weight: bold;">
+                                        <th style="background: #e3f2fd;">NoPO</th>
+                                        <th style="background: #e8f5e9;">Model</th>
+                                        <th style="background: #fff3e0;">Qty</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>4502195897</td>
+                                        <td>RF-2400DEG-K</td>
+                                        <td>3486</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">kosong</td>
+                                        <td>RF-D10EG-K</td>
+                                        <td>108</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">kosong</td>
+                                        <td>RF-D10EG-W</td>
+                                        <td>21</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Catatan Penting:</strong><br>
+                            • Kolom NoPO boleh kosong (akan menggunakan nilai sebelumnya)<br>
+                            • Pastikan Model sesuai dengan data master<br>
+                            • Qty harus berupa angka
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            const fileInput = document.getElementById('fileInput');
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInfo = document.getElementById('fileInfo');
+            const submitBtn = document.getElementById('submitBtn');
+            const form = document.getElementById('uploadForm');
+            
+            // Drag and drop functionality
+            uploadArea.addEventListener('dragenter', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('drag-over');
+            });
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+            });
+            
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('drag-over');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('drag-over');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    handleFileSelection();
+                }
+            });
+            
+            // File input change
+            fileInput.addEventListener('change', handleFileSelection);
+            
+            // Form submission
+            form.addEventListener('submit', function(e) {
+                if (!fileInput.files.length) {
+                    e.preventDefault();
+                    alert('⚠️ Silakan pilih file terlebih dahulu!');
+                    return;
+                }
+                
+                // Update UI for processing
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sedang Memproses...';
+                submitBtn.disabled = true;
+                
+                // Update step indicator
+                document.querySelectorAll('.step').forEach((step, index) => {
+                    if (index === 1) {
+                        step.classList.add('active');
+                    }
+                });
+            });
+            
+            function handleFileSelection() {
+                const file = fileInput.files[0];
+                if (!file) return;
+                
+                // Validate file type
+                const allowedTypes = ['.xlsx', '.xls'];
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                
+                if (!allowedTypes.includes(fileExtension)) {
+                    alert('❌ Format file tidak didukung! Gunakan file .xlsx atau .xls');
+                    clearFile();
+                    return;
+                }
+                
+                // Validate file size (10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('❌ File terlalu besar! Maksimal 10MB');
+                    clearFile();
+                    return;
+                }
+                
+                // Show file info
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('fileSize').textContent = formatFileSize(file.size);
+                
+                fileInfo.classList.remove('d-none');
+                uploadArea.style.display = 'none';
+                
+                // Update step indicator
+                document.querySelectorAll('.step').forEach((step, index) => {
+                    if (index === 0) {
+                        step.querySelector('.step-number').innerHTML = '✓';
+                        step.querySelector('.step-number').style.background = '#28a745';
+                    }
+                });
+            }
+            
+            window.clearFile = function() {
+                fileInput.value = '';
+                fileInfo.classList.add('d-none');
+                uploadArea.style.display = 'block';
+                submitBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Proses File Sekarang';
+                submitBtn.disabled = false;
+                
+                // Reset step indicator
+                document.querySelectorAll('.step').forEach((step, index) => {
+                    if (index === 0) {
+                        step.querySelector('.step-number').innerHTML = '1';
+                        step.querySelector('.step-number').style.background = '#28a745';
+                    } else {
+                        step.classList.remove('active');
+                    }
+                });
+            };
+            
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        });
+    </script>
+}

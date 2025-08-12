@@ -2,6 +2,10 @@
     ViewData["Title"] = "Input PO - Upload Excel";
 }
 
+@section Styles {
+    <link rel="stylesheet" href="~/css/po.css" asp-append-version="true" />
+}
+
 <div class="container py-4">
     <h2 class="mb-4 text-success">
         <i class="fas fa-file-upload me-2"></i>Input Purchase Order - Upload Excel
@@ -98,6 +102,7 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/po.js" asp-append-version="true"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.querySelector('input[type="file"]');
