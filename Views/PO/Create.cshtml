@@ -1,0 +1,128 @@
+@{
+    ViewData["Title"] = "Input PO - Upload Excel";
+}
+
+<div class="container py-4">
+    <h2 class="mb-4 text-success">
+        <i class="fas fa-file-upload me-2"></i>Input Purchase Order - Upload Excel
+    </h2>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload File Excel</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Upload" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Pilih File Excel</label>
+                            <input type="file" name="excelFile" class="form-control form-control-lg" accept=".xlsx,.xls" required>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                File yang didukung: .xlsx, .xls (maksimal 10MB)
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-cloud-upload-alt me-2"></i>Upload & Process
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Format Excel yang Benar</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>NoPO</th>
+                                    <th>Model</th>
+                                    <th>Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>4502195897</td>
+                                    <td>RF-2400DEG-K</td>
+                                    <td>3486</td>
+                                </tr>
+                                <tr>
+                                    <td></td>
+                                    <td>RF-D10EG-K</td>
+                                    <td>108</td>
+                                </tr>
+                                <tr>
+                                    <td></td>
+                                    <td>RF-D10EG-W</td>
+                                    <td>21</td>
+                                </tr>
+                                <tr>
+                                    <td>4502195898</td>
+                                    <td>RF-2400DEG-K</td>
+                                    <td>561</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>Catatan:</strong> Jika kolom NoPO kosong, sistem akan otomatis menggunakan NoPO dari baris sebelumnya.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card border-warning mt-3">
+                <div class="card-header bg-warning">
+                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Penting</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li><i class="fas fa-check text-success me-2"></i>Pastikan file memiliki header di baris pertama</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Kolom harus berurutan: NoPO, Model, Qty</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Quantity harus berupa angka</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Model harus sesuai dengan data master</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.querySelector('input[type="file"]');
+            const submitButton = document.querySelector('button[type="submit"]');
+            
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('File terlalu besar! Maksimal 10MB.');
+                        this.value = '';
+                        return;
+                    }
+                    
+                    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                    submitButton.disabled = false;
+                } else {
+                    submitButton.innerHTML = '<i class="fas fa-cloud-upload-alt me-2"></i>Upload & Process';
+                }
+            });
+            
+            document.querySelector('form').addEventListener('submit', function() {
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                submitButton.disabled = true;
+            });
+        });
+    </script>
+}

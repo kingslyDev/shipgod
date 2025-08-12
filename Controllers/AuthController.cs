@@ -43,7 +43,7 @@ public class AuthController : Controller
         {
             new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
             new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.Role, user.Role.ToString())
+            new(ClaimTypes.Role, user.Role.ToString().ToLowerInvariant())
         };
 
         var identity = new ClaimsIdentity(claims, AuthConstants.CookieScheme);

@@ -26,15 +26,14 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddDomainServices(this IServiceCollection services)
     {
-    services.AddScoped<IUserRepository, UserRepository>();
-    services.AddScoped<IUserService, UserService>();
-    services.AddScoped<IModelConfigurationRepository, ModelConfigurationRepository>();
-    services.AddScoped<IModelConfigurationService, ModelConfigurationService>();
-    services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IModelConfigurationRepository, ModelConfigurationRepository>();
+        services.AddScoped<IModelConfigurationService, ModelConfigurationService>();
+        services.AddScoped<IExcelProcessingService, ExcelProcessingService>();
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
         return services;
-    }
-
-    public static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration config)
+    }    public static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration config)
     {
         var key = config["Jwt:Key"] ?? "dev-secret-key-change"; // TODO secure
         services.AddAuthentication(CookieScheme)
@@ -56,10 +55,10 @@ public static class ServiceCollectionExtensions
             });
         services.AddAuthorization(options =>
         {
-            options.AddPolicy("RequireAdmin", p => p.RequireRole("Admin"));
-            options.AddPolicy("RequireScanner", p => p.RequireRole("Scanner","Admin","Manajemen"));
-            options.AddPolicy("RequireInputer", p => p.RequireRole("Inputer","Admin","Manajemen"));
-            options.AddPolicy("RequireManajemen", p => p.RequireRole("Manajemen","Admin"));
+            options.AddPolicy("RequireAdmin", p => p.RequireRole("admin"));
+            options.AddPolicy("RequireScanner", p => p.RequireRole("scanner","admin","manajemen"));
+            options.AddPolicy("RequireInputer", p => p.RequireRole("inputer","admin","manajemen"));
+            options.AddPolicy("RequireManajemen", p => p.RequireRole("manajemen","admin"));
         });
         return services;
     }

@@ -57,8 +57,7 @@ public class UserService : IUserService
             Username = u.Username,
             Name = u.Name,
             Role = u.Role,
-            CreatedAt = u.CreatedAt,
-            UpdatedAt = u.UpdatedAt
+            CreatedDate = u.CreatedAt
         });
         return Result<IEnumerable<UserDto>>.Success(userDtos);
     }
@@ -74,8 +73,7 @@ public class UserService : IUserService
             Username = u.Username,
             Name = u.Name,
             Role = u.Role,
-            CreatedAt = u.CreatedAt,
-            UpdatedAt = u.UpdatedAt
+            CreatedDate = u.CreatedAt
         });
         return Result<(IEnumerable<UserDto>, int, int, int, string?)>.Success((dtos,total,page,pageSize,search));
     }

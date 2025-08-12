@@ -50,7 +50,7 @@ public class UserDto
     public int UserId { get; set; }
     public string Username { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public Domain.UserRole Role { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
+    public string RoleName { get; set; } = string.Empty;
+    public UserRole Role { get; set; }
+    public DateTime CreatedDate { get; set; }
 }

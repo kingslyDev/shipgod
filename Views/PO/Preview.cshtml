@@ -1,0 +1,280 @@
+@model ShipmentFinishGood.DTOs.UploadPreviewDto
+@{
+    ViewData["Title"] = "Preview Data PO";
+}
+
+<div class="container-fluid py-4">
+    <h2 class="mb-4 text-info">
+        <i class="fas fa-eye me-2"></i>Preview Data PO - @Model.FileName
+    </h2>
+
+    <form id="submitForm" asp-action="Submit" method="post">
+        <input type="hidden" name="SessionId" value="@Model.SessionId" />
+        
+        <!-- Mode Selection & Settings -->
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Pengaturan Shipment</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Mode Shipment</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="ShipmentType" id="modeLoose" value="LOOSE" checked>
+                                    <label class="form-check-label" for="modeLoose">
+                                        <i class="fas fa-boxes me-2"></i>LOOSE (Gabung per Model)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="ShipmentType" id="modePallet" value="PALLET">
+                                    <label class="form-check-label" for="modePallet">
+                                        <i class="fas fa-pallet me-2"></i>PALLET (Gabung per PO + Model)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Tanggal Shipment</label>
+                                <input type="date" name="ShipmentDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Prefix Pallet</label>
+                                <input type="text" name="PalletPrefix" class="form-control" placeholder="AA" maxlength="5">
+                                <div class="form-text">Prefix untuk barcode pallet (opsional)</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Prefix PCS</label>
+                                <input type="text" name="PcsPrefix" class="form-control" placeholder="AB" maxlength="5">
+                                <div class="form-text">Prefix untuk barcode PCS (opsional)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informasi Data</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="border-end">
+                                    <h4 class="text-primary mb-1" id="totalRows">@Model.RawData.Count</h4>
+                                    <small class="text-muted">Total Baris Excel</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border-end">
+                                    <h4 class="text-success mb-1" id="processedRows">@Model.ProcessedData.Count</h4>
+                                    <small class="text-muted">Baris Setelah Diproses</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <h4 class="text-warning mb-1" id="totalBoxes">0</h4>
+                                <small class="text-muted">Total BOX yang akan dibuat</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-table me-2"></i>Data Setelah Diproses</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="previewTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 120px;">No PO</th>
+                                <th style="width: 150px;">Model</th>
+                                <th style="width: 80px;">Total Qty</th>
+                                <th style="width: 70px;">Pallet</th>
+                                <th style="width: 70px;">Box</th>
+                                <th style="width: 70px;">PCS</th>
+                                <th style="width: 120px;">Invoice</th>
+                                <th style="width: 120px;">Container</th>
+                                <th style="width: 150px;">Shipment Detail</th>
+                                <th style="width: 80px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewTableBody">
+                            @for (int i = 0; i < Model.ProcessedData.Count; i++)
+                            {
+                                <tr data-index="@i">
+                                    <td>
+                                        <input type="hidden" name="ProcessedData[@i].NoPO" value="@Model.ProcessedData[i].NoPO" />
+                                        <span class="fw-bold">@Model.ProcessedData[i].NoPO</span>
+                                    </td>
+                                    <td>
+                                        <input type="hidden" name="ProcessedData[@i].Model" value="@Model.ProcessedData[i].Model" />
+                                        <span class="badge bg-primary">@Model.ProcessedData[i].Model</span>
+                                    </td>
+                                    <td>
+                                        <input type="hidden" name="ProcessedData[@i].TotalQty" value="@Model.ProcessedData[i].TotalQty" />
+                                        <span class="fw-bold text-primary">@Model.ProcessedData[i].TotalQty.ToString("N0")</span>
+                                    </td>
+                                    <td>
+                                        <input type="hidden" name="ProcessedData[@i].QtyPallet" value="@Model.ProcessedData[i].QtyPallet" />
+                                        <span class="badge bg-success">@Model.ProcessedData[i].QtyPallet</span>
+                                    </td>
+                                    <td>
+                                        <input type="hidden" name="ProcessedData[@i].QtyBox" value="@Model.ProcessedData[i].QtyBox" />
+                                        <span class="badge bg-warning text-dark">@Model.ProcessedData[i].QtyBox</span>
+                                    </td>
+                                    <td>
+                                        <input type="hidden" name="ProcessedData[@i].QtyPcs" value="@Model.ProcessedData[i].QtyPcs" />
+                                        <span class="badge bg-info">@Model.ProcessedData[i].QtyPcs</span>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="ProcessedData[@i].NoInvoice" class="form-control form-control-sm" placeholder="Invoice..." value="@Model.ProcessedData[i].NoInvoice" />
+                                    </td>
+                                    <td>
+                                        <input type="text" name="ProcessedData[@i].Container" class="form-control form-control-sm" placeholder="Container..." value="@Model.ProcessedData[i].Container" />
+                                    </td>
+                                    <td>
+                                        <input type="text" name="ProcessedData[@i].ShipmentDetail" class="form-control form-control-sm" placeholder="Detail..." value="@Model.ProcessedData[i].ShipmentDetail" />
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="editRow(@i)">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <button type="submit" class="btn btn-success btn-lg me-3">
+                    <i class="fas fa-calculator me-2"></i>Submit & Calculate
+                </button>
+                <a asp-action="Create" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>Upload Ulang
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update calculation when mode changes
+            document.querySelectorAll('input[name="ShipmentType"]').forEach(radio => {
+                radio.addEventListener('change', updateCalculation);
+            });
+            
+            // Initial calculation
+            updateCalculation();
+        });
+
+        function updateCalculation() {
+            const shipmentType = document.querySelector('input[name="ShipmentType"]:checked').value;
+            const sessionId = @Model.SessionId;
+            
+            fetch('/PO/UpdateMode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `sessionId=${sessionId}&shipmentType=${shipmentType}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateTable(data.data);
+                    updateStatistics(data.data);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function updateTable(data) {
+            const tbody = document.getElementById('previewTableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach((item, index) => {
+                const row = `
+                    <tr data-index="${index}">
+                        <td>
+                            <input type="hidden" name="ProcessedData[${index}].NoPO" value="${item.noPO}" />
+                            <span class="fw-bold">${item.noPO}</span>
+                        </td>
+                        <td>
+                            <input type="hidden" name="ProcessedData[${index}].Model" value="${item.model}" />
+                            <span class="badge bg-primary">${item.model}</span>
+                        </td>
+                        <td>
+                            <input type="hidden" name="ProcessedData[${index}].TotalQty" value="${item.totalQty}" />
+                            <span class="fw-bold text-primary">${item.totalQty.toLocaleString()}</span>
+                        </td>
+                        <td>
+                            <input type="hidden" name="ProcessedData[${index}].QtyPallet" value="${item.qtyPallet}" />
+                            <span class="badge bg-success">${item.qtyPallet}</span>
+                        </td>
+                        <td>
+                            <input type="hidden" name="ProcessedData[${index}].QtyBox" value="${item.qtyBox}" />
+                            <span class="badge bg-warning text-dark">${item.qtyBox}</span>
+                        </td>
+                        <td>
+                            <input type="hidden" name="ProcessedData[${index}].QtyPcs" value="${item.qtyPcs}" />
+                            <span class="badge bg-info">${item.qtyPcs}</span>
+                        </td>
+                        <td>
+                            <input type="text" name="ProcessedData[${index}].NoInvoice" class="form-control form-control-sm" placeholder="Invoice..." />
+                        </td>
+                        <td>
+                            <input type="text" name="ProcessedData[${index}].Container" class="form-control form-control-sm" placeholder="Container..." />
+                        </td>
+                        <td>
+                            <input type="text" name="ProcessedData[${index}].ShipmentDetail" class="form-control form-control-sm" placeholder="Detail..." />
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editRow(${index})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function updateStatistics(data) {
+            document.getElementById('processedRows').textContent = data.length;
+            
+            const totalBoxes = data.reduce((sum, item) => sum + item.qtyBox, 0);
+            document.getElementById('totalBoxes').textContent = totalBoxes.toLocaleString();
+        }
+
+        function editRow(index) {
+            // Simple inline editing functionality
+            const row = document.querySelector(`tr[data-index="${index}"]`);
+            const totalQtyInput = row.querySelector(`input[name="ProcessedData[${index}].TotalQty"]`);
+            
+            const newQty = prompt('Enter new quantity:', totalQtyInput.value);
+            if (newQty && !isNaN(newQty) && parseInt(newQty) > 0) {
+                totalQtyInput.value = parseInt(newQty);
+                row.querySelector('td:nth-child(3) span').textContent = parseInt(newQty).toLocaleString();
+                
+                // TODO: Implement recalculation for this row
+                alert('Quantity updated. Note: Automatic recalculation will be implemented.');
+            }
+        }
+    </script>
+}
