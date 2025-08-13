@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Models;
 using ShipmentFinishGood.Repositories;
+using System.Security.Cryptography;
 
 namespace ShipmentFinishGood.Services
 {
@@ -17,98 +18,142 @@ namespace ShipmentFinishGood.Services
             _modelConfigService = modelConfigService;
         }
 
-        public async Task<UploadPreviewDto> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
+    public async Task<UploadPreviewDto> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
+    {
+        // Generate file hash for duplicate detection
+        var fileHash = await GenerateFileHashAsync(file);
+        
+        // Check for duplicate uploads (same file content + same user + within last 24 hours)
+        var duplicateCheck = await _context.UploadSessions
+            .Where(s => s.FileHash == fileHash && 
+                       s.UploadedBy == uploadedBy && 
+                       s.UploadDate >= DateTime.Now.AddDays(-1) &&
+                       s.Status != "DELETED")
+            .FirstOrDefaultAsync();
+
+        if (duplicateCheck != null)
         {
-            var rawData = ParseExcelFileAsync(file);
-            var processedDataLoose = await CalculateProcessedDataAsync(rawData, "LOOSE");
+            throw new InvalidOperationException($"File '{file.FileName}' dengan konten yang sama sudah diupload pada {duplicateCheck.UploadDate:dd/MM/yyyy HH:mm}. Session ID: {duplicateCheck.SessionId}");
+        }
 
-            var session = new UploadSession
-            {
-                FileName = file.FileName,
-                SheetName = "Sheet1",
-                Status = "PREVIEW",
-                UploadDate = DateTime.Now,
-                UploadedBy = uploadedBy,
-                SheetIdentifier = GenerateSheetIdentifier()
-            };
+        var rawData = ParseExcelFileAsync(file);
+        
+        // Group by country first
+        var dataByCountry = rawData
+            .GroupBy(r => r.Country ?? "Unknown")
+            .ToDictionary(g => g.Key, g => g.ToList());
 
-            _context.UploadSessions.Add(session);
-            await _context.SaveChangesAsync();
+        // Calculate processed data for each country
+        var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
+        foreach (var countryGroup in dataByCountry)
+        {
+            var processedData = await CalculateProcessedDataAsync(countryGroup.Value, "LOOSE");
+            processedDataByCountry[countryGroup.Key] = processedData;
+        }
 
-            foreach (var row in rawData)
-            {
-                var detail = new UploadSessionDetail
-                {
-                    SessionId = session.SessionId,
-                    OriginalPO = row.NoPO,
-                    Model = row.Model,
-                    OriginalQty = row.Qty,
-                    RowIndex = row.RowIndex
-                };
-                _context.UploadSessionDetails.Add(detail);
-            }
-            await _context.SaveChangesAsync();
+        var session = new UploadSession
+        {
+            FileName = file.FileName,
+            SheetName = "Sheet1",
+            Status = "PREVIEW",
+            UploadDate = DateTime.Now,
+            UploadedBy = uploadedBy,
+            SheetIdentifier = GenerateSheetIdentifier(),
+            FileHash = fileHash,
+            Countries = string.Join(",", dataByCountry.Keys)  // Store all countries
+        };            _context.UploadSessions.Add(session);
+        await _context.SaveChangesAsync();
 
-            return new UploadPreviewDto
+        // Store raw data with country info
+        foreach (var row in rawData)
+        {
+            var detail = new UploadSessionDetail
             {
                 SessionId = session.SessionId,
-                FileName = session.FileName,
-                SheetName = session.SheetName,
-                RawData = rawData,
-                ProcessedData = processedDataLoose
+                OriginalPO = row.NoPO,
+                Model = row.Model,
+                OriginalQty = row.Qty,
+                RowIndex = row.RowIndex,
+                Country = row.Country  // NEW: Store country
             };
+            _context.UploadSessionDetails.Add(detail);
+        }
+        await _context.SaveChangesAsync();
+
+        // Flatten for backward compatibility
+        var allProcessedData = processedDataByCountry.Values.SelectMany(x => x).ToList();
+
+        return new UploadPreviewDto
+        {
+            SessionId = session.SessionId,
+            FileName = session.FileName,
+            SheetName = session.SheetName,
+            RawData = rawData,
+            ProcessedData = allProcessedData,
+            ProcessedDataByCountry = processedDataByCountry,
+            PendingCountries = dataByCountry.Keys.ToList(),
+            SubmittedCountries = new List<string>()
+        };
         }
 
-        private List<ExcelRowData> ParseExcelFileAsync(IFormFile file)
+    private List<ExcelRowData> ParseExcelFileAsync(IFormFile file)
+    {
+        var rawData = new List<ExcelRowData>();
+
+        using var stream = file.OpenReadStream();
+        using var workbook = new XLWorkbook(stream);
+        var worksheet = workbook.Worksheet(1);
+
+        var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+        var currentPO = string.Empty;
+        var currentCountry = string.Empty;  // NEW: Track current country
+
+        for (int row = 2; row <= lastRowUsed; row++)
         {
-            var rawData = new List<ExcelRowData>();
+            var countryCell = worksheet.Cell(row, 1).GetString().Trim();  // Column 1: Country
+            var noPOCell = worksheet.Cell(row, 2).GetString().Trim();     // Column 2: No PO
+            var modelCell = worksheet.Cell(row, 3).GetString().Trim();    // Column 3: Model
+            var qtyCell = worksheet.Cell(row, 4).GetString().Trim();      // Column 4: Qty
 
-            using var stream = file.OpenReadStream();
-            using var workbook = new XLWorkbook(stream);
-            var worksheet = workbook.Worksheet(1);
+            if (string.IsNullOrEmpty(modelCell) && string.IsNullOrEmpty(qtyCell))
+                continue;
 
-            var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
-            var currentPO = string.Empty;
-
-            for (int row = 2; row <= lastRowUsed; row++)
+            // Inherit Country if empty
+            if (!string.IsNullOrEmpty(countryCell))
             {
-                var noPOCell = worksheet.Cell(row, 1).GetString().Trim();
-                var modelCell = worksheet.Cell(row, 2).GetString().Trim();
-                var qtyCell = worksheet.Cell(row, 3).GetString().Trim();
-
-                if (string.IsNullOrEmpty(modelCell) && string.IsNullOrEmpty(qtyCell))
-                    continue;
-
-                if (!string.IsNullOrEmpty(noPOCell))
-                {
-                    currentPO = noPOCell;
-                }
-
-                if (!int.TryParse(qtyCell.Replace(".", "").Replace(",", ""), out int qty))
-                {
-                    if (decimal.TryParse(qtyCell, out decimal decimalQty))
-                    {
-                        qty = (int)Math.Round(decimalQty);
-                    }
-                    else
-                    {
-                        continue;
-                    }
-                }
-
-                rawData.Add(new ExcelRowData
-                {
-                    NoPO = currentPO,
-                    Model = modelCell,
-                    Qty = qty,
-                    RowIndex = row
-                });
+                currentCountry = countryCell;
             }
 
-            return rawData;
+            // Inherit PO if empty
+            if (!string.IsNullOrEmpty(noPOCell))
+            {
+                currentPO = noPOCell;
+            }
+
+            if (!int.TryParse(qtyCell.Replace(".", "").Replace(",", ""), out int qty))
+            {
+                if (decimal.TryParse(qtyCell, out decimal decimalQty))
+                {
+                    qty = (int)Math.Round(decimalQty);
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            rawData.Add(new ExcelRowData
+            {
+                NoPO = currentPO,
+                Country = currentCountry,  // NEW: Add country
+                Model = modelCell,
+                Qty = qty,
+                RowIndex = row
+            });
         }
 
-        public async Task<List<ProcessedPOData>> CalculateProcessedDataAsync(List<ExcelRowData> rawData, string shipmentType)
+        return rawData;
+    }        public async Task<List<ProcessedPOData>> CalculateProcessedDataAsync(List<ExcelRowData> rawData, string shipmentType)
         {
             var modelConfigs = await _modelConfigService.GetAllAsync();
             // Group by model name because we can have both LOOSE and PALLET configs with the same model name
@@ -125,6 +170,7 @@ namespace ShipmentFinishGood.Services
                     .Select(g => new ProcessedPOData
                     {
                         NoPO = string.Join(", ", g.Select(x => x.NoPO).Distinct()),
+                        Country = g.Select(x => x.Country).FirstOrDefault() ?? "",  // NEW: Include country
                         Model = g.Key ?? "",
                         TotalQty = g.Sum(x => x.Qty)
                     })
@@ -137,6 +183,7 @@ namespace ShipmentFinishGood.Services
                     .Select(g => new ProcessedPOData
                     {
                         NoPO = g.Key.NoPO ?? "",
+                        Country = g.Select(x => x.Country).FirstOrDefault() ?? "",  // NEW: Include country
                         Model = g.Key.Model ?? "",
                         TotalQty = g.Sum(x => x.Qty)
                     })
@@ -212,7 +259,8 @@ namespace ShipmentFinishGood.Services
                     ShipmentDetail = item.ShipmentDetail,
                     SourceSessionId = request.SessionId,
                     ShipmentMethod = request.ShipmentType,
-                    CreatedBy = createdBy
+                    CreatedBy = createdBy,
+                    Country = item.Country  // NEW: Store country in POMaster
                 };
 
                 _context.POMasters.Add(poMaster);
@@ -222,37 +270,121 @@ namespace ShipmentFinishGood.Services
             return true;
         }
 
-        public async Task<UploadPreviewDto?> GetPreviewAsync(int sessionId)
+        // NEW: Method to submit specific country
+        public async Task<bool> SubmitCountryDataAsync(CountrySubmissionRequest request, string createdBy)
         {
-            var session = await _context.UploadSessions
-                .Include(s => s.Details)
-                .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+            // Validate no duplicate country submission
+            var existingCountrySubmission = await _context.UploadSessions
+                .Where(s => s.ParentSessionId == request.SessionId && 
+                            s.Country == request.Country && 
+                            s.Status == "PROCESSED")
+                .FirstOrDefaultAsync();
 
-            if (session == null) return null;
-
-            var rawData = session.Details.Select(d => new ExcelRowData
+            if (existingCountrySubmission != null)
             {
-                NoPO = d.OriginalPO,
-                Model = d.Model,
-                Qty = d.OriginalQty,
-                RowIndex = d.RowIndex
-            }).ToList();
+                throw new InvalidOperationException($"Country {request.Country} sudah di-submit sebelumnya!");
+            }
 
-            var processedData = await CalculateProcessedDataAsync(rawData, session.ShipmentType ?? "LOOSE");
+            // Create new session for this country
+            var parentSession = await _context.UploadSessions.FindAsync(request.SessionId);
+            if (parentSession == null) return false;
 
-            return new UploadPreviewDto
+            var newSession = new UploadSession
             {
-                SessionId = session.SessionId,
-                FileName = session.FileName,
-                SheetName = session.SheetName,
-                RawData = rawData,
-                ProcessedData = processedData,
-                ShipmentType = session.ShipmentType,
-                ShipmentDate = session.ShipmentDate
+                FileName = $"{parentSession.FileName} - {request.Country}",
+                SheetName = parentSession.SheetName,
+                ShipmentType = request.ShipmentType,
+                ShipmentDate = request.ShipmentDate,
+                Status = "PROCESSED",
+                UploadedBy = parentSession.UploadedBy,
+                Country = request.Country,
+                ParentSessionId = request.SessionId,
+                SheetIdentifier = GenerateSheetIdentifier()
             };
+
+            _context.UploadSessions.Add(newSession);
+            await _context.SaveChangesAsync();
+
+            // Create POMasters for this country
+            foreach (var item in request.ProcessedData)
+            {
+                var poMaster = new POMaster
+                {
+                    NoPO = item.NoPO,
+                    ModelProduk = item.Model,
+                    QtyTotal = item.TotalQty,
+                    QtyPallet = item.QtyPallet,
+                    QtyBox = item.QtyBox,
+                    QtyPcs = item.QtyPcs,
+                    Container = item.Container,
+                    NoInvoice = item.NoInvoice,
+                    ShipmentDetail = item.ShipmentDetail,
+                    SourceSessionId = newSession.SessionId,
+                    ShipmentMethod = request.ShipmentType,
+                    CreatedBy = createdBy,
+                    Country = request.Country  // NEW: Store country in POMaster
+                };
+
+                _context.POMasters.Add(poMaster);
+            }
+
+            await _context.SaveChangesAsync();
+            return true;
         }
 
-        public async Task<bool> UpdatePODataAsync(int poId, ProcessedPOData updatedData)
+    public async Task<UploadPreviewDto?> GetPreviewAsync(int sessionId)
+    {
+        var session = await _context.UploadSessions
+            .Include(s => s.Details)
+            .Include(s => s.ChildSessions)
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+        if (session == null) return null;
+
+        // Get submitted countries from child sessions
+        var submittedCountries = session.ChildSessions
+            .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
+            .Select(c => c.Country!)
+            .ToList();
+
+        var rawData = session.Details.Select(d => new ExcelRowData
+        {
+            NoPO = d.OriginalPO,
+            Country = d.Country,  // NEW: Include country
+            Model = d.Model,
+            Qty = d.OriginalQty,
+            RowIndex = d.RowIndex
+        }).ToList();
+
+        // Group by country
+        var dataByCountry = rawData
+            .GroupBy(r => r.Country ?? "Unknown")
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
+        foreach (var countryGroup in dataByCountry.Where(c => !submittedCountries.Contains(c.Key)))
+        {
+            var processedData = await CalculateProcessedDataAsync(countryGroup.Value, session.ShipmentType ?? "LOOSE");
+            processedDataByCountry[countryGroup.Key] = processedData;
+        }
+
+        var allProcessedData = processedDataByCountry.Values.SelectMany(x => x).ToList();
+        var pendingCountries = dataByCountry.Keys.Where(c => !submittedCountries.Contains(c)).ToList();
+
+        return new UploadPreviewDto
+        {
+            SessionId = session.SessionId,
+            FileName = session.FileName,
+            SheetName = session.SheetName,
+            RawData = rawData,
+            ProcessedData = allProcessedData,
+            ProcessedDataByCountry = processedDataByCountry,
+            PendingCountries = pendingCountries,
+            SubmittedCountries = submittedCountries,
+            ShipmentType = session.ShipmentType,
+            ShipmentDate = session.ShipmentDate
+        };
+    }        public async Task<bool> UpdatePODataAsync(int poId, ProcessedPOData updatedData)
         {
             var poMaster = await _context.POMasters.FindAsync(poId);
             if (poMaster == null) return false;
@@ -358,6 +490,14 @@ namespace ShipmentFinishGood.Services
         private string GenerateSheetIdentifier()
         {
             return $"SH{DateTime.Now:yyyyMMddHHmmss}";
+        }
+
+        private async Task<string> GenerateFileHashAsync(IFormFile file)
+        {
+            using var stream = file.OpenReadStream();
+            using var sha256 = SHA256.Create();
+            var hashBytes = await Task.Run(() => sha256.ComputeHash(stream));
+            return Convert.ToBase64String(hashBytes);
         }
     }
 }

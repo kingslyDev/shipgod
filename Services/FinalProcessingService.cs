@@ -139,6 +139,30 @@ namespace ShipmentFinishGood.Services
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var qrIdentity = $"QR_{session.SheetIdentifier}_{session.ShipmentType}_{timestamp}";
             
+            // Check for QR Identity duplicate
+            var duplicateQR = await _context.UploadSessions
+                .Where(s => s.IdentityQRCode == qrIdentity && 
+                           s.SessionId != sessionId &&
+                           s.Status != "DELETED")
+                .FirstOrDefaultAsync();
+
+            if (duplicateQR != null)
+            {
+                // Add milliseconds to make it unique
+                var timestampWithMs = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                qrIdentity = $"QR_{session.SheetIdentifier}_{session.ShipmentType}_{timestampWithMs}";
+                
+                // Double check uniqueness
+                var duplicateQR2 = await _context.UploadSessions
+                    .Where(s => s.IdentityQRCode == qrIdentity && s.SessionId != sessionId)
+                    .FirstOrDefaultAsync();
+                    
+                if (duplicateQR2 != null)
+                {
+                    throw new InvalidOperationException($"Unable to generate unique QR Identity. Please try again.");
+                }
+            }
+            
             session.IdentityQRCode = qrIdentity;
             session.Status = "QR_GENERATED";
 

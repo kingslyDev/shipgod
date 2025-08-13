@@ -67,10 +67,10 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
                             <div>
-                                <div class="h5 mb-0">@Model.Count(h => h.Action == "AREA_ASSIGN")</div>
-                                <div class="small">Area Assignments</div>
+                                <div class="h5 mb-0">@Model.Count(h => h.Result == "SUCCESS")</div>
+                                <div class="small">Successful Scans</div>
                             </div>
-                            <i class="fas fa-map-marker-alt fa-2x"></i>
+                            <i class="fas fa-check-circle fa-2x"></i>
                         </div>
                     </div>
                 </div>
@@ -93,7 +93,6 @@
                                 <th>Action</th>
                                 <th>Barcode/QR</th>
                                 <th>User</th>
-                                <th>Area</th>
                                 <th>Result</th>
                                 <th>Details</th>
                             </tr>
@@ -119,11 +118,6 @@
                                                     <i class="fas fa-box me-1"></i>Box Scan
                                                 </span>
                                                 break;
-                                            case "AREA_ASSIGN":
-                                                <span class="badge bg-warning text-dark">
-                                                    <i class="fas fa-map-marker-alt me-1"></i>Area Assign
-                                                </span>
-                                                break;
                                             default:
                                                 <span class="badge bg-secondary">@activity.Action</span>
                                                 break;
@@ -144,16 +138,6 @@
                                         @if (!string.IsNullOrEmpty(activity.UserId))
                                         {
                                             <span class="badge bg-info">@activity.UserId</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">-</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (!string.IsNullOrEmpty(activity.AssignedArea))
-                                        {
-                                            <span class="badge bg-primary">Area @activity.AssignedArea</span>
                                         }
                                         else
                                         {
@@ -245,7 +229,7 @@
                 },
                 columnDefs: [
                     { targets: [2], orderable: false }, // Barcode column
-                    { targets: [6], orderable: false }  // Details column
+                    { targets: [5], orderable: false }  // Details column
                 ]
             });
 

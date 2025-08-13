@@ -1,214 +1,1181 @@
 @model ShipmentFinishGood.DTOs.UploadPreviewDto
 @{
-    ViewData["Title"] = "Periksa Data PO";
+    ViewData["Title"] = "Preview Data PO";
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/po.css" asp-append-version="true" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Modern Clean Design for Baby Boomers & Millennials */
+        :root {
+            --primary-blue: #2c5282;
+            --primary-light: #3182ce;
+            --success-green: #38a169;
+            --warning-orange: #ed8936;
+            --info-teal: #319795;
+            --danger-red: #e53e3e;
+            --gray-50: #f7fafc;
+            --gray-100: #edf2f7;
+            --gray-200: #e2e8f0;
+            --gray-600: #718096;
+            --gray-800: #2d3748;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+        }
+
+        /* Header Design */
+        .page-header {
+            background: linear-gradient(135deg, var(--primary-blue), var(--primary-light));
+            color: var(--white);
+            padding: 2rem;
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            transform: translate(50px, -50px);
+        }
+
+        .page-header h2 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .page-header .subtitle {
+            font-size: 1.125rem;
+            opacity: 0.9;
+            margin: 0;
+            font-weight: 400;
+        }
+
+        /* Country Management Card */
+        .country-selector {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+        }
+
+        .country-selector h4 {
+            color: var(--gray-800);
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .country-badge {
+            background: var(--success-green);
+            color: var(--white);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            margin-right: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pending-badge {
+            background: var(--warning-orange);
+            color: var(--white);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            margin-right: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .submitted-badge {
+            background: var(--success-green);
+            color: var(--white);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            margin-right: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Enhanced Form Controls */
+        .form-select {
+            border: 2px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            background-color: var(--white);
+        }
+
+        .form-select:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+            outline: none;
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+        }
+
+        .settings-panel h5 {
+            color: var(--gray-800);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .form-check-input {
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-top: 0.125rem;
+        }
+
+        .form-check-label {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--gray-800);
+            margin-left: 0.5rem;
+        }
+
+        /* Stats Row */
+        .stats-row {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+        }
+
+        .stats-card {
+            text-align: center;
+            padding: 1rem;
+            border-radius: var(--radius-lg);
+            background: var(--gray-50);
+            border: 1px solid var(--gray-100);
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .stats-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Table Improvements */
+        .table-container {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, var(--primary-blue), var(--primary-light));
+            color: var(--white);
+            padding: 1.5rem 2rem;
+            border: none;
+        }
+
+        .table-header h5 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .table-header .badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: var(--white);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .table th {
+            background: var(--gray-50);
+            color: var(--gray-800);
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 1rem;
+            border: none;
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .table td {
+            padding: 1rem;
+            border: none;
+            border-bottom: 1px solid var(--gray-100);
+            vertical-align: middle;
+        }
+
+        .table tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        /* Enhanced Badges */
+        .badge {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            border-radius: 50px;
+        }
+
+        /* Submit Button */
+        .btn-submit-country {
+            background: linear-gradient(135deg, var(--success-green), #48bb78);
+            border: none;
+            color: var(--white);
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-sm);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .btn-submit-country:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            background: linear-gradient(135deg, #2f855a, var(--success-green));
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-content {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: var(--radius-xl);
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Animations */
+        .country-table {
+            display: none;
+            animation: fadeInUp 0.4s ease-out;
+        }
+
+        .country-table.active {
+            display: block;
+        }
+
+        @@keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @@keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @@keyframes slideOutRight {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+
+        /* Responsive Design */
+        @@media (max-width: 768px) {
+            .page-header {
+                padding: 1.5rem;
+            }
+            
+            .page-header h2 {
+                font-size: 1.75rem;
+            }
+            
+            .country-selector,
+            .settings-panel,
+            .stats-row {
+                padding: 1.5rem;
+            }
+            
+            .stats-number {
+                font-size: 2rem;
+            }
+        }
+
+        /* Accessibility Improvements */
+        .form-control:focus,
+        .form-select:focus {
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+            border-color: var(--primary-light);
+        }
+
+        /* Success States */
+        .alert-success {
+            background: linear-gradient(135deg, #f0fff4, #e6fffa);
+            border: 1px solid #9ae6b4;
+            color: #276749;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+        }
+    </style>
 }
 
-<div class="main-container">
-    <!-- Enhanced Header -->
+<div class="container-fluid">
+    @Html.AntiForgeryToken()
+    
+    <!-- Modern Header -->
     <div class="page-header">
-        <h1>
+        <h2>
             <i class="fas fa-clipboard-check"></i>
-            Periksa Data Sebelum Disimpan
-        </h1>
+            Preview Data PO
+        </h2>
         <p class="subtitle">
-            📁 File: <strong>@Model.FileName</strong> | Pastikan semua data sudah benar sebelum melanjutkan
+            <i class="fas fa-file-excel me-2"></i>
+            <strong>@Model.FileName</strong> - Ready for processing
         </p>
     </div>
 
-    <!-- Enhanced Breadcrumb -->
-    <nav class="breadcrumb-enhanced" aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item">
-                <a href="@Url.Action("Index", "Home")">🏠 Beranda</a>
-            </li>
-            <li class="breadcrumb-item">
-                <a href="@Url.Action("Index", "PO")">📋 Daftar PO</a>
-            </li>
-            <li class="breadcrumb-item">
-                <a href="@Url.Action("Create", "PO")">📤 Upload Data</a>
-            </li>
-            <li class="breadcrumb-item active" aria-current="page">👀 Periksa Data</li>
-        </ol>
-    </nav>
+    <!-- Country Management Section -->
+    @if(Model.ProcessedDataByCountry.Any())
+    {
+        <div class="country-selector">
+            <h4>
+                <i class="fas fa-globe-americas"></i>
+                Country Management System
+            </h4>
+            
+            @if(Model.SubmittedCountries.Any())
+            {
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Completed Countries</strong>
+                    </h6>
+                    <div class="d-flex flex-wrap">
+                        @foreach(var country in Model.SubmittedCountries)
+                        {
+                            <span class="submitted-badge">
+                                <i class="fas fa-check"></i>
+                                @country
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+            
+            @if(Model.PendingCountries.Any())
+            {
+                <div class="mb-4">
+                    <label class="form-label fw-bold mb-3">
+                        <i class="fas fa-tasks me-2"></i>
+                        Select Country to Process:
+                    </label>
+                    <select id="countryDropdown" class="form-select form-select-lg" onchange="switchCountry()">
+                        <option value="">-- Choose a Country --</option>
+                        @foreach(var country in Model.PendingCountries)
+                        {
+                            <option value="@country">
+                                🌍 @country (@Model.ProcessedDataByCountry[country].Count items)
+                            </option>
+                        }
+                    </select>
+                </div>
+                
+                <div>
+                    <h6 class="text-muted mb-3">
+                        <i class="fas fa-hourglass-half me-2"></i>
+                        <strong>Pending Countries</strong>
+                    </h6>
+                    <div class="d-flex flex-wrap">
+                        @foreach(var country in Model.PendingCountries)
+                        {
+                            <span class="pending-badge">
+                                <i class="fas fa-clock"></i>
+                                @country (@Model.ProcessedDataByCountry[country].Count items)
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-success text-center mt-4">
+                    <i class="fas fa-trophy fa-3x mb-3 text-success"></i>
+                    <h4 class="mb-3">🎉 Mission Accomplished!</h4>
+                    <p class="mb-0">All countries have been successfully processed and submitted.</p>
+                </div>
+            }
+        </div>
+    }
 
-    <!-- Progress Wizard -->
-    <div class="progress-wizard">
-        <div class="progress-step completed">
-            <div class="step-circle">✓</div>
-            <div class="step-label">Upload File</div>
+    <!-- Enhanced Settings Panel -->
+    @if(Model.PendingCountries.Any())
+    {
+        <div class="settings-panel" id="settingsPanel" style="display: none;">
+            <h5>
+                <i class="fas fa-cogs"></i>
+                Configuration Settings
+            </h5>
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card h-100 border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-primary">
+                                <i class="fas fa-shipping-fast me-2"></i>
+                                Shipment Type
+                            </h6>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="shipmentType" id="typeLoose" value="LOOSE" checked onchange="updateMode()">
+                                <label class="form-check-label" for="typeLoose">
+                                    <i class="fas fa-boxes me-2 text-info"></i>
+                                    <strong>LOOSE</strong>
+                                    <small class="d-block text-muted">Group by Model</small>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="shipmentType" id="typePallet" value="PALLET" onchange="updateMode()">
+                                <label class="form-check-label" for="typePallet">
+                                    <i class="fas fa-pallet me-2 text-warning"></i>
+                                    <strong>PALLET</strong>
+                                    <small class="d-block text-muted">Group by PO + Model</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card h-100 border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-primary">
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                Shipment Date
+                            </h6>
+                            <input type="date" id="shipmentDate" class="form-control form-control-lg" 
+                                   value="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                            <small class="text-muted">Select the planned shipment date</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card h-100 border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title text-primary">
+                                <i class="fas fa-tag me-2"></i>
+                                Prefix Settings
+                            </h6>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small">Pallet Prefix</label>
+                                    <input type="text" id="palletPrefix" class="form-control" 
+                                           placeholder="AA" maxlength="5">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">PCS Prefix</label>
+                                    <input type="text" id="pcsPrefix" class="form-control" 
+                                           placeholder="AB" maxlength="5">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="progress-step active">
-            <div class="step-circle">2</div>
-            <div class="step-label">Periksa Data</div>
+
+        <!-- Enhanced Statistics Row -->
+        <div class="stats-row" id="statsRow" style="display: none;">
+            <div class="row g-4">
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-card">
+                        <span class="stats-number text-primary" id="totalItems">0</span>
+                        <div class="stats-label">
+                            <i class="fas fa-list me-1"></i>
+                            Total Items
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-card">
+                        <span class="stats-number text-success" id="totalPallets">0</span>
+                        <div class="stats-label">
+                            <i class="fas fa-pallet me-1"></i>
+                            Pallets
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-card">
+                        <span class="stats-number text-warning" id="totalBoxes">0</span>
+                        <div class="stats-label">
+                            <i class="fas fa-box me-1"></i>
+                            Boxes
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-card">
+                        <span class="stats-number text-info" id="totalPCS">0</span>
+                        <div class="stats-label">
+                            <i class="fas fa-cube me-1"></i>
+                            PCS
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="progress-step">
-            <div class="step-circle">3</div>
-            <div class="step-label">Selesai</div>
-        </div>
+    }
+
+    <!-- Country Tables -->
+    <div id="countryTables">
+        @foreach(var countryData in Model.ProcessedDataByCountry.Where(c => Model.PendingCountries.Contains(c.Key)))
+        {
+            <div class="country-table" data-country="@countryData.Key">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h5>
+                            <i class="fas fa-flag"></i>
+                            @countryData.Key Processing
+                            <span class="badge bg-light text-primary ms-3">
+                                <i class="fas fa-list me-1"></i>
+                                @countryData.Value.Count items
+                            </span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="table_@countryData.Key">
+                                <thead>
+                                    <tr>
+                                        <th><i class="fas fa-file-alt me-2"></i>PO Number</th>
+                                        <th><i class="fas fa-cube me-2"></i>Model</th>
+                                        <th><i class="fas fa-calculator me-2"></i>Total Qty</th>
+                                        <th><i class="fas fa-pallet me-2"></i>Pallet</th>
+                                        <th><i class="fas fa-box me-2"></i>Box</th>
+                                        <th><i class="fas fa-boxes me-2"></i>PCS</th>
+                                        <th><i class="fas fa-file-invoice me-2"></i>Invoice</th>
+                                        <th><i class="fas fa-shipping-fast me-2"></i>Container</th>
+                                        <th><i class="fas fa-info-circle me-2"></i>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < countryData.Value.Count; i++)
+                                    {
+                                        var item = countryData.Value[i];
+                                        <tr>
+                                            <td>
+                                                <div class="fw-bold text-primary">@item.NoPO</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-tag me-1"></i>
+                                                    @item.Model
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="fw-bold text-primary fs-6">
+                                                    @item.TotalQty.ToString("N0")
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success fs-6">
+                                                    @item.QtyPallet
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-warning fs-6">
+                                                    @item.QtyBox
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info fs-6">
+                                                    @item.QtyPcs
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">
+                                                        <i class="fas fa-file-invoice text-muted"></i>
+                                                    </span>
+                                                    <input type="text" class="form-control" 
+                                                           name="invoice_@(countryData.Key)_@i" 
+                                                           placeholder="Invoice number..." 
+                                                           value="@item.NoInvoice" />
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">
+                                                        <i class="fas fa-shipping-fast text-muted"></i>
+                                                    </span>
+                                                    <input type="text" class="form-control" 
+                                                           name="container_@(countryData.Key)_@i" 
+                                                           placeholder="Container ID..." 
+                                                           value="@item.Container" />
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">
+                                                        <i class="fas fa-info-circle text-muted"></i>
+                                                    </span>
+                                                    <input type="text" class="form-control" 
+                                                           name="detail_@(countryData.Key)_@i" 
+                                                           placeholder="Additional details..." 
+                                                           value="@item.ShipmentDetail" />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer text-center bg-light py-4">
+                        <button type="button" class="btn btn-submit-country btn-lg" onclick="submitCountry('@countryData.Key')">
+                            <i class="fas fa-paper-plane"></i>
+                            Submit @countryData.Key Data
+                        </button>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Review all data before submitting. This action cannot be undone.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 
-    <form id="submitForm" asp-action="Submit" method="post">
-        <input type="hidden" name="SessionId" value="@Model.SessionId" />
-        
-        <!-- Settings Section -->
-        <div class="row">
-            <div class="col-lg-6">
-                <div class="settings-card">
-                    <div class="card-header-enhanced">
-                        <i class="fas fa-cogs me-2"></i>Pengaturan Shipment
-                    </div>
-                    <div class="card-body-enhanced">
-                        <div class="mb-4">
-                            <label class="form-label-enhanced">Mode Shipment</label>
-                            <div class="radio-option" onclick="selectRadio('modeLoose')">
-                                <input class="form-check-input" type="radio" name="ShipmentType" id="modeLoose" value="LOOSE" checked>
-                                <label for="modeLoose">
-                                    <i class="fas fa-boxes me-2"></i>LOOSE (Gabung per Model)
-                                    <br><small class="text-muted">Menggabungkan produk berdasarkan model yang sama</small>
-                                </label>
-                            </div>
-                            <div class="radio-option" onclick="selectRadio('modePallet')">
-                                <input class="form-check-input" type="radio" name="ShipmentType" id="modePallet" value="PALLET">
-                                <label for="modePallet">
-                                    <i class="fas fa-pallet me-2"></i>PALLET (Gabung per PO + Model)
-                                    <br><small class="text-muted">Menggabungkan berdasarkan PO dan model</small>
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label-enhanced" for="shipmentDate">Tanggal Shipment</label>
-                                <input type="date" id="shipmentDate" name="ShipmentDate" class="form-control-enhanced" value="@DateTime.Today.ToString("yyyy-MM-dd")" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label-enhanced" for="palletPrefix">Prefix Pallet</label>
-                                <input type="text" id="palletPrefix" name="PalletPrefix" class="form-control-enhanced" placeholder="Contoh: AA" maxlength="5">
-                                <small class="text-muted">Prefix untuk barcode pallet (opsional)</small>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label-enhanced" for="pcsPrefix">Prefix PCS</label>
-                                <input type="text" id="pcsPrefix" name="PcsPrefix" class="form-control-enhanced" placeholder="Contoh: AB" maxlength="5">
-                                <small class="text-muted">Prefix untuk barcode PCS (opsional)</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-6">
-                <!-- Statistics -->
-                <div class="stats-container">
-                    <div class="stat-card">
-                        <div class="stat-number" id="totalRows">@Model.RawData.Count</div>
-                        <div class="stat-label">Total Baris Excel</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="processedRows">@Model.ProcessedData.Count</div>
-                        <div class="stat-label">Baris Diproses</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="totalBoxes">0</div>
-                        <div class="stat-label">Total BOX</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Data Table -->
-        <div class="table-container">
-            <div class="table-header">
-                <i class="fas fa-table me-2"></i>Data Setelah Diproses
-            </div>
-            <div class="table-responsive">
-                <table class="table-enhanced" id="previewTable">
-                    <thead>
-                        <tr>
-                            <th>No PO</th>
-                            <th>Model</th>
-                            <th>Total Qty</th>
-                            <th>Pallet</th>
-                            <th>Box</th>
-                            <th>PCS</th>
-                            <th>Invoice</th>
-                            <th>Container</th>
-                            <th>Shipment Detail</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="previewTableBody">
-                        @for (int i = 0; i < Model.ProcessedData.Count; i++)
-                        {
-                            <tr data-index="@i">
-                                <td>
-                                    <input type="hidden" name="ProcessedData[@i].NoPO" value="@Model.ProcessedData[i].NoPO" />
-                                    <strong>@Model.ProcessedData[i].NoPO</strong>
-                                </td>
-                                <td>
-                                    <input type="hidden" name="ProcessedData[@i].Model" value="@Model.ProcessedData[i].Model" />
-                                    <span class="badge-enhanced" style="background: var(--primary-color); color: white;">@Model.ProcessedData[i].Model</span>
-                                </td>
-                                <td>
-                                    <input type="hidden" name="ProcessedData[@i].TotalQty" value="@Model.ProcessedData[i].TotalQty" />
-                                    <strong style="color: var(--primary-color);">@Model.ProcessedData[i].TotalQty.ToString("N0")</strong>
-                                </td>
-                                <td>
-                                    <input type="hidden" name="ProcessedData[@i].QtyPallet" value="@Model.ProcessedData[i].QtyPallet" />
-                                    <span class="badge-enhanced" style="background: var(--success-color); color: white;">@Model.ProcessedData[i].QtyPallet</span>
-                                </td>
-                                <td>
-                                    <input type="hidden" name="ProcessedData[@i].QtyBox" value="@Model.ProcessedData[i].QtyBox" />
-                                    <span class="badge-enhanced" style="background: var(--warning-color); color: white;">@Model.ProcessedData[i].QtyBox</span>
-                                </td>
-                                <td>
-                                    <input type="hidden" name="ProcessedData[@i].QtyPcs" value="@Model.ProcessedData[i].QtyPcs" />
-                                    <span class="badge-enhanced" style="background: var(--primary-light); color: white;">@Model.ProcessedData[i].QtyPcs</span>
-                                </td>
-                                <td>
-                                    <input type="text" name="ProcessedData[@i].NoInvoice" class="form-control-enhanced" style="font-size: 0.9rem; padding: 8px;" placeholder="Invoice..." value="@Model.ProcessedData[i].NoInvoice" />
-                                </td>
-                                <td>
-                                    <input type="text" name="ProcessedData[@i].Container" class="form-control-enhanced" style="font-size: 0.9rem; padding: 8px;" placeholder="Container..." value="@Model.ProcessedData[i].Container" />
-                                </td>
-                                <td>
-                                    <input type="text" name="ProcessedData[@i].ShipmentDetail" class="form-control-enhanced" style="font-size: 0.9rem; padding: 8px;" placeholder="Detail..." value="@Model.ProcessedData[i].ShipmentDetail" />
-                                </td>
-                                <td>
-                                    <button type="button" class="btn btn-sm" style="background: var(--primary-light); color: white; border: none; padding: 8px 12px; border-radius: var(--border-radius);" onclick="editRow(@i)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <button type="submit" class="btn-large btn-primary-large">
-                <i class="fas fa-calculator me-2"></i>Submit & Calculate
-            </button>
-            <a asp-action="Create" class="btn-large btn-secondary-large">
-                <i class="fas fa-arrow-left me-2"></i>Upload Ulang
+    <!-- Enhanced No Data Message -->
+    @if(!Model.ProcessedDataByCountry.Any())
+    {
+        <div class="alert alert-warning text-center py-5">
+            <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i>
+            <h4 class="mb-3">No Data Found</h4>
+            <p class="mb-4">No country data found in the uploaded file. Please verify your Excel file format and ensure it contains the required columns.</p>
+            <a asp-action="Create" class="btn btn-outline-primary">
+                <i class="fas fa-upload me-2"></i>
+                Upload Another File
             </a>
         </div>
-    </form>
+    }
+
+    <!-- Enhanced All Done Message -->
+    <div id="allDoneMessage" style="display: none;">
+        <div class="alert alert-success text-center py-5">
+            <i class="fas fa-trophy fa-4x mb-4 text-success"></i>
+            <h3 class="mb-3">🎉 Mission Accomplished!</h3>
+            <p class="mb-4 fs-5">All countries have been successfully processed and submitted. Your data is ready for the next stage.</p>
+            <div class="d-flex gap-3 justify-content-center">
+                <a asp-action="Index" class="btn btn-success btn-lg">
+                    <i class="fas fa-list me-2"></i>
+                    View All Sessions
+                </a>
+                <a asp-action="Create" class="btn btn-outline-primary btn-lg">
+                    <i class="fas fa-plus me-2"></i>
+                    Upload New File
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
-    <script src="~/js/po.js" asp-append-version="true"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function(){
-            if (window.PO && PO.initPreview) PO.initPreview(@Model.SessionId);
+        let currentData = @Html.Raw(Json.Serialize(Model.ProcessedDataByCountry));
+        let submittedCountries = @Html.Raw(Json.Serialize(Model.SubmittedCountries));
+        let sessionId = '@Model.SessionId';
+
+        // Switch country view
+        function switchCountry() {
+            const dropdown = document.getElementById('countryDropdown');
+            const selectedCountry = dropdown.value;
+            
+            // Hide all tables
+            document.querySelectorAll('.country-table').forEach(table => {
+                table.classList.remove('active');
+            });
+            
+            if (selectedCountry) {
+                // Show selected table
+                const targetTable = document.querySelector(`.country-table[data-country="${selectedCountry}"]`);
+                if (targetTable) {
+                    targetTable.classList.add('active');
+                }
+                
+                // Show settings panel and stats
+                document.getElementById('settingsPanel').style.display = 'block';
+                document.getElementById('statsRow').style.display = 'block';
+                
+                // Update stats
+                updateStats(selectedCountry);
+            } else {
+                // Hide panels
+                document.getElementById('settingsPanel').style.display = 'none';
+                document.getElementById('statsRow').style.display = 'none';
+            }
+        }
+
+        // Update mode - Fixed to recalculate data
+        async function updateMode() {
+            const selectedCountry = document.getElementById('countryDropdown').value;
+            const shipmentType = document.querySelector('input[name="shipmentType"]:checked')?.value;
+            
+            console.log('UpdateMode called:', { selectedCountry, shipmentType, sessionId });
+            
+            if (!selectedCountry || !shipmentType) {
+                console.warn('Missing required data for updateMode');
+                return;
+            }
+            
+            try {
+                showLoadingState('Recalculating...');
+                
+                const requestBody = {
+                    sessionId: parseInt(sessionId),
+                    shipmentType: shipmentType
+                };
+                
+                console.log('Sending request:', requestBody);
+                
+                const response = await fetch('/PO/UpdateMode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log('UpdateMode response:', result);
+                
+                if (result.success && result.dataByCountry) {
+                    // Update all country data
+                    Object.keys(result.dataByCountry).forEach(country => {
+                        updateCurrentDataForCountry(country, result.dataByCountry[country]);
+                    });
+                    
+                    // Update display for current country
+                    updateTableDisplay(selectedCountry);
+                    updateStats(selectedCountry);
+                    showToast('✅ Calculation updated successfully!', 'success');
+                } else {
+                    throw new Error(result.message || 'Failed to update calculation');
+                }
+            } catch (error) {
+                console.error('Error updating mode:', error);
+                showToast('❌ Error updating calculation: ' + error.message, 'error');
+            } finally {
+                hideLoadingState();
+            }
+        }
+
+        // Update statistics
+        function updateStats(country) {
+            const data = currentData[country];
+            if (!data) return;
+
+            let totalItems = data.length;
+            let totalPallets = 0;
+            let totalBoxes = 0;
+            let totalPCS = 0;
+
+            data.forEach(item => {
+                totalPallets += item.QtyPallet || 0;
+                totalBoxes += item.QtyBox || 0;
+                totalPCS += item.QtyPcs || 0;
+            });
+
+            document.getElementById('totalItems').textContent = totalItems;
+            document.getElementById('totalPallets').textContent = totalPallets;
+            document.getElementById('totalBoxes').textContent = totalBoxes;
+            document.getElementById('totalPCS').textContent = totalPCS;
+        }
+
+        // Helper function to update current data for specific country
+        function updateCurrentDataForCountry(country, newData) {
+            // Transform backend data to match frontend structure
+            currentData[country] = newData.map(item => ({
+                NoPO: item.noPO || item.NoPO,
+                Model: item.model || item.Model,
+                TotalQty: item.totalQty || item.TotalQty,
+                QtyPallet: item.qtyPallet || item.QtyPallet || 0,
+                QtyBox: item.qtyBox || item.QtyBox || 0,
+                QtyPcs: item.qtyPcs || item.QtyPcs || 0,
+                Country: country,
+                Container: item.container || item.Container || '',
+                NoInvoice: item.noInvoice || item.NoInvoice || '',
+                ShipmentDetail: item.shipmentDetail || item.ShipmentDetail || ''
+            }));
+        }
+
+        // Helper function to update table display
+        function updateTableDisplay(country) {
+            const tableBody = document.querySelector(`#table_${country} tbody`);
+            if (!tableBody) return;
+            
+            const data = currentData[country];
+            if (!data) return;
+            
+            tableBody.innerHTML = '';
+            
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <div class="fw-bold text-primary">${item.NoPO}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-primary">
+                            <i class="fas fa-tag me-1"></i>
+                            ${item.Model}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-primary fs-6">
+                            ${item.TotalQty.toLocaleString()}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-success fs-6">
+                            ${item.QtyPallet}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-warning fs-6">
+                            ${item.QtyBox}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-info fs-6">
+                            ${item.QtyPcs}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">
+                                <i class="fas fa-file-invoice text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control" 
+                                   name="invoice_${country}_${index}" 
+                                   placeholder="Invoice number..." 
+                                   value="${item.NoInvoice || ''}" />
+                        </div>
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">
+                                <i class="fas fa-shipping-fast text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control" 
+                                   name="container_${country}_${index}" 
+                                   placeholder="Container ID..." 
+                                   value="${item.Container || ''}" />
+                        </div>
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">
+                                <i class="fas fa-info-circle text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control" 
+                                   name="detail_${country}_${index}" 
+                                   placeholder="Additional details..." 
+                                   value="${item.ShipmentDetail || ''}" />
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Loading state helpers
+        function showLoadingState(message = 'Loading...') {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loadingOverlay';
+            loadingDiv.className = 'loading-overlay';
+            loadingDiv.innerHTML = `
+                <div class="loading-content">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">${message}</p>
+                </div>
+            `;
+            document.body.appendChild(loadingDiv);
+        }
+
+        function hideLoadingState() {
+            const loadingDiv = document.getElementById('loadingOverlay');
+            if (loadingDiv) {
+                loadingDiv.remove();
+            }
+        }
+
+        // Submit country
+        async function submitCountry(country) {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            
+            // Get form data
+            const shipmentType = document.querySelector('input[name="shipmentType"]:checked').value;
+            const shipmentDate = document.getElementById('shipmentDate').value;
+            const palletPrefix = document.getElementById('palletPrefix').value;
+            const pcsPrefix = document.getElementById('pcsPrefix').value;
+
+            if (!shipmentDate) {
+                alert('Please select shipment date!');
+                return;
+            }
+
+            // Update button state
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+
+            try {
+                // Collect row data for this country
+                const tableRows = document.querySelectorAll(`#table_${country} tbody tr`);
+                const countryData = [];
+                
+                tableRows.forEach((row, index) => {
+                    const cells = row.querySelectorAll('td');
+                    const invoice = row.querySelector(`input[name="invoice_${country}_${index}"]`).value;
+                    const container = row.querySelector(`input[name="container_${country}_${index}"]`).value;
+                    const detail = row.querySelector(`input[name="detail_${country}_${index}"]`).value;
+                    
+                    // Get data from currentData
+                    const originalData = currentData[country][index];
+                    
+                    countryData.push({
+                        NoPO: originalData.NoPO,
+                        Model: originalData.Model,
+                        TotalQty: originalData.TotalQty,
+                        QtyPallet: originalData.QtyPallet,
+                        QtyBox: originalData.QtyBox,
+                        QtyPcs: originalData.QtyPcs,
+                        NoInvoice: invoice,
+                        Container: container,
+                        ShipmentDetail: detail,
+                        Country: country
+                    });
+                });
+
+                const requestData = {
+                    SessionId: parseInt(sessionId),
+                    Country: country,
+                    ShipmentType: shipmentType,
+                    ShipmentDate: shipmentDate,
+                    PalletPrefix: palletPrefix,
+                    PcsPrefix: pcsPrefix,
+                    ProcessedData: countryData
+                };
+
+                const response = await fetch('/PO/SubmitCountry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Success feedback
+                    button.innerHTML = '<i class="fas fa-check me-2"></i>Submitted ✅';
+                    button.classList.remove('btn-submit-country');
+                    button.classList.add('btn-secondary');
+                    
+                    // Remove from dropdown
+                    const dropdown = document.getElementById('countryDropdown');
+                    const option = dropdown.querySelector(`option[value="${country}"]`);
+                    if (option) option.remove();
+                    
+                    // Update pending badges - Fix selector issue
+                    const pendingBadges = document.querySelectorAll('.pending-badge');
+                    pendingBadges.forEach(badge => {
+                        if (badge.textContent.includes(country)) {
+                            badge.className = 'submitted-badge';
+                            badge.innerHTML = `<i class="fas fa-check"></i> ${country}`;
+                        }
+                    });
+                    
+                    // Hide current table
+                    document.querySelector(`.country-table[data-country="${country}"]`).style.display = 'none';
+                    
+                    // Check if all countries are submitted
+                    if (dropdown.options.length <= 1) { // Only default option left
+                        document.getElementById('settingsPanel').style.display = 'none';
+                        document.getElementById('statsRow').style.display = 'none';
+                        document.getElementById('countryTables').style.display = 'none';
+                        document.getElementById('allDoneMessage').style.display = 'block';
+                    } else {
+                        // Auto-select next country
+                        if (dropdown.options.length > 1) {
+                            dropdown.selectedIndex = 1;
+                            switchCountry();
+                        }
+                    }
+                    
+                    // Show success message
+                    showToast(`✅ ${country} submitted successfully!`, 'success');
+                    
+                } else {
+                    throw new Error(result.message || 'Submission failed');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.innerHTML = originalText;
+                showToast(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Enhanced Toast notification
+        function showToast(message, type) {
+            // Remove existing toasts
+            const existingToasts = document.querySelectorAll('.custom-toast');
+            existingToasts.forEach(toast => toast.remove());
+            
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed custom-toast`;
+            toast.style.cssText = `
+                top: 20px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 350px; 
+                max-width: 500px;
+                box-shadow: var(--shadow-lg);
+                border-radius: var(--radius-lg);
+                animation: slideInRight 0.3s ease-out;
+            `;
+            
+            toast.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'} fa-lg"></i>
+                    </div>
+                    <div class="flex-grow-1">${message}</div>
+                    <button type="button" class="btn-close ms-2" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.style.animation = 'slideOutRight 0.3s ease-in';
+                    setTimeout(() => toast.remove(), 300);
+                }
+            }, 5000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-select first country if available
+            const dropdown = document.getElementById('countryDropdown');
+            if (dropdown && dropdown.options.length > 1) {
+                dropdown.selectedIndex = 1;
+                switchCountry();
+            }
         });
     </script>
 }

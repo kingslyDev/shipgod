@@ -17,6 +17,9 @@ namespace ShipmentFinishGood.Models
         
         public int RowIndex { get; set; }
         
+        // NEW: Country field
+        public string? Country { get; set; }
+        
         // Navigation properties
         public virtual UploadSession Session { get; set; } = null!;
     }

@@ -12,5 +12,8 @@ namespace ShipmentFinishGood.Services
         Task<bool> UpdatePODataAsync(int poId, ProcessedPOData updatedData);
         Task<List<POMaster>> GetPOMastersBySessionAsync(int sessionId);
         Task<List<POSessionSummaryDto>> GetAllPOSessionsAsync();
+        
+        // NEW: Country submission method
+        Task<bool> SubmitCountryDataAsync(CountrySubmissionRequest request, string createdBy);
     }
 }

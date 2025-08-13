@@ -22,6 +22,21 @@ namespace ShipmentFinishGood.Controllers
         public async Task<IActionResult> Index()
         {
             var activeSessions = await _scanService.GetActiveSessionsAsync();
+            
+            // Check if current user is locked to a session
+            var userName = User.Identity?.Name ?? "Unknown";
+            var userLockResult = await _scanService.CheckUserLockAsync(userName);
+            
+            if (userLockResult.IsSuccess)
+            {
+                var lockedSessionResult = await _scanService.GetUserLockedSessionAsync(userName);
+                if (lockedSessionResult.IsSuccess)
+                {
+                    ViewBag.UserLockedSession = lockedSessionResult.Value;
+                    TempData["Info"] = $"You are currently locked to session: {lockedSessionResult.Value}. Complete this session to unlock.";
+                }
+            }
+            
             return View(activeSessions);
         }
 
@@ -80,10 +95,24 @@ namespace ShipmentFinishGood.Controllers
                 
                 if (result.IsSuccess)
                 {
+                    // Get updated progress after successful scan
+                    var progress = await _scanService.GetScanProgressAsync(sessionId);
+                    
                     return Json(new { 
                         success = true, 
                         message = "Box scanned successfully!", 
-                        data = result.Value 
+                        data = new {
+                            BarcodeValue = result.Value?.BarcodeValue ?? barcode,
+                            ScanType = result.Value?.ScanType ?? "BOX_BARCODE",
+                            Message = result.Value?.Message ?? "Box scanned successfully",
+                            Timestamp = result.Value?.Timestamp ?? DateTime.Now,
+                            ScannedBy = result.Value?.ScannedBy ?? userName,
+                            // Add progress data
+                            scannedCount = progress.ScannedCount,
+                            totalBarcodes = progress.TotalBarcodes,
+                            progressPercentage = progress.ProgressPercentage,
+                            canComplete = progress.CanComplete
+                        }
                     });
                 }
                 else
@@ -108,29 +137,7 @@ namespace ShipmentFinishGood.Controllers
             }
         }
 
-        [HttpPost]
-        public async Task<IActionResult> AssignArea(int sessionId, string area)
-        {
-            try
-            {
-                var userName = User.Identity?.Name ?? "Unknown";
-                var result = await _scanService.AssignAreaAsync(sessionId, area, userName);
-                
-                if (result.IsSuccess)
-                {
-                    TempData["Success"] = $"Session assigned to Area {area} successfully!";
-                    return Json(new { success = true, message = $"Assigned to Area {area}" });
-                }
-                else
-                {
-                    return Json(new { success = false, message = result.Error });
-                }
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = $"Error assigning area: {ex.Message}" });
-            }
-        }
+
 
         [HttpGet]
         public async Task<IActionResult> GetScanProgress(int sessionId)
@@ -210,22 +217,107 @@ namespace ShipmentFinishGood.Controllers
             {
                 var userName = User.Identity?.Name ?? "Unknown";
                 var result = await _scanService.CompleteScanAsync(sessionId, userName);
-                
+
                 if (result.IsSuccess)
                 {
-                    TempData["Success"] = "Scanning completed successfully!";
-                    return RedirectToAction("Index");
+                    return Json(new { success = true, message = "Scanning completed successfully!" });
                 }
                 else
                 {
-                    TempData["Error"] = result.Error;
-                    return RedirectToAction("StartScan", new { sessionId });
+                    return Json(new { success = false, message = result.Error ?? "Failed to complete scan." });
                 }
             }
             catch (Exception ex)
             {
-                TempData["Error"] = $"Error completing scan: {ex.Message}";
-                return RedirectToAction("StartScan", new { sessionId });
+                return Json(new { success = false, message = $"Error completing scan: {ex.Message}" });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> CheckUserLock()
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var userLockResult = await _scanService.CheckUserLockAsync(userName);
+                
+                if (userLockResult.IsSuccess)
+                {
+                    var lockedSessionResult = await _scanService.GetUserLockedSessionAsync(userName);
+                    return Json(new { 
+                        success = true, 
+                        isLocked = true,
+                        lockedSession = lockedSessionResult.IsSuccess ? lockedSessionResult.Value : null
+                    });
+                }
+                else
+                {
+                    return Json(new { success = true, isLocked = false });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GenerateQRForSession(int sessionId)
+        {
+            try
+            {
+                var result = await _scanService.GenerateQRForSessionAsync(sessionId);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { success = true, qrIdentity = result.Value, message = "QR generated successfully!" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UnlockUser()
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                
+                // Find user's current lock and remove all scanning activities that created the lock
+                var userLockResult = await _scanService.GetUserLockedSessionAsync(userName);
+                if (userLockResult.IsSuccess)
+                {
+                    // This is a simple unlock - in production you might want more validation
+                    // For now, we'll complete the session to unlock the user
+                    var sessions = await _scanService.GetActiveSessionsAsync();
+                    var lockedSession = sessions.FirstOrDefault(s => s.QRIdentity == userLockResult.Value);
+                    
+                    if (lockedSession != null)
+                    {
+                        var completeResult = await _scanService.CompleteScanAsync(lockedSession.SessionId, userName);
+                        if (completeResult.IsSuccess)
+                        {
+                            return Json(new { success = true, message = "User unlocked successfully!" });
+                        }
+                        else
+                        {
+                            return Json(new { success = false, message = "Failed to unlock user: " + completeResult.Error });
+                        }
+                    }
+                }
+                
+                return Json(new { success = false, message = "User is not locked to any session" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
             }
         }
     }

@@ -37,6 +37,9 @@ namespace ShipmentFinishGood.Models
         
         public string? CreatedBy { get; set; }
         
+        // NEW: Country field
+        public string? Country { get; set; }
+        
         // Navigation properties
         public virtual UploadSession? SourceSession { get; set; }
         public virtual ICollection<PODetail> Details { get; set; } = new List<PODetail>();

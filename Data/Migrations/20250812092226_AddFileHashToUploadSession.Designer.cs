@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShipmentFinishGood.Repositories;
 
@@ -11,9 +12,11 @@ using ShipmentFinishGood.Repositories;
 namespace ShipmentFinishGood.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250812092226_AddFileHashToUploadSession")]
+    partial class AddFileHashToUploadSession
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -567,9 +570,6 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.Property<string>("Container")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Country")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
@@ -664,12 +664,6 @@ namespace ShipmentFinishGood.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SessionId"));
 
-                    b.Property<string>("Countries")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Country")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("FileHash")
                         .HasColumnType("nvarchar(max)");
 
@@ -682,9 +676,6 @@ namespace ShipmentFinishGood.Data.Migrations
 
                     b.Property<string>("MasterBarcode")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("ParentSessionId")
-                        .HasColumnType("int");
 
                     b.Property<string>("SheetIdentifier")
                         .HasColumnType("nvarchar(max)");
@@ -714,8 +705,6 @@ namespace ShipmentFinishGood.Data.Migrations
 
                     b.HasKey("SessionId");
 
-                    b.HasIndex("ParentSessionId");
-
                     b.ToTable("UploadSessions");
                 });
 
@@ -726,9 +715,6 @@ namespace ShipmentFinishGood.Data.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DetailId"));
-
-                    b.Property<string>("Country")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Model")
                         .HasColumnType("nvarchar(max)");
@@ -825,15 +811,6 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.Navigation("SourceSession");
                 });
 
-            modelBuilder.Entity("ShipmentFinishGood.Models.UploadSession", b =>
-                {
-                    b.HasOne("ShipmentFinishGood.Models.UploadSession", "ParentSession")
-                        .WithMany("ChildSessions")
-                        .HasForeignKey("ParentSessionId");
-
-                    b.Navigation("ParentSession");
-                });
-
             modelBuilder.Entity("ShipmentFinishGood.Models.UploadSessionDetail", b =>
                 {
                     b.HasOne("ShipmentFinishGood.Models.UploadSession", "Session")
@@ -852,8 +829,6 @@ namespace ShipmentFinishGood.Data.Migrations
 
             modelBuilder.Entity("ShipmentFinishGood.Models.UploadSession", b =>
                 {
-                    b.Navigation("ChildSessions");
-
                     b.Navigation("Details");
 
                     b.Navigation("POMasters");

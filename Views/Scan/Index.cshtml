@@ -33,6 +33,59 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
+    @if (TempData["Info"] != null)
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="fas fa-info-circle me-2"></i>@TempData["Info"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Main Scanning Input -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-qrcode me-2"></i>Smart Scanner
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">
+                                    <i class="fas fa-crosshairs"></i>
+                                </span>
+                                <input type="text" 
+                                       id="mainScanInput" 
+                                       class="form-control" 
+                                       placeholder="📱 Scan QR Identity or Box Barcode here..." 
+                                       autocomplete="off" 
+                                       autofocus>
+                                <button class="btn btn-primary" type="button" onclick="processScan()">
+                                    <i class="fas fa-check me-1"></i>Scan
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                <strong>Instructions:</strong> 
+                                First scan QR Identity to lock session, then scan box barcodes.
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div id="scanStatus" class="text-center">
+                                <div class="h6 mb-1">Status</div>
+                                <span class="badge bg-secondary" id="statusBadge">Ready to Scan</span>
+                                <div class="small text-muted mt-1" id="statusDetail">
+                                    Scan QR Identity to begin
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     @if (Model?.Any() == true)
     {
@@ -130,17 +183,6 @@
                                 </div>
                             </div>
 
-                            <!-- Assigned Area -->
-                            @if (!string.IsNullOrEmpty(session.AssignedArea))
-                            {
-                                <div class="mb-3">
-                                    <small class="text-muted">Assigned Area:</small>
-                                    <div>
-                                        <span class="badge bg-info">Area @session.AssignedArea</span>
-                                    </div>
-                                </div>
-                            }
-
                             <!-- Session Details -->
                             <div class="row mb-3">
                                 <div class="col-6">
@@ -155,9 +197,14 @@
                         </div>
                         <div class="card-footer bg-light">
                             <div class="d-flex gap-2 justify-content-center">
+                                @{
+                                    var isLocked = ViewBag.UserLockedSession?.ToString() == session.QRIdentity;
+                                    var buttonClass = isLocked ? "btn btn-warning btn-sm" : "btn btn-primary btn-sm";
+                                    var buttonText = isLocked ? "Continue Locked Session" : "Start Scanning";
+                                }
                                 <a asp-action="StartScan" asp-route-sessionId="@session.SessionId" 
-                                   class="btn btn-primary btn-sm">
-                                    <i class="fas fa-qrcode me-1"></i>Start Scanning
+                                   class="@buttonClass">
+                                    <i class="fas fa-qrcode me-1"></i>@buttonText
                                 </a>
                                 <a asp-action="SessionDetail" asp-route-sessionId="@session.SessionId" 
                                    class="btn btn-outline-info btn-sm">
@@ -180,10 +227,18 @@
                         <div class="text-center py-5">
                             <i class="fas fa-barcode fa-3x text-muted mb-3"></i>
                             <h4 class="text-muted">No Sessions Available</h4>
-                            <p class="text-muted">There are no scanning sessions available at the moment. Please check back later or contact administrator.</p>
-                            <a asp-controller="Home" asp-action="Index" class="btn btn-primary">
-                                <i class="fas fa-home me-2"></i>Back to Dashboard
-                            </a>
+                            <p class="text-muted">There are no scanning sessions available at the moment. Please check for sessions that need QR generation.</p>
+                            <div class="d-flex gap-2 justify-content-center flex-wrap">
+                                <button class="btn btn-primary" onclick="checkForValidatedSessions()">
+                                    <i class="fas fa-search me-2"></i>Check for Sessions
+                                </button>
+                                <a asp-controller="PO" asp-action="Index" class="btn btn-outline-primary">
+                                    <i class="fas fa-upload me-2"></i>Upload New PO
+                                </a>
+                                <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">
+                                    <i class="fas fa-home me-2"></i>Back to Dashboard
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -194,9 +249,252 @@
 
 @section Scripts {
     <script>
+        let currentUserLock = null;
+        let activeSessions = [];
+
+        // Initialize on page load
+        $(document).ready(function() {
+            // Focus on main scan input
+            $('#mainScanInput').focus();
+            
+            // Enter key support
+            $('#mainScanInput').on('keypress', function(e) {
+                if (e.which === 13) { // Enter key
+                    processScan();
+                }
+            });
+
+            // Check user lock status on load
+            checkUserLockStatus();
+            
+            // Load available sessions for reference
+            loadAvailableSessions();
+        });
+
+        // Main scanning function
+        function processScan() {
+            const input = $('#mainScanInput');
+            const scannedValue = input.val().trim();
+            
+            if (!scannedValue) {
+                showAlert('Please enter or scan a value', 'warning');
+                input.focus();
+                return;
+            }
+
+            // Determine scan type and process
+            if (isMasterQR(scannedValue)) {
+                processMasterQR(scannedValue);
+            } else if (isBoxBarcode(scannedValue)) {
+                processBoxBarcode(scannedValue);
+            } else {
+                showAlert('Invalid QR/Barcode format. Please scan a valid QR Identity or Box Barcode.', 'danger');
+                input.focus();
+            }
+        }
+
+        // Check if scanned value is Master QR
+        function isMasterQR(value) {
+            // Master QR format: QR_sessionId_timestamp (exact match with available sessions)
+            return activeSessions.some(session => session.qrIdentity === value);
+        }
+
+        // Check if scanned value is Box Barcode
+        function isBoxBarcode(value) {
+            // Box barcode format: QR_sessionId_timestamp_BOX_model_number
+            return value.includes('_BOX_') && activeSessions.some(session => 
+                value.startsWith(session.qrIdentity + '_BOX_'));
+        }
+
+        // Process Master QR scan
+        function processMasterQR(qrCode) {
+            const session = activeSessions.find(s => s.qrIdentity === qrCode);
+            if (!session) {
+                showAlert('QR Identity not found in available sessions', 'danger');
+                return;
+            }
+
+            // Check if user is already locked to different session
+            if (currentUserLock && currentUserLock !== qrCode) {
+                showAlert(`You are already locked to session: ${currentUserLock}. Complete that session first.`, 'warning');
+                return;
+            }
+
+            // Call backend to scan Master QR
+            $.ajax({
+                url: '@Url.Action("ScanMasterQR", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: session.sessionId,
+                    qrCode: qrCode
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        currentUserLock = qrCode;
+                        updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
+                        showAlert(`✅ ${response.message}`, 'success');
+                        
+                        // Clear input and focus for box scanning
+                        $('#mainScanInput').val('').focus();
+                        
+                        // Update UI to show locked state
+                        updateUIForLockedState(session);
+                    } else {
+                        showAlert(`❌ ${response.message}`, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Error scanning Master QR. Please try again.', 'danger');
+                }
+            });
+        }
+
+        // Process Box Barcode scan
+        function processBoxBarcode(barcode) {
+            if (!currentUserLock) {
+                showAlert('Please scan Master QR first to lock to a session', 'warning');
+                return;
+            }
+
+            // Find which session this barcode belongs to
+            const session = activeSessions.find(s => barcode.startsWith(s.qrIdentity + '_BOX_'));
+            if (!session) {
+                showAlert('Invalid barcode format', 'danger');
+                return;
+            }
+
+            // Verify user is locked to this session
+            if (currentUserLock !== session.qrIdentity) {
+                showAlert(`This barcode belongs to a different session. You are locked to: ${currentUserLock}`, 'warning');
+                return;
+            }
+
+            // Call backend to scan box barcode
+            $.ajax({
+                url: '@Url.Action("ScanBoxBarcode", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: session.sessionId,
+                    barcode: barcode
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert(`✅ ${response.message}`, 'success');
+                        
+                        // Clear input and focus for next scan
+                        $('#mainScanInput').val('').focus();
+                        
+                        // Update progress if available
+                        if (response.data) {
+                            updateScanProgress(response.data);
+                        }
+                    } else {
+                        showAlert(`❌ ${response.message}`, 'danger');
+                        
+                        // Show debug info if available
+                        if (response.debug) {
+                            console.log('Debug info:', response.debug);
+                        }
+                    }
+                },
+                error: function() {
+                    showAlert('Error scanning box barcode. Please try again.', 'danger');
+                }
+            });
+        }
+
+        // Check user lock status
+        function checkUserLockStatus() {
+            $.ajax({
+                url: '@Url.Action("CheckUserLock", "Scan")',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.isLocked) {
+                        currentUserLock = response.lockedSession;
+                        const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                        if (session) {
+                            updateScanStatus('locked', `Locked to: ${session.fileName}`, 'warning');
+                            updateUIForLockedState(session);
+                        } else {
+                            updateScanStatus('locked', `Locked to: ${currentUserLock}`, 'warning');
+                        }
+                        
+                        // Show info message
+                        showAlert(`You are currently locked to session: ${currentUserLock}. Continue scanning boxes or complete the session.`, 'info');
+                    }
+                }
+            });
+        }
+
+        // Load available sessions for reference
+        function loadAvailableSessions() {
+            // Get sessions from Model (already loaded in page)
+            activeSessions = [
+                @if (Model?.Any() == true)
+                {
+                    @foreach (var session in Model)
+                    {
+                        @:{
+                        @:    sessionId: @session.SessionId,
+                        @:    fileName: '@Html.Raw(session.FileName.Replace("'", "\\'"))',
+                        @:    qrIdentity: '@session.QRIdentity'
+                        @:},
+                    }
+                }
+            ];
+        }
+
+        // Update scan status display
+        function updateScanStatus(status, message, badgeClass) {
+            const statusBadge = $('#statusBadge');
+            const statusDetail = $('#statusDetail');
+            
+            statusBadge.removeClass('bg-secondary bg-success bg-warning bg-danger')
+                      .addClass(`bg-${badgeClass}`);
+            
+            switch(status) {
+                case 'ready':
+                    statusBadge.text('Ready to Scan');
+                    statusDetail.text('Scan QR Identity to begin');
+                    break;
+                case 'locked':
+                    statusBadge.text('Session Locked');
+                    statusDetail.text(message);
+                    break;
+                case 'scanning':
+                    statusBadge.text('Scanning Boxes');
+                    statusDetail.text(message);
+                    break;
+            }
+        }
+
+        // Update UI for locked state
+        function updateUIForLockedState(session) {
+            // Update placeholder text
+            $('#mainScanInput').attr('placeholder', `📦 Scan box barcodes for: ${session.fileName}`);
+            
+            // Update status
+            updateScanStatus('scanning', `Ready to scan boxes`, 'success');
+        }
+
+        // Update scan progress
+        function updateScanProgress(progressData) {
+            if (progressData.progressPercentage !== undefined) {
+                const message = `Progress: ${progressData.scannedCount}/${progressData.totalBarcodes} (${progressData.progressPercentage.toFixed(1)}%)`;
+                updateScanStatus('scanning', message, 'success');
+            }
+        }
+
+        // Existing utility functions
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(function() {
-                showAlert('QR Identity copied to clipboard!', 'success');
+                showAlert('QR Identity copied to clipboard! 📋', 'success');
             }, function(err) {
                 console.error('Could not copy text: ', err);
                 showAlert('Failed to copy to clipboard', 'danger');
@@ -207,6 +505,15 @@
             location.reload();
         }
 
+        function checkForValidatedSessions() {
+            showAlert('Checking for available sessions and generating QR codes if needed...', 'info');
+            
+            // Force refresh to trigger the auto QR generation logic
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        }
+
         function showAlert(message, type) {
             const alertContainer = document.querySelector('.container');
             const alertElement = document.createElement('div');
@@ -214,7 +521,7 @@
             alertElement.className = `alert alert-${type} alert-dismissible fade show`;
             alertElement.setAttribute('role', 'alert');
             alertElement.innerHTML = `
-                <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>${message}
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>${message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
 
@@ -222,11 +529,15 @@
 
             setTimeout(() => {
                 alertElement.remove();
-            }, 3000);
+            }, 5000);
         }
 
-        // Auto-refresh every 30 seconds
-        setInterval(refreshSessions, 30000);
+        // Auto-refresh every 30 seconds (only if not locked)
+        setInterval(function() {
+            if (!currentUserLock) {
+                refreshSessions();
+            }
+        }, 30000);
     </script>
 }
 

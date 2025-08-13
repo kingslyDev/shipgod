@@ -65,7 +65,7 @@
     @if (Model.ScanActivities?.Any() == true)
     {
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card bg-success text-white">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
@@ -78,7 +78,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card bg-primary text-white">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
@@ -91,20 +91,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="h5 mb-0">@Model.ScanActivities.Count(a => a.Action == "AREA_ASSIGN")</div>
-                                <div class="small">Area Assignments</div>
-                            </div>
-                            <i class="fas fa-map-marker-alt fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
@@ -182,10 +169,6 @@
                                                                     <span class="badge bg-success me-2">Box Scan</span>
                                                                     <span>Box Barcode Scanned</span>
                                                                     break;
-                                                                case "AREA_ASSIGN":
-                                                                    <span class="badge bg-warning text-dark me-2">Area Assignment</span>
-                                                                    <span>Session Assigned to Area @activity.AssignedArea</span>
-                                                                    break;
                                                                 default:
                                                                     <span class="badge bg-secondary me-2">@activity.Action</span>
                                                                     <span>Unknown Activity</span>
@@ -201,13 +184,6 @@
                                                                 <div>
                                                                     <i class="fas fa-user me-1 text-muted"></i>
                                                                     <span class="small">@activity.UserId</span>
-                                                                </div>
-                                                            }
-                                                            @if (!string.IsNullOrEmpty(activity.AssignedArea))
-                                                            {
-                                                                <div>
-                                                                    <i class="fas fa-map-marker-alt me-1 text-muted"></i>
-                                                                    <span class="small">Area @activity.AssignedArea</span>
                                                                 </div>
                                                             }
                                                         </div>

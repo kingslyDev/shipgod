@@ -3,6 +3,7 @@ namespace ShipmentFinishGood.DTOs
     public class ExcelRowData
     {
         public string? NoPO { get; set; }
+        public string? Country { get; set; }  // NEW: Country column
         public string? Model { get; set; }
         public int Qty { get; set; }
         public int RowIndex { get; set; }
@@ -11,6 +12,7 @@ namespace ShipmentFinishGood.DTOs
     public class ProcessedPOData
     {
         public string NoPO { get; set; } = string.Empty;
+        public string Country { get; set; } = string.Empty;  // NEW: Country field
         public string Model { get; set; } = string.Empty;
         public int TotalQty { get; set; }
         public int QtyPallet { get; set; }
@@ -29,6 +31,12 @@ namespace ShipmentFinishGood.DTOs
         public string SheetName { get; set; } = string.Empty;
         public List<ExcelRowData> RawData { get; set; } = new();
         public List<ProcessedPOData> ProcessedData { get; set; } = new();
+        
+        // NEW: Country-based data
+        public Dictionary<string, List<ProcessedPOData>> ProcessedDataByCountry { get; set; } = new();
+        public List<string> SubmittedCountries { get; set; } = new();
+        public List<string> PendingCountries { get; set; } = new();
+        
         public string? ShipmentType { get; set; }
         public DateTime? ShipmentDate { get; set; }
         public string? PalletPrefix { get; set; }
@@ -43,6 +51,34 @@ namespace ShipmentFinishGood.DTOs
         public string? PalletPrefix { get; set; }
         public string? PcsPrefix { get; set; }
         public List<ProcessedPOData> ProcessedData { get; set; } = new();
+    }
+
+    public class CountrySubmissionRequest
+    {
+        public int SessionId { get; set; }
+        public string Country { get; set; } = string.Empty;
+        public string ShipmentType { get; set; } = string.Empty;
+        public DateTime ShipmentDate { get; set; }
+        public string? PalletPrefix { get; set; }
+        public string? PcsPrefix { get; set; }
+        public List<ProcessedPOData> ProcessedData { get; set; } = new();
+    }
+
+    public class UpdateModeRequest
+    {
+        public int SessionId { get; set; }
+        public string ShipmentType { get; set; } = string.Empty;
+    }
+
+    public class CountrySubmissionResult
+    {
+        public bool Success { get; set; }
+        public string Country { get; set; } = string.Empty;
+        public int NewSessionId { get; set; }
+        public string QRIdentity { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public List<string> RemainingCountries { get; set; } = new();
+        public bool AllCountriesSubmitted { get; set; }
     }
 
     public class FinalTableDto
@@ -193,7 +229,6 @@ namespace ShipmentFinishGood.DTOs
         public DateTime CreatedDate { get; set; }
         public string? CreatedBy { get; set; }
         public string Status { get; set; } = string.Empty; // Pending, Ready, In Progress, Completed
-        public string? AssignedArea { get; set; }
     }
 
     public class ScanSessionDto
@@ -209,7 +244,6 @@ namespace ShipmentFinishGood.DTOs
         public List<BarcodeDto> BarcodeList { get; set; } = new();
         public List<string> ScannedBarcodes { get; set; } = new();
         public bool IsMasterScanned { get; set; }
-        public string? AssignedArea { get; set; }
         public bool CanComplete { get; set; }
         public double ProgressPercentage => TotalBarcodes > 0 ? (double)ScannedCount / TotalBarcodes * 100 : 0;
     }
@@ -246,7 +280,6 @@ namespace ShipmentFinishGood.DTOs
         public int ScannedCount { get; set; }
         public double ProgressPercentage { get; set; }
         public bool IsMasterScanned { get; set; }
-        public string? AssignedArea { get; set; }
         public DateTime? LastScanTime { get; set; }
         public bool CanComplete { get; set; }
     }
@@ -257,7 +290,6 @@ namespace ShipmentFinishGood.DTOs
         public string BarcodeValue { get; set; } = string.Empty;
         public string Action { get; set; } = string.Empty;
         public string? UserId { get; set; }
-        public string? AssignedArea { get; set; }
         public DateTime Timestamp { get; set; }
         public string Result { get; set; } = string.Empty;
         public string? ErrorMessage { get; set; }

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Services;
 using ShipmentFinishGood.Common;
+using ShipmentFinishGood.Repositories;
 using System.Security.Claims;
 
 namespace ShipmentFinishGood.Controllers
@@ -11,10 +13,12 @@ namespace ShipmentFinishGood.Controllers
     public class POController : Controller
     {
         private readonly IExcelProcessingService _excelService;
+        private readonly AppDbContext _context;
 
-        public POController(IExcelProcessingService excelService)
+        public POController(IExcelProcessingService excelService, AppDbContext context)
         {
             _excelService = excelService;
+            _context = context;
         }
 
         public async Task<IActionResult> Index()
@@ -71,26 +75,58 @@ namespace ShipmentFinishGood.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> UpdateMode(int sessionId, string shipmentType)
+        public async Task<IActionResult> UpdateMode([FromBody] UpdateModeRequest request)
         {
-            var preview = await _excelService.GetPreviewAsync(sessionId);
+            var preview = await _excelService.GetPreviewAsync(request.SessionId);
             if (preview == null)
             {
                 return Json(new { success = false, message = "Session not found" });
             }
 
-            var processedData = await _excelService.CalculateProcessedDataAsync(preview.RawData, shipmentType);
+            // Recalculate all data with new shipment type
+            var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
             
+            foreach (var countryData in preview.ProcessedDataByCountry)
+            {
+                var rawDataForCountry = preview.RawData
+                    .Where(r => r.Country == countryData.Key)
+                    .ToList();
+                    
+                var recalculatedData = await _excelService.CalculateProcessedDataAsync(rawDataForCountry, request.ShipmentType);
+                processedDataByCountry[countryData.Key] = recalculatedData;
+            }
+            
+            // Return all recalculated data grouped by country
             return Json(new { 
                 success = true, 
-                data = processedData.Select(p => new {
-                    noPO = p.NoPO,
-                    model = p.Model,
-                    totalQty = p.TotalQty,
-                    qtyPallet = p.QtyPallet,
-                    qtyBox = p.QtyBox,
-                    qtyPcs = p.QtyPcs
-                })
+                data = processedDataByCountry.SelectMany(kvp => 
+                    kvp.Value.Select(p => new {
+                        country = kvp.Key,
+                        noPO = p.NoPO,
+                        model = p.Model,
+                        totalQty = p.TotalQty,
+                        qtyPallet = p.QtyPallet,
+                        qtyBox = p.QtyBox,
+                        qtyPcs = p.QtyPcs,
+                        container = p.Container,
+                        noInvoice = p.NoInvoice,
+                        shipmentDetail = p.ShipmentDetail
+                    })
+                ).ToList(),
+                dataByCountry = processedDataByCountry.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value.Select(p => new {
+                        noPO = p.NoPO,
+                        model = p.Model,
+                        totalQty = p.TotalQty,
+                        qtyPallet = p.QtyPallet,
+                        qtyBox = p.QtyBox,
+                        qtyPcs = p.QtyPcs,
+                        container = p.Container,
+                        noInvoice = p.NoInvoice,
+                        shipmentDetail = p.ShipmentDetail
+                    }).ToList()
+                )
             });
         }
 
@@ -141,6 +177,107 @@ namespace ShipmentFinishGood.Controllers
             {
                 return Json(new { success = false, message = "Failed to update PO" });
             }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SubmitCountry([FromBody] CountrySubmissionRequest request)
+        {
+            try
+            {
+                // Validate country not already submitted
+                var isAlreadySubmitted = await _context.UploadSessions
+                    .AnyAsync(s => s.ParentSessionId == request.SessionId && 
+                                  s.Country == request.Country && 
+                                  s.Status == "PROCESSED");
+
+                if (isAlreadySubmitted)
+                {
+                    return Json(new CountrySubmissionResult
+                    {
+                        Success = false,
+                        Message = $"Country {request.Country} sudah di-submit sebelumnya!"
+                    });
+                }
+
+                // Submit country data
+                var success = await _excelService.SubmitCountryDataAsync(request, User.Identity?.Name ?? "System");
+                
+                if (success)
+                {
+                    // Get the new session for QR generation
+                    var newSession = await _context.UploadSessions
+                        .Where(s => s.ParentSessionId == request.SessionId && s.Country == request.Country)
+                        .OrderByDescending(s => s.SessionId)
+                        .FirstAsync();
+
+                    // Generate QR for this country session
+                    var qrIdentity = await GenerateQRIdentityAsync(newSession.SessionId);
+                    
+                    // Get remaining countries
+                    var remainingCountries = await GetRemainingCountries(request.SessionId);
+                    
+                    return Json(new CountrySubmissionResult
+                    {
+                        Success = true,
+                        Country = request.Country,
+                        NewSessionId = newSession.SessionId,
+                        QRIdentity = qrIdentity,
+                        Message = $"Country {request.Country} berhasil di-submit!",
+                        RemainingCountries = remainingCountries,
+                        AllCountriesSubmitted = remainingCountries.Count == 0
+                    });
+                }
+
+                return Json(new CountrySubmissionResult
+                {
+                    Success = false,
+                    Message = "Gagal memproses data country"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new CountrySubmissionResult
+                {
+                    Success = false,
+                    Message = ex.Message
+                });
+            }
+        }
+
+        private async Task<string> GenerateQRIdentityAsync(int sessionId)
+        {
+            string qrIdentity;
+            do {
+                qrIdentity = $"QR{DateTime.Now:yyyyMMddHHmmss}{DateTime.Now.Millisecond:000}";
+                await Task.Delay(1); // Ensure different milliseconds
+            } while (await _context.UploadSessions.AnyAsync(s => s.IdentityQRCode == qrIdentity));
+
+            var session = await _context.UploadSessions.FindAsync(sessionId);
+            if (session != null)
+            {
+                session.IdentityQRCode = qrIdentity;
+                await _context.SaveChangesAsync();
+            }
+
+            return qrIdentity;
+        }
+
+        private async Task<List<string>> GetRemainingCountries(int sessionId)
+        {
+            var parentSession = await _context.UploadSessions
+                .Include(s => s.ChildSessions)
+                .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+            if (parentSession == null || string.IsNullOrEmpty(parentSession.Countries))
+                return new List<string>();
+
+            var allCountries = parentSession.Countries.Split(',').ToList();
+            var submittedCountries = parentSession.ChildSessions
+                .Where(c => c.Status == "PROCESSED")
+                .Select(c => c.Country)
+                .ToList();
+
+            return allCountries.Where(c => !submittedCountries.Contains(c)).ToList();
         }
     }
 }
