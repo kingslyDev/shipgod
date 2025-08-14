@@ -1140,15 +1140,24 @@
                     const detail = row.querySelector(`input[name="detail_${country}_${index}"]`).value;
                     
                     // Get data from currentData (which includes updated calculations)
-                    const originalData = currentData[country][index];
+                    const currentRowData = currentData[country][index];
+                    
+                    // Get current values from UI (in case they were updated but not yet saved)
+                    const currentPO = row.querySelector(`input[name="po_${country}_${index}"]`).value;
+                    const currentQty = parseInt(row.querySelector(`input[name="qty_${country}_${index}"]`).value);
+                    
+                    // Get current calculated quantities from UI display
+                    const currentPallet = parseInt(row.querySelector('.qty-display[data-type="pallet"]').textContent) || 0;
+                    const currentBox = parseInt(row.querySelector('.qty-display[data-type="box"]').textContent) || 0;
+                    const currentPcs = parseInt(row.querySelector('.qty-display[data-type="pcs"]').textContent) || 0;
                     
                     countryData.push({
-                        NoPO: row.querySelector(`input[name="po_${country}_${index}"]`).value || originalData.NoPO,
-                        Model: originalData.Model,
-                        TotalQty: parseInt(row.querySelector(`input[name="qty_${country}_${index}"]`).value) || originalData.TotalQty,
-                        QtyPallet: originalData.QtyPallet,
-                        QtyBox: originalData.QtyBox,
-                        QtyPcs: originalData.QtyPcs,
+                        NoPO: currentPO || currentRowData.NoPO,
+                        Model: currentRowData.Model,
+                        TotalQty: currentQty || currentRowData.TotalQty,
+                        QtyPallet: currentPallet,
+                        QtyBox: currentBox,
+                        QtyPcs: currentPcs,
                         NoInvoice: invoice,
                         Container: container,
                         ShipmentDetail: detail,
