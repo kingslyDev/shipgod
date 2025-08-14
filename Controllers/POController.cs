@@ -36,6 +36,7 @@ namespace ShipmentFinishGood.Controllers
         [HttpPost]
         public async Task<IActionResult> Upload(IFormFile excelFile)
         {
+            // Input validation
             if (excelFile == null || excelFile.Length == 0)
             {
                 TempData["Error"] = "Please select a file to upload.";
@@ -51,14 +52,45 @@ namespace ShipmentFinishGood.Controllers
             try
             {
                 var userName = User.Identity?.Name ?? "Unknown";
-                var preview = await _excelService.ProcessExcelFileAsync(excelFile, userName);
                 
-                TempData["Success"] = "Excel file processed successfully. Please review the data below.";
-                return View("Preview", preview);
+                // Use new unified file processing method
+                var uploadResult = await _excelService.ProcessFileUploadAsync(excelFile, userName);
+                
+                // Handle different scenarios based on upload result
+                if (uploadResult.IsExistingFile)
+                {
+                    if (uploadResult.HasRemainingCountries)
+                    {
+                        // File exists with remaining countries - resume processing
+                        TempData["Info"] = uploadResult.Message;
+                        return RedirectToAction("Preview", new { id = uploadResult.SessionId });
+                    }
+                    else
+                    {
+                        // File completely processed - redirect to index
+                        TempData["Warning"] = uploadResult.Message;
+                        return RedirectToAction("Index");
+                    }
+                }
+                else
+                {
+                    // New file processing
+                    if (uploadResult.PreviewData != null)
+                    {
+                        TempData["Success"] = uploadResult.Message;
+                        return View("Preview", uploadResult.PreviewData);
+                    }
+                    else
+                    {
+                        // Error in processing
+                        TempData["Error"] = uploadResult.Message;
+                        return RedirectToAction("Create");
+                    }
+                }
             }
             catch (Exception ex)
             {
-                TempData["Error"] = $"Error processing file: {ex.Message}";
+                TempData["Error"] = $"Unexpected error: {ex.Message}";
                 return RedirectToAction("Create");
             }
         }

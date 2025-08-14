@@ -74,6 +74,44 @@
             font-weight: 400;
         }
 
+        /* NEW: File Resume Status */
+        .file-resume-info {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.5rem;
+            margin-top: 1rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .file-resume-info .icon {
+            color: #ffd700;
+            margin-right: 0.5rem;
+        }
+
+        .file-resume-info .text {
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .countries-status {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-completed { background: rgba(56, 161, 105, 0.3); }
+        .status-remaining { background: rgba(237, 137, 54, 0.3); }
+
         /* Country Management Card */
         .country-selector {
             background: var(--white);
@@ -475,6 +513,33 @@
             <i class="fas fa-file-excel me-2"></i>
             <strong>@Model.FileName</strong> - Ready for processing
         </p>
+        
+        @* NEW: Show file resume information if applicable *@
+        @if(Model.SubmittedCountries.Any())
+        {
+            <div class="file-resume-info">
+                <div class="text">
+                    <i class="fas fa-history icon"></i>
+                    File ini telah dilanjutkan dari upload sebelumnya
+                </div>
+                <div class="countries-status">
+                    @if(Model.SubmittedCountries.Any())
+                    {
+                        <span class="status-item status-completed">
+                            <i class="fas fa-check-circle"></i>
+                            @Model.SubmittedCountries.Count Selesai
+                        </span>
+                    }
+                    @if(Model.PendingCountries.Any())
+                    {
+                        <span class="status-item status-remaining">
+                            <i class="fas fa-clock"></i>
+                            @Model.PendingCountries.Count Tersisa
+                        </span>
+                    }
+                </div>
+            </div>
+        }
     </div>
 
     <!-- Country Management Section -->

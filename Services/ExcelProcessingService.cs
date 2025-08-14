@@ -517,5 +517,168 @@ namespace ShipmentFinishGood.Services
             var hashBytes = await Task.Run(() => sha256.ComputeHash(stream));
             return Convert.ToBase64String(hashBytes);
         }
+
+        // NEW: File hash and resume functionality
+        public async Task<UploadSession?> GetExistingSessionByHashAsync(string fileHash)
+        {
+            try
+            {
+                return await _context.UploadSessions
+                    .Include(s => s.ChildSessions)
+                    .Include(s => s.Details)
+                    .Where(s => s.FileHash == fileHash && 
+                               s.Status != "DELETED" && 
+                               s.ParentSessionId == null) // Only parent sessions
+                    .OrderByDescending(s => s.UploadDate)
+                    .FirstOrDefaultAsync();
+            }
+            catch (Exception)
+            {
+                // Log error if needed, return null for graceful degradation
+                return null;
+            }
+        }
+
+        public async Task<List<string>> GetRemainingCountriesAsync(int sessionId)
+        {
+            try
+            {
+                var session = await _context.UploadSessions
+                    .Include(s => s.Details)
+                    .Include(s => s.ChildSessions)
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+                if (session == null) return new List<string>();
+
+                // Get all countries from original data
+                var allCountries = session.Details
+                    .Where(d => !string.IsNullOrEmpty(d.Country))
+                    .Select(d => d.Country!)
+                    .Distinct()
+                    .ToList();
+
+                // Get submitted countries
+                var submittedCountries = session.ChildSessions
+                    .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
+                    .Select(c => c.Country!)
+                    .ToList();
+
+                // Return remaining countries
+                return allCountries.Except(submittedCountries).ToList();
+            }
+            catch (Exception)
+            {
+                // Log error if needed, return empty list for graceful degradation
+                return new List<string>();
+            }
+        }
+
+        public async Task<bool> HasAnySubmittedCountriesAsync(int sessionId)
+        {
+            try
+            {
+                return await _context.UploadSessions
+                    .AnyAsync(s => s.ParentSessionId == sessionId && 
+                                  s.Status == "PROCESSED" && 
+                                  !string.IsNullOrEmpty(s.Country));
+            }
+            catch (Exception)
+            {
+                // Log error if needed, return false for graceful degradation
+                return false;
+            }
+        }
+
+        public async Task<FileUploadResult> ProcessFileUploadAsync(IFormFile file, string uploadedBy)
+        {
+            try
+            {
+                // Generate file hash
+                var fileHash = await GenerateFileHashAsync(file);
+                
+                // Check if file already exists
+                var existingSession = await GetExistingSessionByHashAsync(fileHash);
+                
+                if (existingSession != null)
+                {
+                    // File already uploaded - check remaining countries
+                    var remainingCountries = await GetRemainingCountriesAsync(existingSession.SessionId);
+                    var hasSubmitted = await HasAnySubmittedCountriesAsync(existingSession.SessionId);
+                    
+                    // Get submitted countries for information
+                    var submittedCountries = existingSession.ChildSessions
+                        .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
+                        .Select(c => c.Country!)
+                        .ToList();
+
+                    if (remainingCountries.Any())
+                    {
+                        // Has remaining countries - get preview data
+                        var previewData = await GetPreviewAsync(existingSession.SessionId);
+                        
+                        return new FileUploadResult
+                        {
+                            IsExistingFile = true,
+                            HasRemainingCountries = true,
+                            AllCountriesCompleted = false,
+                            SessionId = existingSession.SessionId,
+                            FileName = existingSession.FileName,
+                            RemainingCountries = remainingCountries,
+                            SubmittedCountries = submittedCountries,
+                            Message = hasSubmitted 
+                                ? $"File sudah pernah diupload. Melanjutkan proses yang tersisa ({remainingCountries.Count} negara)."
+                                : "File sudah pernah diupload. Melanjutkan dari awal.",
+                            PreviewData = previewData
+                        };
+                    }
+                    else
+                    {
+                        // All countries completed
+                        return new FileUploadResult
+                        {
+                            IsExistingFile = true,
+                            HasRemainingCountries = false,
+                            AllCountriesCompleted = true,
+                            SessionId = existingSession.SessionId,
+                            FileName = existingSession.FileName,
+                            RemainingCountries = new List<string>(),
+                            SubmittedCountries = submittedCountries,
+                            Message = "File ini sudah selesai diproses. Semua negara telah disubmit."
+                        };
+                    }
+                }
+                else
+                {
+                    // New file - normal processing
+                    var previewData = await ProcessExcelFileAsync(file, uploadedBy);
+                    
+                    return new FileUploadResult
+                    {
+                        IsExistingFile = false,
+                        HasRemainingCountries = true,
+                        AllCountriesCompleted = false,
+                        SessionId = previewData.SessionId,
+                        FileName = previewData.FileName,
+                        RemainingCountries = previewData.PendingCountries,
+                        SubmittedCountries = new List<string>(),
+                        Message = "File berhasil diproses. Silakan review data sebelum submit.",
+                        PreviewData = previewData
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error and return failure result
+                return new FileUploadResult
+                {
+                    IsExistingFile = false,
+                    HasRemainingCountries = false,
+                    AllCountriesCompleted = false,
+                    SessionId = 0,
+                    FileName = file.FileName,
+                    Message = $"Error processing file: {ex.Message}"
+                };
+            }
+        }
     }
 }

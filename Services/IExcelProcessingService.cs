@@ -16,5 +16,11 @@ namespace ShipmentFinishGood.Services
         
         // NEW: Country submission method
         Task<bool> SubmitCountryDataAsync(CountrySubmissionRequest request, string createdBy);
+        
+        // NEW: File hash and resume functionality
+        Task<UploadSession?> GetExistingSessionByHashAsync(string fileHash);
+        Task<List<string>> GetRemainingCountriesAsync(int sessionId);
+        Task<bool> HasAnySubmittedCountriesAsync(int sessionId);
+        Task<FileUploadResult> ProcessFileUploadAsync(IFormFile file, string uploadedBy);
     }
 }

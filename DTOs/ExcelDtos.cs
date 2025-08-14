@@ -324,4 +324,18 @@ namespace ShipmentFinishGood.DTOs
         public int TotalBoxes { get; set; }
         public List<ScanHistoryDto> ScanActivities { get; set; } = new();
     }
+
+    // NEW: Upload result for handling file resume functionality
+    public class FileUploadResult
+    {
+        public bool IsExistingFile { get; set; }
+        public bool HasRemainingCountries { get; set; }
+        public bool AllCountriesCompleted { get; set; }
+        public int SessionId { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public List<string> RemainingCountries { get; set; } = new();
+        public List<string> SubmittedCountries { get; set; } = new();
+        public string Message { get; set; } = string.Empty;
+        public UploadPreviewDto? PreviewData { get; set; }
+    }
 }
