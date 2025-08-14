@@ -70,6 +70,26 @@ namespace ShipmentFinishGood.DTOs
         public string ShipmentType { get; set; } = string.Empty;
     }
 
+    public class UpdateRowDataRequest
+    {
+        public int SessionId { get; set; }
+        public string Country { get; set; } = string.Empty;
+        public int RowIndex { get; set; }
+        public string ShipmentType { get; set; } = string.Empty;
+        public RowUpdateData RowData { get; set; } = new();
+    }
+
+    public class RowUpdateData
+    {
+        public string NoPO { get; set; } = string.Empty;
+        public int TotalQty { get; set; }
+        public string NoInvoice { get; set; } = string.Empty;
+        public string Container { get; set; } = string.Empty;
+        public string ShipmentDetail { get; set; } = string.Empty;
+        public int RowIndex { get; set; }
+        public string Country { get; set; } = string.Empty;
+    }
+
     public class CountrySubmissionResult
     {
         public bool Success { get; set; }

@@ -403,6 +403,62 @@
             border-radius: var(--radius-lg);
             padding: 1.5rem;
         }
+
+        /* Lock/Unlock Row Styles */
+        .row-lock-btn {
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .row-lock-btn[data-locked="true"] {
+            background: var(--warning-orange);
+            border-color: var(--warning-orange);
+            color: white;
+        }
+
+        .row-lock-btn[data-locked="false"] {
+            background: var(--success-green);
+            border-color: var(--success-green);
+            color: white;
+        }
+
+        .row-lock-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Locked row styles */
+        tr.row-locked {
+            background-color: #fefefe;
+            opacity: 0.8;
+        }
+
+        tr.row-locked .editable-field {
+            background-color: #f8f9fa !important;
+            border-color: #dee2e6 !important;
+            cursor: not-allowed;
+        }
+
+        /* Unlocked row styles */
+        tr.row-unlocked {
+            background-color: #f0fff4;
+            border-left: 4px solid var(--success-green);
+        }
+
+        tr.row-unlocked .editable-field {
+            background-color: white !important;
+            border-color: var(--success-green) !important;
+        }
+
+        /* Modified row indicator */
+        tr.row-modified {
+            background-color: #fff3cd;
+            border-left: 4px solid var(--warning-orange);
+        }
     </style>
 }
 
@@ -631,6 +687,7 @@
                             <table class="table table-hover mb-0" id="table_@countryData.Key">
                                 <thead>
                                     <tr>
+                                        <th><i class="fas fa-lock me-2"></i>Action</th>
                                         <th><i class="fas fa-file-alt me-2"></i>PO Number</th>
                                         <th><i class="fas fa-cube me-2"></i>Model</th>
                                         <th><i class="fas fa-calculator me-2"></i>Total Qty</th>
@@ -646,9 +703,20 @@
                                     @for (int i = 0; i < countryData.Value.Count; i++)
                                     {
                                         var item = countryData.Value[i];
-                                        <tr>
+                                        <tr data-row-index="@i" data-country="@countryData.Key">
                                             <td>
-                                                <div class="fw-bold text-primary">@item.NoPO</div>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-warning row-lock-btn" 
+                                                        data-locked="true"
+                                                        onclick="toggleRowLock(this, '@countryData.Key', @i)">
+                                                    <i class="fas fa-lock"></i>
+                                                </button>
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm editable-field" 
+                                                       name="po_@(countryData.Key)_@i" 
+                                                       value="@item.NoPO" 
+                                                       readonly />
                                             </td>
                                             <td>
                                                 <span class="badge bg-primary">
@@ -657,22 +725,23 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <div class="fw-bold text-primary fs-6">
-                                                    @item.TotalQty.ToString("N0")
-                                                </div>
+                                                <input type="number" class="form-control form-control-sm editable-field" 
+                                                       name="qty_@(countryData.Key)_@i" 
+                                                       value="@item.TotalQty" 
+                                                       readonly />
                                             </td>
                                             <td>
-                                                <span class="badge bg-success fs-6">
+                                                <span class="badge bg-success fs-6 qty-display" data-type="pallet">
                                                     @item.QtyPallet
                                                 </span>
                                             </td>
                                             <td>
-                                                <span class="badge bg-warning fs-6">
+                                                <span class="badge bg-warning fs-6 qty-display" data-type="box">
                                                     @item.QtyBox
                                                 </span>
                                             </td>
                                             <td>
-                                                <span class="badge bg-info fs-6">
+                                                <span class="badge bg-info fs-6 qty-display" data-type="pcs">
                                                     @item.QtyPcs
                                                 </span>
                                             </td>
@@ -681,10 +750,11 @@
                                                     <span class="input-group-text">
                                                         <i class="fas fa-file-invoice text-muted"></i>
                                                     </span>
-                                                    <input type="text" class="form-control" 
+                                                    <input type="text" class="form-control editable-field" 
                                                            name="invoice_@(countryData.Key)_@i" 
                                                            placeholder="Invoice number..." 
-                                                           value="@item.NoInvoice" />
+                                                           value="@item.NoInvoice" 
+                                                           readonly />
                                                 </div>
                                             </td>
                                             <td>
@@ -692,10 +762,11 @@
                                                     <span class="input-group-text">
                                                         <i class="fas fa-shipping-fast text-muted"></i>
                                                     </span>
-                                                    <input type="text" class="form-control" 
+                                                    <input type="text" class="form-control editable-field" 
                                                            name="container_@(countryData.Key)_@i" 
                                                            placeholder="Container ID..." 
-                                                           value="@item.Container" />
+                                                           value="@item.Container" 
+                                                           readonly />
                                                 </div>
                                             </td>
                                             <td>
@@ -703,10 +774,11 @@
                                                     <span class="input-group-text">
                                                         <i class="fas fa-info-circle text-muted"></i>
                                                     </span>
-                                                    <input type="text" class="form-control" 
+                                                    <input type="text" class="form-control editable-field" 
                                                            name="detail_@(countryData.Key)_@i" 
                                                            placeholder="Additional details..." 
-                                                           value="@item.ShipmentDetail" />
+                                                           value="@item.ShipmentDetail" 
+                                                           readonly />
                                                 </div>
                                             </td>
                                         </tr>
@@ -912,9 +984,25 @@
             
             data.forEach((item, index) => {
                 const row = document.createElement('tr');
+                row.setAttribute('data-row-index', index);
+                row.setAttribute('data-country', country);
+                row.className = 'row-locked';
+                
                 row.innerHTML = `
                     <td>
-                        <div class="fw-bold text-primary">${item.NoPO}</div>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-warning row-lock-btn" 
+                                data-locked="true"
+                                onclick="toggleRowLock(this, '${country}', ${index})">
+                            <i class="fas fa-lock"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm editable-field" 
+                               name="po_${country}_${index}" 
+                               value="${item.NoPO}" 
+                               data-original-value="${item.NoPO}"
+                               readonly />
                     </td>
                     <td>
                         <span class="badge bg-primary">
@@ -923,22 +1011,24 @@
                         </span>
                     </td>
                     <td>
-                        <div class="fw-bold text-primary fs-6">
-                            ${item.TotalQty.toLocaleString()}
-                        </div>
+                        <input type="number" class="form-control form-control-sm editable-field" 
+                               name="qty_${country}_${index}" 
+                               value="${item.TotalQty}" 
+                               data-original-value="${item.TotalQty}"
+                               readonly />
                     </td>
                     <td>
-                        <span class="badge bg-success fs-6">
+                        <span class="badge bg-success fs-6 qty-display" data-type="pallet">
                             ${item.QtyPallet}
                         </span>
                     </td>
                     <td>
-                        <span class="badge bg-warning fs-6">
+                        <span class="badge bg-warning fs-6 qty-display" data-type="box">
                             ${item.QtyBox}
                         </span>
                     </td>
                     <td>
-                        <span class="badge bg-info fs-6">
+                        <span class="badge bg-info fs-6 qty-display" data-type="pcs">
                             ${item.QtyPcs}
                         </span>
                     </td>
@@ -947,10 +1037,12 @@
                             <span class="input-group-text">
                                 <i class="fas fa-file-invoice text-muted"></i>
                             </span>
-                            <input type="text" class="form-control" 
+                            <input type="text" class="form-control editable-field" 
                                    name="invoice_${country}_${index}" 
                                    placeholder="Invoice number..." 
-                                   value="${item.NoInvoice || ''}" />
+                                   value="${item.NoInvoice || ''}" 
+                                   data-original-value="${item.NoInvoice || ''}"
+                                   readonly />
                         </div>
                     </td>
                     <td>
@@ -958,10 +1050,12 @@
                             <span class="input-group-text">
                                 <i class="fas fa-shipping-fast text-muted"></i>
                             </span>
-                            <input type="text" class="form-control" 
+                            <input type="text" class="form-control editable-field" 
                                    name="container_${country}_${index}" 
                                    placeholder="Container ID..." 
-                                   value="${item.Container || ''}" />
+                                   value="${item.Container || ''}" 
+                                   data-original-value="${item.Container || ''}"
+                                   readonly />
                         </div>
                     </td>
                     <td>
@@ -969,14 +1063,25 @@
                             <span class="input-group-text">
                                 <i class="fas fa-info-circle text-muted"></i>
                             </span>
-                            <input type="text" class="form-control" 
+                            <input type="text" class="form-control editable-field" 
                                    name="detail_${country}_${index}" 
                                    placeholder="Additional details..." 
-                                   value="${item.ShipmentDetail || ''}" />
+                                   value="${item.ShipmentDetail || ''}" 
+                                   data-original-value="${item.ShipmentDetail || ''}"
+                                   readonly />
                         </div>
                     </td>
                 `;
+                
                 tableBody.appendChild(row);
+                
+                // Add event listeners for change detection
+                const editableFields = row.querySelectorAll('.editable-field');
+                editableFields.forEach(field => {
+                    field.addEventListener('input', function() {
+                        markRowAsModified(row);
+                    });
+                });
             });
         }
 
@@ -1034,13 +1139,13 @@
                     const container = row.querySelector(`input[name="container_${country}_${index}"]`).value;
                     const detail = row.querySelector(`input[name="detail_${country}_${index}"]`).value;
                     
-                    // Get data from currentData
+                    // Get data from currentData (which includes updated calculations)
                     const originalData = currentData[country][index];
                     
                     countryData.push({
-                        NoPO: originalData.NoPO,
+                        NoPO: row.querySelector(`input[name="po_${country}_${index}"]`).value || originalData.NoPO,
                         Model: originalData.Model,
-                        TotalQty: originalData.TotalQty,
+                        TotalQty: parseInt(row.querySelector(`input[name="qty_${country}_${index}"]`).value) || originalData.TotalQty,
                         QtyPallet: originalData.QtyPallet,
                         QtyBox: originalData.QtyBox,
                         QtyPcs: originalData.QtyPcs,
@@ -1176,6 +1281,267 @@
                 dropdown.selectedIndex = 1;
                 switchCountry();
             }
+
+            // Initialize all rows as locked
+            initializeRowStates();
         });
+
+        // Initialize row states
+        function initializeRowStates() {
+            document.querySelectorAll('tr[data-row-index]').forEach(row => {
+                row.classList.add('row-locked');
+                
+                // Store original values for comparison
+                const editableFields = row.querySelectorAll('.editable-field');
+                editableFields.forEach(field => {
+                    field.setAttribute('data-original-value', field.value);
+                    
+                    // Add change event listener
+                    field.addEventListener('input', function() {
+                        markRowAsModified(row);
+                    });
+                });
+            });
+        }
+
+        // Toggle row lock/unlock
+        async function toggleRowLock(button, country, rowIndex) {
+            const row = button.closest('tr');
+            const isCurrentlyLocked = button.getAttribute('data-locked') === 'true';
+            
+            if (isCurrentlyLocked) {
+                // Unlock row
+                unlockRow(button, row);
+            } else {
+                // Lock row - check for changes first
+                await lockRow(button, row, country, rowIndex);
+            }
+        }
+
+        // Unlock row
+        function unlockRow(button, row) {
+            button.setAttribute('data-locked', 'false');
+            button.innerHTML = '<i class="fas fa-unlock"></i>';
+            button.className = 'btn btn-sm btn-outline-success row-lock-btn';
+            
+            row.classList.remove('row-locked');
+            row.classList.add('row-unlocked');
+            
+            // Enable editing
+            const editableFields = row.querySelectorAll('.editable-field');
+            editableFields.forEach(field => {
+                field.removeAttribute('readonly');
+            });
+            
+            showToast('🔓 Row unlocked - You can now edit this data', 'success');
+        }
+
+        // Lock row
+        async function lockRow(button, row, country, rowIndex) {
+            // Check if data has been modified
+            const hasChanges = checkRowChanges(row);
+            
+            if (hasChanges) {
+                // Show confirmation dialog
+                const confirmed = await showConfirmationDialog(
+                    'Data Changes Detected',
+                    'You have made changes to this row. Do you want to save the changes and recalculate quantities?',
+                    'Save & Lock',
+                    'Cancel'
+                );
+                
+                if (!confirmed) {
+                    return; // User cancelled
+                }
+                
+                // Save changes and recalculate
+                try {
+                    await saveRowChanges(row, country, rowIndex);
+                    
+                    // Success - lock the row
+                    performRowLock(button, row);
+                    showToast('✅ Changes saved and quantities recalculated', 'success');
+                    
+                } catch (error) {
+                    showToast('❌ Error saving changes: ' + error.message, 'error');
+                    return;
+                }
+            } else {
+                // No changes, just lock
+                performRowLock(button, row);
+                showToast('🔒 Row locked', 'success');
+            }
+        }
+
+        // Perform the actual row locking
+        function performRowLock(button, row) {
+            button.setAttribute('data-locked', 'true');
+            button.innerHTML = '<i class="fas fa-lock"></i>';
+            button.className = 'btn btn-sm btn-outline-warning row-lock-btn';
+            
+            row.classList.remove('row-unlocked', 'row-modified');
+            row.classList.add('row-locked');
+            
+            // Disable editing
+            const editableFields = row.querySelectorAll('.editable-field');
+            editableFields.forEach(field => {
+                field.setAttribute('readonly', 'readonly');
+                // Update original value after save
+                field.setAttribute('data-original-value', field.value);
+            });
+        }
+
+        // Check if row has changes
+        function checkRowChanges(row) {
+            const editableFields = row.querySelectorAll('.editable-field');
+            for (let field of editableFields) {
+                const originalValue = field.getAttribute('data-original-value') || '';
+                const currentValue = field.value || '';
+                if (originalValue !== currentValue) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Mark row as modified
+        function markRowAsModified(row) {
+            if (!row.classList.contains('row-locked')) {
+                row.classList.add('row-modified');
+            }
+        }
+
+        // Save row changes and recalculate
+        async function saveRowChanges(row, country, rowIndex) {
+            // Get core data (PO and Qty) for recalculation
+            const coreData = {
+                rowIndex: parseInt(rowIndex),
+                country: country,
+                noPO: row.querySelector(`input[name="po_${country}_${rowIndex}"]`).value,
+                totalQty: parseInt(row.querySelector(`input[name="qty_${country}_${rowIndex}"]`).value) || 0
+            };
+
+            // Get metadata (invoice, container, detail) for local storage
+            const metadata = {
+                noInvoice: row.querySelector(`input[name="invoice_${country}_${rowIndex}"]`).value,
+                container: row.querySelector(`input[name="container_${country}_${rowIndex}"]`).value,
+                shipmentDetail: row.querySelector(`input[name="detail_${country}_${rowIndex}"]`).value
+            };
+
+            const requestData = {
+                sessionId: parseInt(sessionId),
+                country: country,
+                rowIndex: rowIndex,
+                rowData: coreData,
+                shipmentType: document.querySelector('input[name="shipmentType"]:checked')?.value || 'LOOSE'
+            };
+
+            const response = await fetch('/PO/UpdateRowData', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to save changes');
+            }
+
+            // Update the row with new calculated values
+            if (result.updatedRowData) {
+                // Update core calculated data
+                updateRowDisplay(row, result.updatedRowData);
+                
+                // Update currentData with both core and metadata
+                if (currentData[country] && currentData[country][rowIndex]) {
+                    Object.assign(currentData[country][rowIndex], {
+                        ...result.updatedRowData,
+                        ...metadata // Include metadata in local data
+                    });
+                }
+                
+                // Update stats for current country
+                updateStats(country);
+            }
+        }
+
+        // Update row display with new data
+        function updateRowDisplay(row, newData) {
+            // Update quantity displays
+            const palletDisplay = row.querySelector('.qty-display[data-type="pallet"]');
+            const boxDisplay = row.querySelector('.qty-display[data-type="box"]');
+            const pcsDisplay = row.querySelector('.qty-display[data-type="pcs"]');
+            
+            if (palletDisplay) palletDisplay.textContent = newData.qtyPallet || 0;
+            if (boxDisplay) boxDisplay.textContent = newData.qtyBox || 0;
+            if (pcsDisplay) pcsDisplay.textContent = newData.qtyPcs || 0;
+        }
+
+        // Enhanced confirmation dialog
+        function showConfirmationDialog(title, message, confirmText = 'Confirm', cancelText = 'Cancel') {
+            return new Promise((resolve) => {
+                // Remove existing modal if any
+                const existingModal = document.getElementById('confirmationModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                const modal = document.createElement('div');
+                modal.id = 'confirmationModal';
+                modal.className = 'modal fade';
+                modal.innerHTML = `
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning text-white">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    ${title}
+                                </h5>
+                            </div>
+                            <div class="modal-body">
+                                <p class="mb-0">${message}</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="fas fa-times me-2"></i>
+                                    ${cancelText}
+                                </button>
+                                <button type="button" class="btn btn-warning" id="confirmBtn">
+                                    <i class="fas fa-check me-2"></i>
+                                    ${confirmText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                // Initialize Bootstrap modal
+                const bsModal = new bootstrap.Modal(modal);
+                
+                // Handle confirm
+                modal.querySelector('#confirmBtn').addEventListener('click', () => {
+                    resolve(true);
+                    bsModal.hide();
+                });
+
+                // Handle cancel/close
+                modal.addEventListener('hidden.bs.modal', () => {
+                    resolve(false);
+                    modal.remove();
+                });
+
+                bsModal.show();
+            });
+        }
     </script>
 }

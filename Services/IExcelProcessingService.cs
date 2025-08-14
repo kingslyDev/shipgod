@@ -7,6 +7,7 @@ namespace ShipmentFinishGood.Services
     {
         Task<UploadPreviewDto> ProcessExcelFileAsync(IFormFile file, string uploadedBy);
         Task<List<ProcessedPOData>> CalculateProcessedDataAsync(List<ExcelRowData> rawData, string shipmentType);
+        Task<ProcessedPOData> CalculateSingleRowAsync(string model, int totalQty, string shipmentType);
         Task<bool> SubmitProcessedDataAsync(CalculationRequest request, string createdBy);
         Task<UploadPreviewDto?> GetPreviewAsync(int sessionId);
         Task<bool> UpdatePODataAsync(int poId, ProcessedPOData updatedData);

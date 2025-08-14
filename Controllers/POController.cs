@@ -5,6 +5,7 @@ using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Services;
 using ShipmentFinishGood.Common;
 using ShipmentFinishGood.Repositories;
+using ShipmentFinishGood.Data;
 using System.Security.Claims;
 
 namespace ShipmentFinishGood.Controllers
@@ -176,6 +177,71 @@ namespace ShipmentFinishGood.Controllers
             else
             {
                 return Json(new { success = false, message = "Failed to update PO" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateRowData([FromBody] UpdateRowDataRequest request)
+        {
+            try
+            {
+                // Get the session data
+                var session = await _context.UploadSessions
+                    .Include(s => s.Details)
+                    .FirstOrDefaultAsync(s => s.SessionId == request.SessionId);
+
+                if (session == null)
+                {
+                    return Json(new { success = false, message = "Session not found" });
+                }
+
+                // Get all details for this country and find the specific row
+                var countryDetails = session.Details
+                    .Where(d => d.Country == request.Country)
+                    .OrderBy(d => d.RowIndex)
+                    .ToList();
+
+                if (request.RowIndex >= countryDetails.Count)
+                {
+                    return Json(new { success = false, message = "Row index out of range" });
+                }
+
+                var rowData = countryDetails[request.RowIndex];
+
+                // Update the raw data (what we can)
+                rowData.OriginalPO = request.RowData.NoPO;
+                rowData.OriginalQty = request.RowData.TotalQty;
+
+                // Recalculate quantities for this single row
+                var recalculatedData = await _excelService.CalculateSingleRowAsync(
+                    rowData.Model ?? "", 
+                    request.RowData.TotalQty, 
+                    request.ShipmentType
+                );
+
+                // Save changes to session detail
+                await _context.SaveChangesAsync();
+
+                // Return updated row data with calculated values
+                return Json(new { 
+                    success = true, 
+                    message = "Row data updated successfully",
+                    updatedRowData = new {
+                        noPO = request.RowData.NoPO,
+                        model = rowData.Model,
+                        totalQty = request.RowData.TotalQty,
+                        qtyPallet = recalculatedData.QtyPallet,
+                        qtyBox = recalculatedData.QtyBox,
+                        qtyPcs = recalculatedData.QtyPcs,
+                        noInvoice = request.RowData.NoInvoice,
+                        container = request.RowData.Container,
+                        shipmentDetail = request.RowData.ShipmentDetail
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
             }
         }
 

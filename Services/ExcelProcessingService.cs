@@ -198,6 +198,24 @@ namespace ShipmentFinishGood.Services
             return groupedData.OrderBy(x => x.NoPO).ThenBy(x => x.Model).ToList();
         }
 
+        public async Task<ProcessedPOData> CalculateSingleRowAsync(string model, int totalQty, string shipmentType)
+        {
+            var modelConfigs = await _modelConfigService.GetAllAsync();
+            var configDict = modelConfigs
+                .GroupBy(m => m.ModelName)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var processedData = new ProcessedPOData
+            {
+                Model = model,
+                TotalQty = totalQty
+            };
+
+            CalculateBreakdown(processedData, configDict, shipmentType);
+
+            return processedData;
+        }
+
         private void CalculateBreakdown(ProcessedPOData item, Dictionary<string, List<ModelConfiguration>> configDict, string shipmentType)
         {
             if (!configDict.TryGetValue(item.Model, out var configs) || configs.Count == 0)
