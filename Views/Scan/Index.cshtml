@@ -56,6 +56,9 @@
                         <button class="btn btn-outline-light btn-sm" onclick="manualRefreshSessions()" title="Refresh QR data">
                             <i class="fas fa-sync-alt me-1"></i>Refresh QR Data
                         </button>
+                        <button class="btn btn-outline-light btn-sm" onclick="debugScanSystem()" title="Debug scan system">
+                            <i class="fas fa-bug me-1"></i>Debug
+                        </button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -259,8 +262,10 @@
             console.log('Scanned value:', scannedValue);
             console.log('Scanned value length:', scannedValue.length);
             console.log('Starts with QR_:', scannedValue.startsWith('QR_'));
+            console.log('Contains _BOX_:', scannedValue.includes('_BOX_'));
             console.log('Active sessions count:', activeSessions.length);
             console.log('Available QR identities:', activeSessions.map(s => s.qrIdentity));
+            console.log('Current user lock:', currentUserLock);
             
             // Check for exact matches
             const exactMatch = activeSessions.find(s => s.qrIdentity === scannedValue);
@@ -320,7 +325,14 @@
             // Also check if it's a valid QR format that starts with QR_
             if (!value.startsWith('QR_')) return false;
             
-            return activeSessions.some(session => session.qrIdentity === value);
+            // Debug logging for exact matches
+            console.log('Checking Master QR:', value);
+            console.log('Available QR identities:', activeSessions.map(s => s.qrIdentity));
+            
+            const exactMatch = activeSessions.some(session => session.qrIdentity === value);
+            console.log('Exact match found:', exactMatch);
+            
+            return exactMatch;
         }
 
         // Check if scanned value is Box Barcode
@@ -328,8 +340,18 @@
             // Box barcode format: QR_sessionId_timestamp_BOX_model_number
             if (!value.includes('_BOX_')) return false;
             
-            return activeSessions.some(session => 
-                value.startsWith(session.qrIdentity + '_BOX_'));
+            // Debug logging for barcode validation
+            console.log('Checking Box Barcode:', value);
+            console.log('Available sessions for barcode validation:', activeSessions.length);
+            
+            const isValid = activeSessions.some(session => {
+                const startsWithQR = value.startsWith(session.qrIdentity + '_BOX_');
+                console.log(`Session ${session.sessionId}: ${session.qrIdentity} -> ${startsWithQR}`);
+                return startsWithQR;
+            });
+            
+            console.log('Box barcode is valid:', isValid);
+            return isValid;
         }
 
         // Process Master QR scan
@@ -588,38 +610,6 @@
                 });
             });
         }
-                .then(html => {
-                    // Parse the HTML to extract session data
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    // Extract the script content that contains activeSessions
-                    const scripts = doc.querySelectorAll('script');
-                    for (let script of scripts) {
-                        if (script.textContent.includes('activeSessions = [')) {
-                            // Extract and evaluate the activeSessions part
-                            const match = script.textContent.match(/activeSessions = \[([\s\S]*?)\];/);
-                            if (match) {
-                                try {
-                                    // Safely evaluate the sessions array
-                                    eval('activeSessions = [' + match[1] + '];');
-                                    console.log('Sessions refreshed:', activeSessions);
-                                } catch (e) {
-                                    console.error('Error parsing sessions:', e);
-                                }
-                            }
-                            break;
-                        }
-                    }
-                    resolve();
-                })
-                .catch(error => {
-                    console.error('Error refreshing sessions:', error);
-                    // Fallback to page reload
-                    location.reload();
-                });
-            });
-        }
 
         function checkForValidatedSessions() {
             showAlert('Checking for available sessions and generating QR codes if needed...', 'info');
@@ -654,6 +644,46 @@
             refreshSessions().then(() => {
                 showAlert('✅ QR data refreshed successfully!', 'success');
             });
+        }
+
+        // Debug function for testing entire scan system
+        function debugScanSystem() {
+            console.log('=== SCAN SYSTEM DEBUG ===');
+            console.log('Current User Lock:', currentUserLock);
+            console.log('Active Sessions Count:', activeSessions.length);
+            console.log('Active Sessions:', activeSessions);
+            
+            if (activeSessions.length > 0) {
+                console.log('Testing with first session:', activeSessions[0]);
+                const testQR = activeSessions[0].qrIdentity;
+                const testBoxBarcode = testQR + '_BOX_TEST_001';
+                
+                console.log('Test Master QR:', testQR);
+                console.log('Test Box Barcode:', testBoxBarcode);
+                console.log('Is Master QR valid:', isMasterQR(testQR));
+                console.log('Is Box Barcode valid:', isBoxBarcode(testBoxBarcode));
+                
+                // Test backend connectivity
+                $.ajax({
+                    url: '@Url.Action("DebugSession", "Scan")',
+                    type: 'GET',
+                    data: { sessionId: activeSessions[0].sessionId },
+                    success: function(response) {
+                        console.log('Backend session debug:', response);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Backend connectivity error:', error);
+                    }
+                });
+            } else {
+                console.log('No active sessions found');
+                // Try to generate QR codes
+                console.log('Attempting to check for validated sessions...');
+                checkForValidatedSessions();
+            }
+            
+            console.log('=== END DEBUG ===');
+            showAlert('Debug information logged to console. Press F12 to view.', 'info');
         }
 
         // Debug function for testing QR format

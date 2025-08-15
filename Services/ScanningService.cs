@@ -160,6 +160,11 @@ namespace ShipmentFinishGood.Services
             if (existingScan != null)
                 return Result<ScanResultDto>.Failure("Master QR already scanned");
 
+            // Mark the master QR barcode as scanned in BarcodeRegistry
+            var markMasterResult = await _barcodeService.MarkBarcodeAsScannedAsync(qrCode, scannedBy);
+            if (!markMasterResult.IsSuccess)
+                return Result<ScanResultDto>.Failure($"Failed to mark master QR as scanned: {markMasterResult.Error}");
+
             // Record the scan - this locks the user to this session
             var scanActivity = new ScanningActivity
             {
