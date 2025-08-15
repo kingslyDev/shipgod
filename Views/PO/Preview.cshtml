@@ -582,7 +582,7 @@
                         @foreach(var country in Model.PendingCountries)
                         {
                             <option value="@country">
-                                🌍 @country (@Model.ProcessedDataByCountry[country].Count items)
+                                @country (@Model.ProcessedDataByCountry[country].Count items)
                             </option>
                         }
                     </select>

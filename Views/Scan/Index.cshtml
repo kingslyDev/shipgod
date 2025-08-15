@@ -19,6 +19,9 @@
         </div>
     </div>
 
+    <!-- Anti-forgery token for AJAX requests -->
+    <form id="afToken" class="d-none">@Html.AntiForgeryToken()</form>
+
     @if (TempData["Error"] != null)
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -59,24 +62,28 @@
                                 </span>
                                 <input type="text" 
                                        id="mainScanInput" 
-                                       class="form-control" 
+                                       class="form-control form-control-lg" 
                                        placeholder="📱 Scan QR Identity or Box Barcode here..." 
                                        autocomplete="off" 
+                                       spellcheck="false"
+                                       inputmode="text"
+                                       aria-label="Scan input for QR Identity or Box Barcode"
+                                       aria-describedby="scanHelp"
                                        autofocus>
-                                <button class="btn btn-primary" type="button" onclick="processScan()">
+                                <button class="btn btn-primary btn-lg" type="button" onclick="processScan()" aria-label="Scan input">
                                     <i class="fas fa-check me-1"></i>Scan
                                 </button>
                             </div>
-                            <div class="form-text">
+                            <div id="scanHelp" class="form-text">
                                 <strong>Instructions:</strong> 
                                 First scan QR Identity to lock session, then scan box barcodes.
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div id="scanStatus" class="text-center">
+                            <div id="scanStatus" class="text-center" role="status" aria-live="polite">
                                 <div class="h6 mb-1">Status</div>
-                                <span class="badge bg-secondary" id="statusBadge">Ready to Scan</span>
-                                <div class="small text-muted mt-1" id="statusDetail">
+                                <span class="badge bg-secondary fs-6 px-3 py-2" id="statusBadge">Ready to Scan</span>
+                                <div class="small text-muted mt-2" id="statusDetail">
                                     Scan QR Identity to begin
                                 </div>
                             </div>
@@ -145,76 +152,30 @@
             </div>
         </div>
 
-        <!-- Sessions List -->
-        <div class="row">
-            @foreach (var session in Model)
-            {
-                <div class="col-lg-6 mb-4">
-                    <div class="card shadow-sm h-100 border-left-@(GetStatusColor(session.Status))">
-                        <div class="card-header bg-light">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0 text-primary">
-                                    <i class="fas fa-file-excel me-2"></i>@session.FileName
-                                </h6>
-                                <span class="badge bg-@GetStatusColor(session.Status)">@session.Status</span>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <!-- Session Info -->
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <small class="text-muted">Shipment Type:</small>
-                                    <div class="fw-bold">@session.ShipmentType</div>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted">Total Boxes:</small>
-                                    <div class="fw-bold text-primary">@session.TotalBoxes</div>
-                                </div>
-                            </div>
-
-                            <!-- QR Identity -->
-                            <div class="mb-3">
-                                <small class="text-muted">QR Identity:</small>
-                                <div class="font-monospace small bg-light p-2 rounded">
-                                    @session.QRIdentity
-                                    <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyToClipboard('@session.QRIdentity')">
-                                        <i class="fas fa-copy"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Session Details -->
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <small class="text-muted">Created:</small>
-                                    <div class="small">@session.CreatedDate.ToString("dd/MM/yyyy HH:mm")</div>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted">Created By:</small>
-                                    <div class="small">@session.CreatedBy</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-light">
-                            <div class="d-flex gap-2 justify-content-center">
-                                @{
-                                    var isLocked = ViewBag.UserLockedSession?.ToString() == session.QRIdentity;
-                                    var buttonClass = isLocked ? "btn btn-warning btn-sm" : "btn btn-primary btn-sm";
-                                    var buttonText = isLocked ? "Continue Locked Session" : "Start Scanning";
-                                }
-                                <a asp-action="StartScan" asp-route-sessionId="@session.SessionId" 
-                                   class="@buttonClass">
-                                    <i class="fas fa-qrcode me-1"></i>@buttonText
-                                </a>
-                                <a asp-action="SessionDetail" asp-route-sessionId="@session.SessionId" 
-                                   class="btn btn-outline-info btn-sm">
-                                    <i class="fas fa-eye me-1"></i>View Detail
-                                </a>
-                            </div>
+        <!-- Quick Guide (replaces per-session list) -->
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body d-flex align-items-center">
+                        <i class="fas fa-qrcode text-primary fa-3x me-3" aria-hidden="true"></i>
+                        <div>
+                            <div class="h5 mb-1">Step 1 — Scan QR Identity</div>
+                            <div class="text-muted">Lock to a session by scanning the printed QR Identity.</div>
                         </div>
                     </div>
                 </div>
-            }
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body d-flex align-items-center">
+                        <i class="fas fa-box-open text-success fa-3x me-3" aria-hidden="true"></i>
+                        <div>
+                            <div class="h5 mb-1">Step 2 — Scan Box Barcodes</div>
+                            <div class="text-muted">Scan each box barcode. Progress updates automatically.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     }
     else
@@ -541,16 +502,4 @@
     </script>
 }
 
-@functions {
-    private string GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Ready" => "success",
-            "In Progress" => "warning", 
-            "Completed" => "info",
-            "Pending" => "secondary",
-            _ => "secondary"
-        };
-    }
-}
+@* Removed per-session color helper as the session list UI was removed *@
