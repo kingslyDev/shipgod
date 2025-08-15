@@ -126,7 +126,9 @@ namespace ShipmentFinishGood.Controllers
                             barcode = barcode,
                             sessionQR = currentSession?.QRIdentity,
                             barcodeStartsWithQR = barcode.StartsWith(currentSession?.QRIdentity ?? ""),
-                            sessionExists = currentSession != null
+                            sessionExists = currentSession != null,
+                            sessionStatus = currentSession?.Status,
+                            activeSessions = session.Count()
                         }
                     });
                 }

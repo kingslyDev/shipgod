@@ -47,9 +47,22 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(b => b.SessionId);
             
-        // Add unique constraint for barcode
+        modelBuilder.Entity<BarcodeRegistry>()
+            .HasOne(b => b.POMaster)
+            .WithMany()
+            .HasForeignKey(b => b.POId);
+            
+        // Add unique constraint for active barcodes
         modelBuilder.Entity<BarcodeRegistry>()
             .HasIndex(b => b.BarcodeValue)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsActive] = 1");
+            
+        // Add indexes for performance
+        modelBuilder.Entity<BarcodeRegistry>()
+            .HasIndex(b => new { b.SessionId, b.Status, b.IsActive });
+            
+        modelBuilder.Entity<BarcodeRegistry>()
+            .HasIndex(b => new { b.POId, b.BoxNumber });
     }
 }

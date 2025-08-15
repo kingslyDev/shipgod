@@ -26,15 +26,19 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddDomainServices(this IServiceCollection services)
     {
+        // Register repositories
         services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<IUserService, UserService>();
         services.AddScoped<IModelConfigurationRepository, ModelConfigurationRepository>();
-        services.AddScoped<IModelConfigurationService, ModelConfigurationService>();
+        
+        // Register services
+        services.AddScoped<IUserService, UserService>();
         services.AddScoped<IExcelProcessingService, ExcelProcessingService>();
+        services.AddScoped<IModelConfigurationService, ModelConfigurationService>();
         services.AddScoped<IFinalProcessingService, FinalProcessingService>();
         services.AddScoped<IQRManagementService, QRManagementService>();
         services.AddScoped<IScanningService, ScanningService>();
-        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IBarcodeService, BarcodeService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
         return services;
     }    public static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration config)
     {

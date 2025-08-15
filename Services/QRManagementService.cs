@@ -11,10 +11,12 @@ namespace ShipmentFinishGood.Services
     public class QRManagementService : IQRManagementService
     {
         private readonly AppDbContext _context;
+        private readonly IBarcodeService _barcodeService;
 
-        public QRManagementService(AppDbContext context)
+        public QRManagementService(AppDbContext context, IBarcodeService barcodeService)
         {
             _context = context;
+            _barcodeService = barcodeService;
         }
 
         public async Task<QRManagementDto?> GetQRDataAsync(int sessionId)
@@ -26,16 +28,9 @@ namespace ShipmentFinishGood.Services
             if (session == null || string.IsNullOrEmpty(session.IdentityQRCode))
                 return null;
 
-            // Generate barcode list
-            var barcodeList = new List<string>();
-            foreach (var poMaster in session.POMasters)
-            {
-                for (int i = 1; i <= poMaster.QtyBox; i++)
-                {
-                    var barcode = $"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}";
-                    barcodeList.Add(barcode);
-                }
-            }
+            // Get barcode list from database
+            var barcodes = await _barcodeService.GetBarcodeListForSessionAsync(sessionId);
+            var barcodeList = barcodes.Select(b => b.BarcodeValue).ToList();
 
             // Generate QR code image as base64
             var qrImageBase64 = GenerateQRCodeBase64(session.IdentityQRCode);
@@ -61,9 +56,8 @@ namespace ShipmentFinishGood.Services
             var session = await _context.UploadSessions.FindAsync(sessionId);
             if (session == null) return false;
 
-            // Generate new QR Identity
-            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var qrIdentity = $"QR_{session.SheetIdentifier}_{session.ShipmentType}_{timestamp}";
+            // Generate new QR Identity - use consistent format
+            var qrIdentity = $"QR_{sessionId}_{DateTime.Now:yyyyMMddHHmmss}";
             
             // Check for QR Identity duplicate
             var duplicateQR = await _context.UploadSessions
@@ -75,14 +69,18 @@ namespace ShipmentFinishGood.Services
             if (duplicateQR != null)
             {
                 // Add milliseconds to make it unique
-                var timestampWithMs = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-                qrIdentity = $"QR_{session.SheetIdentifier}_{session.ShipmentType}_{timestampWithMs}";
+                qrIdentity = $"QR_{sessionId}_{DateTime.Now:yyyyMMddHHmmss_fff}";
             }
             
             session.IdentityQRCode = qrIdentity;
+            session.Status = "QR_GENERATED"; // Update status to ensure it appears in active sessions
             
             await _context.SaveChangesAsync();
-            return true;
+
+            // Regenerate barcodes using BarcodeService
+            var regenerateResult = await _barcodeService.GenerateBarcodesForSessionAsync(sessionId, generatedBy);
+            
+            return regenerateResult.IsSuccess;
         }
 
         public async Task<byte[]?> GenerateBarcodesPDFAsync(int sessionId)

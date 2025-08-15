@@ -11,11 +11,13 @@ namespace ShipmentFinishGood.Services
     {
         private readonly AppDbContext _context;
         private readonly IModelConfigurationService _modelConfigService;
+        private readonly IBarcodeService _barcodeService;
 
-        public ExcelProcessingService(AppDbContext context, IModelConfigurationService modelConfigService)
+        public ExcelProcessingService(AppDbContext context, IModelConfigurationService modelConfigService, IBarcodeService barcodeService)
         {
             _context = context;
             _modelConfigService = modelConfigService;
+            _barcodeService = barcodeService;
         }
 
     public async Task<UploadPreviewDto> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
@@ -285,6 +287,15 @@ namespace ShipmentFinishGood.Services
             }
 
             await _context.SaveChangesAsync();
+
+            // Generate QR Identity for the session
+            session.IdentityQRCode = $"QR_{session.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
+            _context.UploadSessions.Update(session);
+            await _context.SaveChangesAsync();
+
+            // Generate barcodes for the session
+            await _barcodeService.GenerateBarcodesForSessionAsync(session.SessionId, createdBy);
+            
             return true;
         }
 
@@ -347,6 +358,15 @@ namespace ShipmentFinishGood.Services
             }
 
             await _context.SaveChangesAsync();
+
+            // Generate QR Identity for the new session
+            newSession.IdentityQRCode = $"QR_{newSession.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
+            _context.UploadSessions.Update(newSession);
+            await _context.SaveChangesAsync();
+
+            // Generate barcodes for the new session
+            await _barcodeService.GenerateBarcodesForSessionAsync(newSession.SessionId, createdBy);
+            
             return true;
         }
 

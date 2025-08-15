@@ -49,9 +49,14 @@
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-qrcode me-2"></i>Smart Scanner
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-qrcode me-2"></i>Smart Scanner
+                        </h5>
+                        <button class="btn btn-outline-light btn-sm" onclick="manualRefreshSessions()" title="Refresh QR data">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh QR Data
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="row align-items-center">
@@ -230,6 +235,12 @@
             
             // Load available sessions for reference
             loadAvailableSessions();
+            
+            // Auto-refresh sessions every 30 seconds to keep data current
+            setInterval(function() {
+                console.log('🔄 Auto-refreshing sessions (30s interval)...');
+                refreshSessions();
+            }, 30000);
         });
 
         // Main scanning function
@@ -243,27 +254,81 @@
                 return;
             }
 
+            // Enhanced debug logging
+            console.log('=== SCAN ATTEMPT ===');
+            console.log('Scanned value:', scannedValue);
+            console.log('Scanned value length:', scannedValue.length);
+            console.log('Starts with QR_:', scannedValue.startsWith('QR_'));
+            console.log('Active sessions count:', activeSessions.length);
+            console.log('Available QR identities:', activeSessions.map(s => s.qrIdentity));
+            
+            // Check for exact matches
+            const exactMatch = activeSessions.find(s => s.qrIdentity === scannedValue);
+            console.log('Exact match found:', !!exactMatch);
+            if (exactMatch) {
+                console.log('Matched session:', exactMatch);
+            }
+            
+            // Check for partial matches
+            const partialMatches = activeSessions.filter(s => 
+                scannedValue.includes(s.qrIdentity) || s.qrIdentity.includes(scannedValue)
+            );
+            console.log('Partial matches:', partialMatches);
+            
+            console.log('Is Master QR:', isMasterQR(scannedValue));
+            console.log('Is Box Barcode:', isBoxBarcode(scannedValue));
+            console.log('=== END SCAN ATTEMPT ===');
+
             // Determine scan type and process
             if (isMasterQR(scannedValue)) {
                 processMasterQR(scannedValue);
             } else if (isBoxBarcode(scannedValue)) {
                 processBoxBarcode(scannedValue);
             } else {
-                showAlert('Invalid QR/Barcode format. Please scan a valid QR Identity or Box Barcode.', 'danger');
-                input.focus();
+                // If not recognized, try refreshing sessions first
+                console.log('⚠️ QR/Barcode not recognized, refreshing sessions...');
+                showAlert('QR not recognized, refreshing data...', 'info');
+                
+                refreshSessions().then(() => {
+                    console.log('🔄 Retrying validation after refresh...');
+                    console.log('Updated sessions count:', activeSessions.length);
+                    console.log('Updated QR identities:', activeSessions.map(s => s.qrIdentity));
+                    
+                    // Try again after refresh
+                    if (isMasterQR(scannedValue)) {
+                        console.log('✅ Master QR recognized after refresh');
+                        processMasterQR(scannedValue);
+                    } else if (isBoxBarcode(scannedValue)) {
+                        console.log('✅ Box Barcode recognized after refresh');
+                        processBoxBarcode(scannedValue);
+                    } else {
+                        console.log('❌ Still not recognized after refresh');
+                        showAlert('Invalid QR/Barcode format. Please scan a valid QR Identity or Box Barcode.', 'danger');
+                        input.focus();
+                    }
+                });
+                return;
             }
+
+            // Clear input after processing
+            input.val('').focus();
         }
 
         // Check if scanned value is Master QR
         function isMasterQR(value) {
             // Master QR format: QR_sessionId_timestamp (exact match with available sessions)
+            // Also check if it's a valid QR format that starts with QR_
+            if (!value.startsWith('QR_')) return false;
+            
             return activeSessions.some(session => session.qrIdentity === value);
         }
 
         // Check if scanned value is Box Barcode
         function isBoxBarcode(value) {
             // Box barcode format: QR_sessionId_timestamp_BOX_model_number
-            return value.includes('_BOX_') && activeSessions.some(session => 
+            if (!value.includes('_BOX_')) return false;
+            
+            return activeSessions.some(session => 
                 value.startsWith(session.qrIdentity + '_BOX_'));
         }
 
@@ -409,6 +474,18 @@
                     }
                 }
             ];
+            
+            // Enhanced debug logging
+            console.log('=== LOADED ACTIVE SESSIONS ===');
+            console.log('Total sessions:', activeSessions.length);
+            activeSessions.forEach((session, index) => {
+                console.log(`Session ${index + 1}:`, {
+                    sessionId: session.sessionId,
+                    fileName: session.fileName,
+                    qrIdentity: session.qrIdentity
+                });
+            });
+            console.log('=== END ACTIVE SESSIONS ===');
         }
 
         // Update scan status display
@@ -463,7 +540,85 @@
         }
 
         function refreshSessions() {
-            location.reload();
+            return new Promise((resolve) => {
+                console.log('🔄 Refreshing sessions...');
+                
+                // Instead of full page reload, fetch fresh session data
+                fetch(window.location.pathname, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.text())
+                .then(html => {
+                    // Parse the response to extract new session data
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Re-evaluate the session loading script
+                    const scripts = doc.querySelectorAll('script');
+                    scripts.forEach(script => {
+                        if (script.textContent.includes('activeSessions = [')) {
+                            // Extract and execute session loading code
+                            const sessionCode = script.textContent.match(/activeSessions = \[([\s\S]*?)\];/);
+                            if (sessionCode) {
+                                try {
+                                    eval('activeSessions = [' + sessionCode[1] + '];');
+                                    console.log('✅ Sessions refreshed successfully');
+                                    console.log('New sessions count:', activeSessions.length);
+                                    activeSessions.forEach((session, index) => {
+                                        console.log(`Refreshed Session ${index + 1}:`, {
+                                            sessionId: session.sessionId,
+                                            qrIdentity: session.qrIdentity
+                                        });
+                                    });
+                                } catch (e) {
+                                    console.error('Error parsing refreshed sessions:', e);
+                                }
+                            }
+                        }
+                    });
+                    
+                    resolve();
+                })
+                .catch(error => {
+                    console.error('Error refreshing sessions:', error);
+                    resolve();
+                });
+            });
+        }
+                .then(html => {
+                    // Parse the HTML to extract session data
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Extract the script content that contains activeSessions
+                    const scripts = doc.querySelectorAll('script');
+                    for (let script of scripts) {
+                        if (script.textContent.includes('activeSessions = [')) {
+                            // Extract and evaluate the activeSessions part
+                            const match = script.textContent.match(/activeSessions = \[([\s\S]*?)\];/);
+                            if (match) {
+                                try {
+                                    // Safely evaluate the sessions array
+                                    eval('activeSessions = [' + match[1] + '];');
+                                    console.log('Sessions refreshed:', activeSessions);
+                                } catch (e) {
+                                    console.error('Error parsing sessions:', e);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    resolve();
+                })
+                .catch(error => {
+                    console.error('Error refreshing sessions:', error);
+                    // Fallback to page reload
+                    location.reload();
+                });
+            });
         }
 
         function checkForValidatedSessions() {
@@ -492,6 +647,28 @@
                 alertElement.remove();
             }, 5000);
         }
+
+        // Manual refresh function for the button
+        function manualRefreshSessions() {
+            showAlert('🔄 Refreshing QR data...', 'info');
+            refreshSessions().then(() => {
+                showAlert('✅ QR data refreshed successfully!', 'success');
+            });
+        }
+
+        // Debug function for testing QR format
+        function testQRFormat(testValue) {
+            console.log('=== QR FORMAT TEST ===');
+            console.log('Test value:', testValue);
+            console.log('Available sessions:', activeSessions.length);
+            console.log('QR identities:', activeSessions.map(s => s.qrIdentity));
+            console.log('Exact match:', activeSessions.some(s => s.qrIdentity === testValue));
+            console.log('Is Master QR:', isMasterQR(testValue));
+            console.log('=== END TEST ===');
+        }
+
+        // Make testQRFormat available globally for debugging
+        window.testQRFormat = testQRFormat;
 
         // Auto-refresh every 30 seconds (only if not locked)
         setInterval(function() {

@@ -273,6 +273,9 @@ namespace ShipmentFinishGood.DTOs
         public string BarcodeValue { get; set; } = string.Empty;
         public string ModelProduct { get; set; } = string.Empty;
         public int BoxNumber { get; set; }
+        public bool IsScanned { get; set; }
+        public DateTime? ScannedDate { get; set; }
+        public string? ScannedBy { get; set; }
     }
 
     public class BarcodeItemDto
