@@ -115,61 +115,42 @@
 @section Scripts {
     <script src="~/js/po.js" asp-append-version="true"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const fileInput = document.querySelector('input[type="file"]');
-        <script>
-            // Enhanced file upload with loading states
-            document.addEventListener('DOMContentLoaded', function() {
-                const uploadForm = document.getElementById('uploadForm');
-                const fileInput = document.getElementById('fileInput');
-                const uploadBtn = document.getElementById('uploadBtn');
-                const btnText = uploadBtn.querySelector('.btn-text');
-                const btnLoading = uploadBtn.querySelector('.btn-loading');
-                
-                // File size validation
-                fileInput.addEventListener('change', function() {
-                    const file = this.files[0];
-                    if (file) {
-                        if (file.size > 10 * 1024 * 1024) {
-                            alert('File terlalu besar! Maksimal 10MB.');
-                            this.value = '';
-                            return;
-                        }
-                        uploadBtn.disabled = false;
-                    } else {
-                        uploadBtn.disabled = true;
-                    }
-                });
-                
-                // Form submission with loading state
-                uploadForm.addEventListener('submit', function(e) {
-                    const file = fileInput.files[0];
-                    if (!file) {
-                        e.preventDefault();
-                        alert('Silakan pilih file Excel terlebih dahulu.');
+        document.addEventListener('DOMContentLoaded', function () {
+            const uploadForm = document.getElementById('uploadForm');
+            const fileInput = document.getElementById('fileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const btnText = uploadBtn.querySelector('.btn-text');
+            const btnLoading = uploadBtn.querySelector('.btn-loading');
+
+            // Validasi ukuran file
+            fileInput.addEventListener('change', function () {
+                const file = this.files[0];
+                if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('File terlalu besar! Maksimal 10MB.');
+                        this.value = '';
                         return;
                     }
-                    
-                    // Show loading state
-                    btnText.classList.add('d-none');
-                    btnLoading.classList.remove('d-none');
+                    uploadBtn.disabled = false;
+                } else {
                     uploadBtn.disabled = true;
-                    
-                    // Prevent double submission
-                    uploadBtn.style.pointerEvents = 'none';
-                });
-                
-                // Initial state
-                uploadBtn.disabled = true;
-            });
-        </script>
                 }
             });
-            
-            document.querySelector('form').addEventListener('submit', function() {
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
-                submitButton.disabled = true;
+
+            // Saat submit form
+            uploadForm.addEventListener('submit', function (e) {
+                const file = fileInput.files[0];
+                if (!file) {
+                    e.preventDefault();
+                    alert('Silakan pilih file Excel terlebih dahulu.');
+                    return;
+                }
+                btnText.classList.add('d-none');
+                btnLoading.classList.remove('d-none');
+                uploadBtn.disabled = true;
+                uploadBtn.style.pointerEvents = 'none';
             });
         });
     </script>
 }
+

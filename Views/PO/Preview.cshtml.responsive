@@ -1,0 +1,64 @@
+        /* Responsive Design - Professional */
+        @media (max-width: 768px) {
+            .page-header {
+                padding: 1.25rem;
+            }
+            
+            .page-header h2 {
+                font-size: 1.5rem;
+            }
+            
+            .accessibility-toggle {
+                position: static;
+                margin-bottom: 1rem;
+                width: 100%;
+                justify-content: flex-end;
+            }
+            
+            .country-selector,
+            .settings-panel,
+            .stats-row {
+                padding: 1.25rem;
+            }
+            
+            .stats-number {
+                font-size: 1.75rem;
+            }
+            
+            .table-container {
+                border-radius: 6px;
+            }
+            
+            .table-header {
+                padding: 0.875rem 1rem;
+            }
+            
+            .table-header h5 {
+                font-size: 1rem;
+            }
+            
+            .btn-submit-country {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        /* Extra small devices */
+        @media (max-width: 576px) {
+            .page-header h2 {
+                font-size: 1.35rem;
+            }
+            
+            .page-header .subtitle {
+                font-size: 0.9rem;
+            }
+            
+            .stats-number {
+                font-size: 1.5rem;
+            }
+            
+            .settings-panel h5,
+            .country-selector h4 {
+                font-size: 1.1rem;
+            }
+        }

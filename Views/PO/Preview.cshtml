@@ -7,85 +7,182 @@
     <link rel="stylesheet" href="~/css/po.css" asp-append-version="true" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Modern Clean Design for Baby Boomers & Millennials */
+        /* Professional Design for Baby Boomers & Millennials */
         :root {
-            --primary-blue: #2c5282;
-            --primary-light: #3182ce;
-            --success-green: #38a169;
-            --warning-orange: #ed8936;
-            --info-teal: #319795;
-            --danger-red: #e53e3e;
-            --gray-50: #f7fafc;
-            --gray-100: #edf2f7;
-            --gray-200: #e2e8f0;
-            --gray-600: #718096;
-            --gray-800: #2d3748;
+            /* Core colors - more corporate/formal */
+            --primary-blue: #1e3a8a;
+            --primary-light: #2563eb;
+            --success-green: #047857;
+            --warning-orange: #b45309;
+            --info-teal: #0f766e;
+            --danger-red: #b91c1c;
+            
+            /* Neutral colors */
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-800: #1f2937;
             --white: #ffffff;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-            --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.06);
-            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
-            --radius-lg: 12px;
-            --radius-xl: 16px;
+            
+            /* UI elements */
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-lg: 0 4px 6px rgba(0,0,0,0.05);
+            --radius-lg: 8px;
+            --radius-xl: 10px;
+            
+            /* Text sizing - default */
+            --font-base: 16px;
+            --line-height: 1.5;
         }
-
+        
+        /* Standard view (millennial) already uses defaults */
+        
+        /* Accessible view (baby boomer) */
+        body.accessible-view {
+            --font-base: 18px;
+            --line-height: 1.6;
+            --shadow-sm: 0;
+            --shadow-md: 0 1px 2px rgba(0,0,0,0.1);
+            --shadow-lg: 0 2px 4px rgba(0,0,0,0.1);
+            --radius-lg: 6px;
+            --radius-xl: 8px;
+        }
+        
+        html { font-size: var(--font-base); }
+        
         body {
-            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            background: var(--gray-50);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
+            line-height: var(--line-height);
+            color: var(--gray-800);
+        }
+        
+        /* Accessibility Toggle Styling */
+        .accessibility-toggle {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: var(--radius-lg);
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .accessibility-toggle label {
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            user-select: none;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Custom checkbox styling */
+        #accessibilityMode:checked + label:before {
+            content: '✓';
+            display: inline-block;
+            width: 1.2rem;
+            height: 1.2rem;
+            margin-right: 0.5rem;
+            background-color: white;
+            color: var(--primary-blue);
+            border-radius: 3px;
+            text-align: center;
+            line-height: 1.2;
+            font-weight: bold;
+        }
+        
+        #accessibilityMode + label:before {
+            content: '';
+            display: inline-block;
+            width: 1.2rem;
+            height: 1.2rem;
+            margin-right: 0.5rem;
+            background-color: transparent;
+            border: 2px solid white;
+            border-radius: 3px;
         }
 
-        /* Header Design */
+        /* Header Design - More professional and corporate */
         .page-header {
-            background: linear-gradient(135deg, var(--primary-blue), var(--primary-light));
+            background: var(--primary-blue);
             color: var(--white);
-            padding: 2rem;
-            border-radius: var(--radius-xl);
-            box-shadow: var(--shadow-lg);
+            padding: 1.75rem 2rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
             margin-bottom: 2rem;
             position: relative;
             overflow: hidden;
         }
 
+        /* Subtler header accent */
         .page-header::before {
             content: '';
             position: absolute;
             top: 0;
             right: 0;
-            width: 200px;
-            height: 200px;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            border-radius: 50%;
-            transform: translate(50px, -50px);
+            width: 150px;
+            height: 150px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 70%);
+            transform: translate(25px, -25px);
         }
 
         .page-header h2 {
-            font-size: 2.25rem;
-            font-weight: 700;
+            font-size: 1.75rem;
+            font-weight: 600;
             margin: 0 0 0.5rem 0;
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
+        }
+        
+        /* Accessibility Toggle */
+        .accessibility-toggle {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.4rem 0.6rem;
+            border-radius: var(--radius-lg);
+            font-size: 0.875rem;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .accessibility-toggle label {
+            color: var(--white);
+            font-weight: 500;
+            font-size: 0.875rem;
+            cursor: pointer;
+            user-select: none;
         }
 
         .page-header .subtitle {
-            font-size: 1.125rem;
+            font-size: 1rem;
             opacity: 0.9;
             margin: 0;
             font-weight: 400;
         }
 
-        /* NEW: File Resume Status */
+        /* File Resume Status - More formal style */
         .file-resume-info {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: var(--radius-lg);
-            padding: 1rem 1.5rem;
+            padding: 0.9rem 1.25rem;
             margin-top: 1rem;
-            backdrop-filter: blur(10px);
         }
 
         .file-resume-info .icon {
-            color: #ffd700;
+            color: rgba(255, 255, 255, 0.9);
             margin-right: 0.5rem;
         }
 
@@ -96,139 +193,173 @@
 
         .countries-status {
             display: flex;
-            gap: 1rem;
+            gap: 0.75rem;
             margin-top: 0.5rem;
             flex-wrap: wrap;
         }
 
         .status-item {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.12);
             padding: 0.25rem 0.75rem;
-            border-radius: 15px;
-            font-size: 0.8rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
             font-weight: 500;
         }
 
-        .status-completed { background: rgba(56, 161, 105, 0.3); }
-        .status-remaining { background: rgba(237, 137, 54, 0.3); }
+        .status-completed { background: rgba(4, 120, 87, 0.2); }
+        .status-remaining { background: rgba(180, 83, 9, 0.2); }
 
-        /* Country Management Card */
+        /* Country Management Card - More corporate style */
         .country-selector {
             background: var(--white);
-            border-radius: var(--radius-xl);
-            padding: 2rem;
-            margin-bottom: 2rem;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--gray-200);
         }
 
         .country-selector h4 {
             color: var(--gray-800);
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            padding-bottom: 0.75rem;
+        }
+
+        /* Consistent badge styling with a formal appearance */
+        .badge-base {
+            color: var(--white);
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            margin-right: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
         }
 
         .country-badge {
             background: var(--success-green);
-            color: var(--white);
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
-            margin-right: 0.75rem;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            font-size: 0.875rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
+            @@extend .badge-base;
         }
 
         .pending-badge {
             background: var(--warning-orange);
             color: var(--white);
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
             margin-right: 0.75rem;
             margin-bottom: 0.5rem;
-            font-weight: 600;
+            font-weight: 500;
             font-size: 0.875rem;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
 
         .submitted-badge {
             background: var(--success-green);
             color: var(--white);
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
             margin-right: 0.75rem;
             margin-bottom: 0.5rem;
-            font-weight: 600;
+            font-weight: 500;
             font-size: 0.875rem;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
+        }
+        
+        /* Accessible view adjustments */
+        body.accessible-view .country-selector h4 {
+            font-size: 1.4rem;
+        }
+        
+        body.accessible-view .pending-badge,
+        body.accessible-view .submitted-badge {
+            font-size: 1rem;
+            padding: 0.5rem 0.9rem;
         }
 
-        /* Enhanced Form Controls */
+        /* Form Controls - Professional styling */
         .form-select {
-            border: 2px solid var(--gray-200);
+            border: 1px solid var(--gray-300);
             border-radius: var(--radius-lg);
-            padding: 0.75rem 1rem;
-            font-size: 1rem;
-            transition: all 0.2s ease;
+            padding: 0.625rem 0.875rem;
+            font-size: 0.95rem;
+            transition: all 0.15s ease;
             background-color: var(--white);
         }
 
         .form-select:focus {
             border-color: var(--primary-light);
-            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
             outline: none;
         }
+        
+        /* Form controls for accessible view */
+        body.accessible-view .form-select {
+            font-size: 1.05rem;
+            padding: 0.75rem 1rem;
+        }
 
-        /* Settings Panel */
+        /* Settings Panel - Corporate styling */
         .settings-panel {
             background: var(--white);
-            border-radius: var(--radius-xl);
-            padding: 2rem;
-            margin-bottom: 2rem;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--gray-200);
         }
 
         .settings-panel h5 {
             color: var(--gray-800);
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            padding-bottom: 0.75rem;
+        }
+        
+        body.accessible-view .settings-panel h5 {
+            font-size: 1.25rem;
         }
 
         .form-check-input {
-            width: 1.25rem;
-            height: 1.25rem;
+            width: 1.125rem;
+            height: 1.125rem;
             margin-top: 0.125rem;
         }
 
         .form-check-label {
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 500;
             color: var(--gray-800);
             margin-left: 0.5rem;
         }
+        
+        body.accessible-view .form-check-label {
+            font-size: 1.05rem;
+        }
 
-        /* Stats Row */
+        /* Stats Row - Professional styling */
         .stats-row {
             background: var(--white);
-            border-radius: var(--radius-xl);
-            padding: 2rem;
-            margin-bottom: 2rem;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--gray-200);
         }
@@ -242,112 +373,144 @@
         }
 
         .stats-number {
-            font-size: 2.5rem;
-            font-weight: 700;
+            font-size: 1.875rem;
+            font-weight: 600;
             margin-bottom: 0.5rem;
             display: block;
+            color: var(--primary-blue);
+        }
+        
+        body.accessible-view .stats-number {
+            font-size: 2.125rem;
         }
 
         .stats-label {
-            font-size: 0.875rem;
-            font-weight: 600;
+            font-size: 0.825rem;
+            font-weight: 500;
             color: var(--gray-600);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        
+        body.accessible-view .stats-label {
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
+        }
 
-        /* Table Improvements */
+        /* Table Improvements - Corporate styling */
         .table-container {
             background: var(--white);
-            border-radius: var(--radius-xl);
+            border-radius: var(--radius-lg);
             overflow: hidden;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--gray-200);
         }
 
         .table-header {
-            background: linear-gradient(135deg, var(--primary-blue), var(--primary-light));
+            background: var(--primary-blue);
             color: var(--white);
-            padding: 1.5rem 2rem;
+            padding: 1rem 1.5rem;
             border: none;
         }
 
         .table-header h5 {
             margin: 0;
-            font-size: 1.25rem;
+            font-size: 1.125rem;
             font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.5rem;
+        }
+        
+        body.accessible-view .table-header h5 {
+            font-size: 1.25rem;
         }
 
         .table-header .badge {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
             color: var(--white);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: none;
         }
 
         .table th {
             background: var(--gray-50);
             color: var(--gray-800);
             font-weight: 600;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 1rem;
+            letter-spacing: 0.3px;
+            padding: 0.875rem 1rem;
             border: none;
-            border-bottom: 2px solid var(--gray-200);
+            border-bottom: 1px solid var(--gray-300);
+        }
+        
+        body.accessible-view .table th {
+            font-size: 0.95rem;
+            padding: 1rem;
         }
 
         .table td {
-            padding: 1rem;
+            padding: 0.875rem 1rem;
             border: none;
             border-bottom: 1px solid var(--gray-100);
             vertical-align: middle;
         }
+        
+        body.accessible-view .table td {
+            padding: 1rem;
+        }
 
         .table tbody tr:hover {
-            background: var(--gray-50);
+            background: rgba(243, 244, 246, 0.5);
         }
 
-        /* Enhanced Badges */
+        /* Badges - Professional styling */
         .badge {
-            padding: 0.5rem 0.75rem;
+            padding: 0.35rem 0.65rem;
             font-size: 0.8125rem;
-            font-weight: 600;
-            border-radius: 50px;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+        
+        body.accessible-view .badge {
+            font-size: 0.9rem;
+            padding: 0.4rem 0.7rem;
         }
 
-        /* Submit Button */
+        /* Submit Button - Professional styling */
         .btn-submit-country {
-            background: linear-gradient(135deg, var(--success-green), #48bb78);
+            background: var(--success-green);
             border: none;
             color: var(--white);
-            padding: 1rem 2rem;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
             box-shadow: var(--shadow-sm);
             display: inline-flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.5rem;
         }
 
+        body.accessible-view .btn-submit-country {
+            font-size: 1.05rem;
+            padding: 0.85rem 1.75rem;
+        }
+        
         .btn-submit-country:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-            background: linear-gradient(135deg, #2f855a, var(--success-green));
+            background: #036c4e; /* Slightly darker */
+            box-shadow: var(--shadow-md);
         }
 
-        /* Loading Overlay */
+        /* Loading Overlay - Professional styling */
         .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.4);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -356,8 +519,8 @@
 
         .loading-content {
             background: var(--white);
-            padding: 2rem;
-            border-radius: var(--radius-xl);
+            padding: 1.5rem 2rem;
+            border-radius: var(--radius-lg);
             text-align: center;
             box-shadow: var(--shadow-lg);
         }
@@ -405,52 +568,114 @@
             }
         }
 
-        /* Responsive Design */
+        /* Responsive Design - Professional */
         @@media (max-width: 768px) {
             .page-header {
-                padding: 1.5rem;
+                padding: 1.25rem;
             }
             
             .page-header h2 {
-                font-size: 1.75rem;
+                font-size: 1.5rem;
+            }
+            
+            .accessibility-toggle {
+                position: static;
+                margin-bottom: 1rem;
+                width: 100%;
+                justify-content: flex-end;
             }
             
             .country-selector,
             .settings-panel,
             .stats-row {
-                padding: 1.5rem;
+                padding: 1.25rem;
             }
             
             .stats-number {
-                font-size: 2rem;
+                font-size: 1.75rem;
+            }
+            
+            .table-container {
+                border-radius: 6px;
+            }
+            
+            .table-header {
+                padding: 0.875rem 1rem;
+            }
+            
+            .table-header h5 {
+                font-size: 1rem;
+            }
+            
+            .btn-submit-country {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        /* Extra small devices */
+        @@media (max-width: 576px) {
+            .page-header h2 {
+                font-size: 1.35rem;
+            }
+            
+            .page-header .subtitle {
+                font-size: 0.9rem;
+            }
+            
+            .stats-number {
+                font-size: 1.5rem;
+            }
+            
+            .settings-panel h5,
+            .country-selector h4 {
+                font-size: 1.1rem;
             }
         }
 
         /* Accessibility Improvements */
         .form-control:focus,
-        .form-select:focus {
-            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        .form-select:focus,
+        button:focus {
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
             border-color: var(--primary-light);
+            outline: none;
+        }
+        
+        /* Higher contrast focus for accessible view */
+        body.accessible-view button:focus,
+        body.accessible-view .form-control:focus,
+        body.accessible-view .form-select:focus {
+            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.4);
         }
 
-        /* Success States */
+        /* Success States - More formal */
         .alert-success {
-            background: linear-gradient(135deg, #f0fff4, #e6fffa);
-            border: 1px solid #9ae6b4;
+            background: #f0fff4;
+            border: 1px solid #c6f6d5;
             color: #276749;
             border-radius: var(--radius-lg);
-            padding: 1.5rem;
+            padding: 1.25rem;
+        }
+        
+        body.accessible-view .alert-success {
+            font-size: 1.05rem;
         }
 
-        /* Lock/Unlock Row Styles */
+        /* Lock/Unlock Row Styles - More professional */
         .row-lock-btn {
-            border-radius: 50%;
-            width: 35px;
-            height: 35px;
+            border-radius: 4px;
+            width: 32px;
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+        }
+        
+        body.accessible-view .row-lock-btn {
+            width: 36px;
+            height: 36px;
         }
 
         .row-lock-btn[data-locked="true"] {
@@ -466,25 +691,25 @@
         }
 
         .row-lock-btn:hover {
-            transform: scale(1.1);
+            opacity: 0.9;
         }
 
-        /* Locked row styles */
+        /* Locked row styles - More subtle/formal */
         tr.row-locked {
-            background-color: #fefefe;
-            opacity: 0.8;
+            background-color: var(--white);
+            opacity: 0.95;
         }
 
         tr.row-locked .editable-field {
-            background-color: #f8f9fa !important;
-            border-color: #dee2e6 !important;
+            background-color: #fafafa !important;
+            border-color: var(--gray-300) !important;
             cursor: not-allowed;
         }
 
-        /* Unlocked row styles */
+        /* Unlocked row styles - More formal */
         tr.row-unlocked {
             background-color: #f0fff4;
-            border-left: 4px solid var(--success-green);
+            border-left: 3px solid var(--success-green);
         }
 
         tr.row-unlocked .editable-field {
@@ -492,10 +717,16 @@
             border-color: var(--success-green) !important;
         }
 
-        /* Modified row indicator */
+        /* Modified row indicator - More formal */
         tr.row-modified {
-            background-color: #fff3cd;
-            border-left: 4px solid var(--warning-orange);
+            background-color: #fff9e8;
+            border-left: 3px solid var(--warning-orange);
+        }
+        
+        body.accessible-view tr.row-locked .editable-field,
+        body.accessible-view tr.row-unlocked .editable-field {
+            font-size: 1.05rem;
+            padding: 0.5rem 0.75rem;
         }
     </style>
 }
@@ -503,8 +734,15 @@
 <div class="container-fluid">
     @Html.AntiForgeryToken()
     
-    <!-- Modern Header -->
+    <!-- Professional Header -->
     <div class="page-header">
+        <div class="accessibility-toggle">
+            <input type="checkbox" id="accessibilityMode" class="d-none">
+            <label for="accessibilityMode">
+                <i class="fas fa-text-height me-1"></i>
+                Easy Read
+            </label>
+        </div>
         <h2>
             <i class="fas fa-clipboard-check"></i>
             Preview Data PO
@@ -905,6 +1143,31 @@
 
 @section Scripts {
     <script>
+        // Accessibility Mode Toggle
+        (function setupAccessibilityToggle() {
+            const checkbox = document.getElementById('accessibilityMode');
+            if (checkbox) {
+                // Load preference from localStorage
+                const isAccessible = localStorage.getItem('accessibleMode') === 'true';
+                checkbox.checked = isAccessible;
+                toggleAccessibleMode(isAccessible);
+                
+                // Handle toggle changes
+                checkbox.addEventListener('change', function() {
+                    toggleAccessibleMode(this.checked);
+                });
+            }
+            
+            function toggleAccessibleMode(enable) {
+                if (enable) {
+                    document.body.classList.add('accessible-view');
+                } else {
+                    document.body.classList.remove('accessible-view');
+                }
+                localStorage.setItem('accessibleMode', enable);
+            }
+        })();
+        
         let currentData = @Html.Raw(Json.Serialize(Model.ProcessedDataByCountry));
         let submittedCountries = @Html.Raw(Json.Serialize(Model.SubmittedCountries));
         let sessionId = '@Model.SessionId';
@@ -1354,10 +1617,22 @@
             if (dropdown && dropdown.options.length > 1) {
                 dropdown.selectedIndex = 1;
                 switchCountry();
+                
+                // Automatically trigger calculations on page load
+                setTimeout(() => {
+                    updateMode(); // This will calculate quantities without requiring manual radio button click
+                }, 300); // Small delay to ensure country switch is complete
             }
 
             // Initialize all rows as locked
             initializeRowStates();
+            
+            // Ensure accessibility mode is applied based on saved preference
+            const isAccessible = localStorage.getItem('accessibleMode') === 'true';
+            document.getElementById('accessibilityMode').checked = isAccessible;
+            if (isAccessible) {
+                document.body.classList.add('accessible-view');
+            }
         });
 
         // Initialize row states
