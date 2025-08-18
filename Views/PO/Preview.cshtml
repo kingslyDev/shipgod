@@ -987,7 +987,7 @@
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover mb-0" id="table_@countryData.Key">
+                            <table class="table table-hover mb-0" id="table_@(countryData.Key.Replace(" ", "_"))">
                                 <thead>
                                     <tr>
                                         <th><i class="fas fa-lock me-2"></i>Action</th>
@@ -1054,7 +1054,7 @@
                                                         <i class="fas fa-file-invoice text-muted"></i>
                                                     </span>
                                                     <input type="text" class="form-control editable-field" 
-                                                           name="invoice_@(countryData.Key)_@i" 
+                                                           name="invoice_@(countryData.Key.Replace(" ", "_"))_@i" 
                                                            placeholder="Invoice number..." 
                                                            value="@item.NoInvoice" 
                                                            readonly />
@@ -1066,7 +1066,7 @@
                                                         <i class="fas fa-shipping-fast text-muted"></i>
                                                     </span>
                                                     <input type="text" class="form-control editable-field" 
-                                                           name="container_@(countryData.Key)_@i" 
+                                                           name="container_@(countryData.Key.Replace(" ", "_"))_@i" 
                                                            placeholder="Container ID..." 
                                                            value="@item.Container" 
                                                            readonly />
@@ -1078,7 +1078,7 @@
                                                         <i class="fas fa-info-circle text-muted"></i>
                                                     </span>
                                                     <input type="text" class="form-control editable-field" 
-                                                           name="detail_@(countryData.Key)_@i" 
+                                                           name="detail_@(countryData.Key.Replace(" ", "_"))_@i" 
                                                            placeholder="Additional details..." 
                                                            value="@item.ShipmentDetail" 
                                                            readonly />
@@ -1091,7 +1091,9 @@
                         </div>
                     </div>
                     <div class="card-footer text-center bg-light py-4">
-                        <button type="button" class="btn btn-submit-country btn-lg" onclick="submitCountry('@countryData.Key')">
+                        <button type="button" class="btn btn-submit-country btn-lg" 
+                                data-country="@countryData.Key" 
+                                onclick="submitCountryByButton(this)">
                             <i class="fas fa-paper-plane"></i>
                             Submit @countryData.Key Data
                         </button>
@@ -1184,7 +1186,7 @@
             
             if (selectedCountry) {
                 // Show selected table
-                const targetTable = document.querySelector(`.country-table[data-country="${selectedCountry}"]`);
+                const targetTable = document.querySelector(`[data-country="${selectedCountry}"]`);
                 if (targetTable) {
                     targetTable.classList.add('active');
                 }
@@ -1366,7 +1368,7 @@
                                 <i class="fas fa-file-invoice text-muted"></i>
                             </span>
                             <input type="text" class="form-control editable-field" 
-                                   name="invoice_${country}_${index}" 
+                                   name="invoice_${country.replace(/ /g, '_')}_${index}" 
                                    placeholder="Invoice number..." 
                                    value="${item.NoInvoice || ''}" 
                                    data-original-value="${item.NoInvoice || ''}"
@@ -1379,7 +1381,7 @@
                                 <i class="fas fa-shipping-fast text-muted"></i>
                             </span>
                             <input type="text" class="form-control editable-field" 
-                                   name="container_${country}_${index}" 
+                                   name="container_${country.replace(/ /g, '_')}_${index}" 
                                    placeholder="Container ID..." 
                                    value="${item.Container || ''}" 
                                    data-original-value="${item.Container || ''}"
@@ -1392,7 +1394,7 @@
                                 <i class="fas fa-info-circle text-muted"></i>
                             </span>
                             <input type="text" class="form-control editable-field" 
-                                   name="detail_${country}_${index}" 
+                                   name="detail_${country.replace(/ /g, '_')}_${index}" 
                                    placeholder="Additional details..." 
                                    value="${item.ShipmentDetail || ''}" 
                                    data-original-value="${item.ShipmentDetail || ''}"
@@ -1437,6 +1439,12 @@
         }
 
         // Submit country
+        // New function to handle button click safely
+        async function submitCountryByButton(button) {
+            const country = button.getAttribute('data-country');
+            await submitCountry(country);
+        }
+
         async function submitCountry(country) {
             const button = event.target;
             const originalText = button.innerHTML;
@@ -1458,14 +1466,14 @@
 
             try {
                 // Collect row data for this country
-                const tableRows = document.querySelectorAll(`#table_${country} tbody tr`);
+                const tableRows = document.querySelectorAll(`#table_${country.replace(/ /g, '_')} tbody tr`);
                 const countryData = [];
                 
                 tableRows.forEach((row, index) => {
                     const cells = row.querySelectorAll('td');
-                    const invoice = row.querySelector(`input[name="invoice_${country}_${index}"]`).value;
-                    const container = row.querySelector(`input[name="container_${country}_${index}"]`).value;
-                    const detail = row.querySelector(`input[name="detail_${country}_${index}"]`).value;
+                    const invoice = row.querySelector(`input[name="invoice_${country.replace(/ /g, '_')}_${index}"]`).value;
+                    const container = row.querySelector(`input[name="container_${country.replace(/ /g, '_')}_${index}"]`).value;
+                    const detail = row.querySelector(`input[name="detail_${country.replace(/ /g, '_')}_${index}"]`).value;
                     
                     // Get data from currentData (which includes updated calculations)
                     const currentRowData = currentData[country][index];
@@ -1539,7 +1547,7 @@
                     });
                     
                     // Hide current table
-                    document.querySelector(`.country-table[data-country="${country}"]`).style.display = 'none';
+                    document.querySelector(`[data-country="${country}"]`).style.display = 'none';
                     
                     // Check if all countries are submitted
                     if (dropdown.options.length <= 1) { // Only default option left
@@ -1772,9 +1780,9 @@
 
             // Get metadata (invoice, container, detail) for local storage
             const metadata = {
-                noInvoice: row.querySelector(`input[name="invoice_${country}_${rowIndex}"]`).value,
-                container: row.querySelector(`input[name="container_${country}_${rowIndex}"]`).value,
-                shipmentDetail: row.querySelector(`input[name="detail_${country}_${rowIndex}"]`).value
+                noInvoice: row.querySelector(`input[name="invoice_${country.replace(/ /g, '_')}_${rowIndex}"]`).value,
+                container: row.querySelector(`input[name="container_${country.replace(/ /g, '_')}_${rowIndex}"]`).value,
+                shipmentDetail: row.querySelector(`input[name="detail_${country.replace(/ /g, '_')}_${rowIndex}"]`).value
             };
 
             const requestData = {

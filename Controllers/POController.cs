@@ -7,6 +7,7 @@ using ShipmentFinishGood.Common;
 using ShipmentFinishGood.Repositories;
 using ShipmentFinishGood.Data;
 using System.Security.Claims;
+using ShipmentFinishGood.Utilities;
 
 namespace ShipmentFinishGood.Controllers
 {
@@ -122,7 +123,7 @@ namespace ShipmentFinishGood.Controllers
             foreach (var countryData in preview.ProcessedDataByCountry)
             {
                 var rawDataForCountry = preview.RawData
-                    .Where(r => r.Country == countryData.Key)
+            .Where(r => CountryNormalizer.Normalize(r.Country) == CountryNormalizer.Normalize(countryData.Key))
                     .ToList();
                     
                 var recalculatedData = await _excelService.CalculateProcessedDataAsync(rawDataForCountry, request.ShipmentType);
@@ -228,8 +229,9 @@ namespace ShipmentFinishGood.Controllers
                 }
 
                 // Get all details for this country and find the specific row
+                var normalizedReqCountry = ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(request.Country);
                 var countryDetails = session.Details
-                    .Where(d => d.Country == request.Country)
+                    .Where(d => ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(d.Country) == normalizedReqCountry)
                     .OrderBy(d => d.RowIndex)
                     .ToList();
 
@@ -282,10 +284,12 @@ namespace ShipmentFinishGood.Controllers
         {
             try
             {
+                // Precompute normalized country (cannot use local functions inside EF queries)
+                string normalizedCountry = CountryNormalizer.Normalize(request.Country);
                 // Validate country not already submitted
                 var isAlreadySubmitted = await _context.UploadSessions
                     .AnyAsync(s => s.ParentSessionId == request.SessionId && 
-                                  s.Country == request.Country && 
+                                  s.Country == normalizedCountry && 
                                   s.Status == "PROCESSED");
 
                 if (isAlreadySubmitted)
@@ -304,7 +308,7 @@ namespace ShipmentFinishGood.Controllers
                 {
                     // Get the new session for QR generation
                     var newSession = await _context.UploadSessions
-                        .Where(s => s.ParentSessionId == request.SessionId && s.Country == request.Country)
+                        .Where(s => s.ParentSessionId == request.SessionId && s.Country == normalizedCountry)
                         .OrderByDescending(s => s.SessionId)
                         .FirstAsync();
 
@@ -369,10 +373,13 @@ namespace ShipmentFinishGood.Controllers
             if (parentSession == null || string.IsNullOrEmpty(parentSession.Countries))
                 return new List<string>();
 
-            var allCountries = parentSession.Countries.Split(',').ToList();
+            var allCountries = parentSession.Countries
+                .Split(',')
+                .Select(c => ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(c))
+                .ToList();
             var submittedCountries = parentSession.ChildSessions
                 .Where(c => c.Status == "PROCESSED")
-                .Select(c => c.Country)
+                .Select(c => ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(c.Country))
                 .ToList();
 
             return allCountries.Where(c => !submittedCountries.Contains(c)).ToList();

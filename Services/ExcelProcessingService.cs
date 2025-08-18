@@ -4,6 +4,7 @@ using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Models;
 using ShipmentFinishGood.Repositories;
 using System.Security.Cryptography;
+using ShipmentFinishGood.Utilities;
 
 namespace ShipmentFinishGood.Services
 {
@@ -19,6 +20,8 @@ namespace ShipmentFinishGood.Services
             _modelConfigService = modelConfigService;
             _barcodeService = barcodeService;
         }
+
+    // Use centralized normalizer for country strings
 
     public async Task<UploadPreviewDto> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
     {
@@ -42,7 +45,7 @@ namespace ShipmentFinishGood.Services
         
         // Group by country first
         var dataByCountry = rawData
-            .GroupBy(r => r.Country ?? "Unknown")
+            .GroupBy(r => CountryNormalizer.NormalizeOrUnknown(r.Country))
             .ToDictionary(g => g.Key, g => g.ToList());
 
         // Calculate processed data for each country
@@ -108,7 +111,7 @@ namespace ShipmentFinishGood.Services
 
         var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
         var currentPO = string.Empty;
-        var currentCountry = string.Empty;  // NEW: Track current country
+    var currentCountry = string.Empty;  // NEW: Track current country
 
         for (int row = 2; row <= lastRowUsed; row++)
         {
@@ -123,7 +126,7 @@ namespace ShipmentFinishGood.Services
             // Inherit Country if empty
             if (!string.IsNullOrEmpty(countryCell))
             {
-                currentCountry = countryCell;
+                currentCountry = CountryNormalizer.Normalize(countryCell);
             }
 
             // Inherit PO if empty
@@ -147,7 +150,7 @@ namespace ShipmentFinishGood.Services
             rawData.Add(new ExcelRowData
             {
                 NoPO = currentPO,
-                Country = currentCountry,  // NEW: Add country
+                Country = currentCountry,  // NEW: Add country (already normalized)
                 Model = modelCell,
                 Qty = qty,
                 RowIndex = row
@@ -264,7 +267,7 @@ namespace ShipmentFinishGood.Services
             session.ShipmentDate = request.ShipmentDate;
             session.Status = "PROCESSED";
 
-            foreach (var item in request.ProcessedData)
+        foreach (var item in request.ProcessedData)
             {
                 var poMaster = new POMaster
                 {
@@ -280,7 +283,7 @@ namespace ShipmentFinishGood.Services
                     SourceSessionId = request.SessionId,
                     ShipmentMethod = request.ShipmentType,
                     CreatedBy = createdBy,
-                    Country = item.Country  // NEW: Store country in POMaster
+                    Country = CountryNormalizer.Normalize(item.Country)  // NEW: Store normalized country in POMaster
                 };
 
                 _context.POMasters.Add(poMaster);
@@ -303,9 +306,12 @@ namespace ShipmentFinishGood.Services
         public async Task<bool> SubmitCountryDataAsync(CountrySubmissionRequest request, string createdBy)
         {
             // Validate no duplicate country submission
+            // Normalize request country for consistent comparisons and storage
+            var normalizedRequestCountry = CountryNormalizer.Normalize(request.Country);
+
             var existingCountrySubmission = await _context.UploadSessions
                 .Where(s => s.ParentSessionId == request.SessionId && 
-                            s.Country == request.Country && 
+                            s.Country == normalizedRequestCountry && 
                             s.Status == "PROCESSED")
                 .FirstOrDefaultAsync();
 
@@ -326,7 +332,7 @@ namespace ShipmentFinishGood.Services
                 ShipmentDate = request.ShipmentDate,
                 Status = "PROCESSED",
                 UploadedBy = parentSession.UploadedBy,
-                Country = request.Country,
+                Country = CountryNormalizer.Normalize(request.Country),
                 ParentSessionId = request.SessionId,
                 SheetIdentifier = GenerateSheetIdentifier()
             };
@@ -335,7 +341,7 @@ namespace ShipmentFinishGood.Services
             await _context.SaveChangesAsync();
 
             // Create POMasters for this country
-            foreach (var item in request.ProcessedData)
+        foreach (var item in request.ProcessedData)
             {
                 var poMaster = new POMaster
                 {
@@ -351,7 +357,7 @@ namespace ShipmentFinishGood.Services
                     SourceSessionId = newSession.SessionId,
                     ShipmentMethod = request.ShipmentType,
                     CreatedBy = createdBy,
-                    Country = request.Country  // NEW: Store country in POMaster
+                    Country = CountryNormalizer.Normalize(request.Country)  // NEW: Store normalized country in POMaster
                 };
 
                 _context.POMasters.Add(poMaster);
@@ -379,10 +385,10 @@ namespace ShipmentFinishGood.Services
 
         if (session == null) return null;
 
-        // Get submitted countries from child sessions
+        // Get submitted countries from child sessions (normalized for comparison)
         var submittedCountries = session.ChildSessions
             .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
-            .Select(c => c.Country!)
+            .Select(c => CountryNormalizer.Normalize(c.Country!))
             .ToList();
 
         var rawData = session.Details.Select(d => new ExcelRowData
@@ -394,9 +400,9 @@ namespace ShipmentFinishGood.Services
             RowIndex = d.RowIndex
         }).ToList();
 
-        // Group by country
+        // Group by country (normalized for consistent comparison)
         var dataByCountry = rawData
-            .GroupBy(r => r.Country ?? "Unknown")
+            .GroupBy(r => CountryNormalizer.NormalizeOrUnknown(r.Country))
             .ToDictionary(g => g.Key, g => g.ToList());
 
         var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
@@ -571,17 +577,17 @@ namespace ShipmentFinishGood.Services
 
                 if (session == null) return new List<string>();
 
-                // Get all countries from original data
+                // Get all countries from original data (normalized for comparison)
                 var allCountries = session.Details
                     .Where(d => !string.IsNullOrEmpty(d.Country))
-                    .Select(d => d.Country!)
+                    .Select(d => CountryNormalizer.Normalize(d.Country!))
                     .Distinct()
                     .ToList();
 
-                // Get submitted countries
+                // Get submitted countries (normalized for comparison)
                 var submittedCountries = session.ChildSessions
                     .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
-                    .Select(c => c.Country!)
+                    .Select(c => CountryNormalizer.Normalize(c.Country!))
                     .ToList();
 
                 // Return remaining countries
