@@ -127,17 +127,6 @@
                             <i class="fas fa-image me-2"></i>Download QR Image
                         </a>
 
-                        @if (Model.CanRegenerate)
-                        {
-                            <form asp-action="RegenerateQR" method="post" class="d-inline">
-                                <input type="hidden" name="sessionId" value="@Model.SessionId" />
-                                <button type="submit" class="btn btn-warning w-100" 
-                                        onclick="return confirm('Are you sure you want to regenerate the QR code? This will invalidate the current QR.')">
-                                    <i class="fas fa-sync-alt me-2"></i>Regenerate QR
-                                </button>
-                            </form>
-                        }
-
                         <hr />
 
                         <button type="button" class="btn btn-outline-primary" onclick="showBarcodeModal()">

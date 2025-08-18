@@ -23,14 +23,17 @@ namespace ShipmentFinishGood.Services
 
         public async Task<List<ScanSessionSummaryDto>> GetActiveSessionsAsync()
         {
-            // Get all sessions that have QR Identity and PO data, regardless of status
+            // Get sessions that have master barcode in BarcodeRegistries
             var sessions = await _context.UploadSessions
                 .Include(s => s.POMasters)
-                .Where(s => !string.IsNullOrEmpty(s.IdentityQRCode) && s.POMasters.Any())
+                .Where(s => s.POMasters.Any() &&
+                           _context.BarcodeRegistries.Any(b => b.SessionId == s.SessionId && 
+                                                              b.BarcodeType == "MASTER" && 
+                                                              b.IsActive))
                 .OrderByDescending(s => s.UploadDate)
                 .ToListAsync();
 
-            // If no sessions found, try to auto-generate QR for VALIDATED sessions
+            // If no sessions found, try to auto-generate barcodes for VALIDATED sessions
             if (!sessions.Any())
             {
                 var validatedSessions = await _context.UploadSessions
@@ -41,10 +44,17 @@ namespace ShipmentFinishGood.Services
 
                 foreach (var session in validatedSessions)
                 {
-                    if (string.IsNullOrEmpty(session.IdentityQRCode))
+                    // Check if barcodes don't exist for this session
+                    var existingBarcodes = await _context.BarcodeRegistries
+                        .CountAsync(b => b.SessionId == session.SessionId && b.IsActive);
+                    
+                    if (existingBarcodes == 0)
                     {
                         // Auto-generate QR Identity if missing
-                        session.IdentityQRCode = $"QR_{session.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
+                        if (string.IsNullOrEmpty(session.IdentityQRCode))
+                        {
+                            session.IdentityQRCode = $"QR_{session.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
+                        }
                         session.Status = "QR_GENERATED";
                         
                         // Update TotalBoxes
@@ -59,27 +69,46 @@ namespace ShipmentFinishGood.Services
                 
                 await _context.SaveChangesAsync();
                 
-                // Re-fetch sessions after generating QR codes
+                // Re-fetch sessions after generating barcodes
                 sessions = await _context.UploadSessions
                     .Include(s => s.POMasters)
-                    .Where(s => !string.IsNullOrEmpty(s.IdentityQRCode) && s.POMasters.Any())
+                    .Where(s => s.POMasters.Any() &&
+                               _context.BarcodeRegistries.Any(b => b.SessionId == s.SessionId && 
+                                                                  b.BarcodeType == "MASTER" && 
+                                                                  b.IsActive))
                     .OrderByDescending(s => s.UploadDate)
                     .ToListAsync();
             }
 
-            return sessions.Select(session => new ScanSessionSummaryDto
+            var result = new List<ScanSessionSummaryDto>();
+            
+            foreach (var session in sessions)
             {
-                SessionId = session.SessionId,
-                FileName = session.FileName,
-                QRIdentity = session.IdentityQRCode!,
-                ShipmentType = session.ShipmentType ?? "LOOSE",
-                ShipmentDate = session.ShipmentDate,
-                TotalBoxes = session.TotalBoxes > 0 ? session.TotalBoxes : session.POMasters.Sum(p => p.QtyBox),
-                TotalPOs = session.POMasters.Count,
-                CreatedDate = session.UploadDate,
-                CreatedBy = session.UploadedBy,
-                Status = GetScanStatus(session.SessionId)
-            }).ToList();
+                // Get master barcode for this session
+                var masterBarcode = await _context.BarcodeRegistries
+                    .FirstOrDefaultAsync(b => b.SessionId == session.SessionId && 
+                                            b.BarcodeType == "MASTER" && 
+                                            b.IsActive);
+
+                if (masterBarcode != null)
+                {
+                    result.Add(new ScanSessionSummaryDto
+                    {
+                        SessionId = session.SessionId,
+                        FileName = session.FileName,
+                        QRIdentity = masterBarcode.BarcodeValue, // Use master barcode instead of IdentityQRCode
+                        ShipmentType = session.ShipmentType ?? "LOOSE",
+                        ShipmentDate = session.ShipmentDate,
+                        TotalBoxes = session.TotalBoxes > 0 ? session.TotalBoxes : session.POMasters.Sum(p => p.QtyBox),
+                        TotalPOs = session.POMasters.Count,
+                        CreatedDate = session.UploadDate,
+                        CreatedBy = session.UploadedBy,
+                        Status = GetScanStatus(session.SessionId)
+                    });
+                }
+            }
+
+            return result;
         }
 
         public async Task<ScanSessionDto?> GetScanSessionAsync(int sessionId)
@@ -91,24 +120,27 @@ namespace ShipmentFinishGood.Services
             if (session == null)
                 return null;
 
-            // Auto-generate QR Identity if missing
-            if (string.IsNullOrEmpty(session.IdentityQRCode))
-            {
-                session.IdentityQRCode = $"QR_{session.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
-                session.Status = "QR_GENERATED";
-                _context.UploadSessions.Update(session);
-                await _context.SaveChangesAsync();
-
-                // Generate barcodes after QR Identity is created
-                await _barcodeService.GenerateBarcodesForSessionAsync(sessionId, "System");
-            }
-
             // Check if barcodes exist, if not generate them
             var totalBarcodes = await _barcodeService.GetTotalBarcodeCountAsync(sessionId);
             if (totalBarcodes == 0)
             {
+                // Auto-generate QR Identity if missing
+                if (string.IsNullOrEmpty(session.IdentityQRCode))
+                {
+                    session.IdentityQRCode = $"QR_{session.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
+                    session.Status = "QR_GENERATED";
+                    _context.UploadSessions.Update(session);
+                    await _context.SaveChangesAsync();
+                }
+
                 await _barcodeService.GenerateBarcodesForSessionAsync(sessionId, "System");
             }
+
+            // Get master barcode from BarcodeRegistries
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
 
             var barcodes = await _barcodeService.GetBarcodeListForSessionAsync(sessionId);
             var scannedBarcodes = await _barcodeService.GetScannedBarcodesAsync(sessionId);
@@ -118,7 +150,7 @@ namespace ShipmentFinishGood.Services
             {
                 SessionId = session.SessionId,
                 FileName = session.FileName,
-                QRIdentity = session.IdentityQRCode,
+                QRIdentity = masterBarcode?.BarcodeValue ?? session.IdentityQRCode ?? string.Empty, // Use master barcode if available
                 ShipmentType = session.ShipmentType ?? "LOOSE",
                 ShipmentDate = session.ShipmentDate,
                 TotalBoxes = session.TotalBoxes,
@@ -145,23 +177,29 @@ namespace ShipmentFinishGood.Services
             if (session.Status == "SCAN_COMPLETED")
                 return Result<ScanResultDto>.Failure("Session has been completed. No further scans allowed.");
 
-            if (session.IdentityQRCode != qrCode)
+            // Get master barcode from BarcodeRegistries instead of using IdentityQRCode
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null)
+                return Result<ScanResultDto>.Failure("Master QR code not found for this session");
+
+            if (masterBarcode.BarcodeValue != qrCode)
                 return Result<ScanResultDto>.Failure("Invalid QR code for this session");
 
             // Check if user is already locked to another session
             var userLockCheck = await CheckUserLockAsync(scannedBy);
             if (!userLockCheck.IsSuccess)
             {
-                var lockedSessionQR = await GetUserLockedSessionAsync(scannedBy);
-                if (lockedSessionQR.IsSuccess && lockedSessionQR.Value != qrCode)
-                    return Result<ScanResultDto>.Failure($"You are locked to session {lockedSessionQR.Value}. Complete that session first.");
+                var lockedSessionResult = await GetUserLockedSessionAsync(scannedBy);
+                if (lockedSessionResult.IsSuccess && lockedSessionResult.Value != qrCode)
+                    return Result<ScanResultDto>.Failure($"You are locked to session {lockedSessionResult.Value}. Complete that session first.");
             }
 
             // Check if already scanned
-            var existingScan = await _context.ScanningActivities
-                .FirstOrDefaultAsync(sa => sa.BarcodeValue == qrCode && sa.Action == "SCAN_MASTER");
-
-            if (existingScan != null)
+            if (masterBarcode.Status == "SCANNED")
                 return Result<ScanResultDto>.Failure("Master QR already scanned");
 
             // Mark the master QR barcode as scanned in BarcodeRegistry
@@ -203,9 +241,24 @@ namespace ShipmentFinishGood.Services
             if (session.Status == "SCAN_COMPLETED")
                 return Result<ScanResultDto>.Failure("Session has been completed. No further scans allowed.");
 
-            // Validate barcode format
-            if (!barcode.StartsWith(session.IdentityQRCode!))
+            // Get the barcode from BarcodeRegistries to validate
+            var barcodeRegistry = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.BarcodeValue == barcode && 
+                                        b.SessionId == sessionId && 
+                                        b.IsActive && 
+                                        b.BarcodeType == "BOX");
+
+            if (barcodeRegistry == null)
                 return Result<ScanResultDto>.Failure("Invalid barcode for this session");
+
+            // Get master barcode to check lock session
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null)
+                return Result<ScanResultDto>.Failure("Master QR code not found for this session");
 
             // Check if user is locked to this session
             var userLockResult = await CheckUserLockAsync(scannedBy);
@@ -213,7 +266,7 @@ namespace ShipmentFinishGood.Services
                 return Result<ScanResultDto>.Failure("You must scan Master QR first to lock to a session");
 
             var lockedSessionResult = await GetUserLockedSessionAsync(scannedBy);
-            if (!lockedSessionResult.IsSuccess || lockedSessionResult.Value != session.IdentityQRCode)
+            if (!lockedSessionResult.IsSuccess || lockedSessionResult.Value != masterBarcode.BarcodeValue)
                 return Result<ScanResultDto>.Failure("You can only scan boxes from your locked session");
 
             // Check if master QR was scanned first
@@ -221,15 +274,9 @@ namespace ShipmentFinishGood.Services
             if (!masterScanned)
                 return Result<ScanResultDto>.Failure("Please scan Master QR first");
 
-            // Check if barcode already scanned using BarcodeService
-            var isAlreadyScanned = await _barcodeService.IsBarcodeScannedAsync(barcode);
-            if (isAlreadyScanned)
+            // Check if barcode already scanned
+            if (barcodeRegistry.Status == "SCANNED")
                 return Result<ScanResultDto>.Failure("Box already scanned");
-
-            // Validate if barcode exists and is valid using BarcodeService
-            var isValidBarcode = await _barcodeService.IsBarcodeValidAsync(barcode, sessionId);
-            if (!isValidBarcode)
-                return Result<ScanResultDto>.Failure("Invalid barcode");
 
             // Mark barcode as scanned using BarcodeService
             var markResult = await _barcodeService.MarkBarcodeAsScannedAsync(barcode, scannedBy);
@@ -341,9 +388,18 @@ namespace ShipmentFinishGood.Services
             if (session == null)
                 return null;
 
+            // Get master barcode for this session
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null)
+                return null;
+
             var activities = await _context.ScanningActivities
-                .Where(sa => sa.BarcodeValue.StartsWith(session.IdentityQRCode!) || 
-                           sa.BarcodeValue == session.IdentityQRCode)
+                .Where(sa => sa.BarcodeValue.StartsWith(masterBarcode.BarcodeValue) || 
+                           sa.BarcodeValue == masterBarcode.BarcodeValue)
                 .Where(sa => sa.Action != "AREA_ASSIGN") // Exclude area assignments
                 .OrderByDescending(sa => sa.Timestamp)
                 .ToListAsync();
@@ -352,7 +408,7 @@ namespace ShipmentFinishGood.Services
             {
                 SessionId = sessionId,
                 FileName = session.FileName,
-                QRIdentity = session.IdentityQRCode!,
+                QRIdentity = masterBarcode.BarcodeValue,
                 ShipmentType = session.ShipmentType ?? "LOOSE",
                 TotalBoxes = session.TotalBoxes,
                 ScanActivities = activities.Select(a => new ScanHistoryDto
@@ -389,12 +445,17 @@ namespace ShipmentFinishGood.Services
             // Check if user has scanned a master QR for any active (not completed) session
             var userMasterScan = await _context.ScanningActivities
                 .Where(sa => sa.UserId == userId && sa.Action == "SCAN_MASTER")
-                .Join(_context.UploadSessions,
+                .Join(_context.BarcodeRegistries,
                     sa => sa.BarcodeValue,
-                    us => us.IdentityQRCode,
-                    (sa, us) => new { sa, us })
-                .Where(joined => joined.us.Status != "SCAN_COMPLETED")
-                .OrderByDescending(joined => joined.sa.Timestamp)
+                    br => br.BarcodeValue,
+                    (sa, br) => new { sa, br })
+                .Where(joined => joined.br.BarcodeType == "MASTER" && joined.br.IsActive)
+                .Join(_context.UploadSessions,
+                    joined => joined.br.SessionId,
+                    us => us.SessionId,
+                    (joined, us) => new { joined.sa, joined.br, us })
+                .Where(final => final.us.Status != "SCAN_COMPLETED")
+                .OrderByDescending(final => final.sa.Timestamp)
                 .FirstOrDefaultAsync();
 
             return userMasterScan != null 
@@ -406,13 +467,18 @@ namespace ShipmentFinishGood.Services
         {
             var userMasterScan = await _context.ScanningActivities
                 .Where(sa => sa.UserId == userId && sa.Action == "SCAN_MASTER")
-                .Join(_context.UploadSessions,
+                .Join(_context.BarcodeRegistries,
                     sa => sa.BarcodeValue,
-                    us => us.IdentityQRCode,
-                    (sa, us) => new { sa, us })
-                .Where(joined => joined.us.Status != "SCAN_COMPLETED")
-                .OrderByDescending(joined => joined.sa.Timestamp)
-                .Select(joined => joined.sa.BarcodeValue)
+                    br => br.BarcodeValue,
+                    (sa, br) => new { sa, br })
+                .Where(joined => joined.br.BarcodeType == "MASTER" && joined.br.IsActive)
+                .Join(_context.UploadSessions,
+                    joined => joined.br.SessionId,
+                    us => us.SessionId,
+                    (joined, us) => new { joined.sa, joined.br, us })
+                .Where(final => final.us.Status != "SCAN_COMPLETED")
+                .OrderByDescending(final => final.sa.Timestamp)
+                .Select(final => final.sa.BarcodeValue)
                 .FirstOrDefaultAsync();
 
             return userMasterScan != null 
@@ -459,22 +525,31 @@ namespace ShipmentFinishGood.Services
 
         private async Task<List<string>> GetScannedBarcodesAsync(int sessionId)
         {
-            var session = await _context.UploadSessions.FindAsync(sessionId);
-            if (session == null) return new List<string>();
+            // Get master barcode for this session
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null) return new List<string>();
 
             return await _context.ScanningActivities
-                .Where(sa => sa.BarcodeValue.StartsWith(session.IdentityQRCode!) && sa.Action == "SCAN_BOX")
+                .Where(sa => sa.BarcodeValue.StartsWith(masterBarcode.BarcodeValue) && sa.Action == "SCAN_BOX")
                 .Select(sa => sa.BarcodeValue)
                 .ToListAsync();
         }
 
         private async Task<bool> IsMasterQRScannedAsync(int sessionId)
         {
-            var session = await _context.UploadSessions.FindAsync(sessionId);
-            if (session == null) return false;
+            // Get master barcode for this session
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
 
-            return await _context.ScanningActivities
-                .AnyAsync(sa => sa.BarcodeValue == session.IdentityQRCode && sa.Action == "SCAN_MASTER");
+            if (masterBarcode == null) return false;
+
+            return masterBarcode.Status == "SCANNED";
         }
 
         private string GetScanStatus(int sessionId)
@@ -492,11 +567,16 @@ namespace ShipmentFinishGood.Services
 
         private async Task<DateTime?> GetLastScanTimeAsync(int sessionId)
         {
-            var session = await _context.UploadSessions.FindAsync(sessionId);
-            if (session == null) return null;
+            // Get master barcode for this session
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null) return null;
 
             return await _context.ScanningActivities
-                .Where(sa => sa.BarcodeValue.StartsWith(session.IdentityQRCode!))
+                .Where(sa => sa.BarcodeValue.StartsWith(masterBarcode.BarcodeValue))
                 .OrderByDescending(sa => sa.Timestamp)
                 .Select(sa => (DateTime?)sa.Timestamp)
                 .FirstOrDefaultAsync();
@@ -531,15 +611,41 @@ namespace ShipmentFinishGood.Services
             if (!session.POMasters.Any())
                 return Result<string>.Failure("Session has no PO data to scan");
 
+            // Check if master barcode already exists
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode != null)
+            {
+                return Result<string>.Success(masterBarcode.BarcodeValue);
+            }
+
+            // Generate barcodes if they don't exist
             if (string.IsNullOrEmpty(session.IdentityQRCode))
             {
                 session.IdentityQRCode = $"QR_{session.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
                 session.Status = "QR_GENERATED";
                 _context.UploadSessions.Update(session);
                 await _context.SaveChangesAsync();
+
+                // Generate barcodes for this session
+                await _barcodeService.GenerateBarcodesForSessionAsync(sessionId, "System");
+
+                // Get the newly created master barcode
+                masterBarcode = await _context.BarcodeRegistries
+                    .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                            b.BarcodeType == "MASTER" && 
+                                            b.IsActive);
+
+                if (masterBarcode != null)
+                {
+                    return Result<string>.Success(masterBarcode.BarcodeValue);
+                }
             }
 
-            return Result<string>.Success(session.IdentityQRCode);
+            return Result<string>.Failure("Failed to generate master QR code");
         }
 
         private async Task SendProgressUpdateAsync(int sessionId, string scannedBarcode)

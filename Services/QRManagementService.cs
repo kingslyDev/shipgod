@@ -25,7 +25,16 @@ namespace ShipmentFinishGood.Services
                 .Include(s => s.POMasters)
                 .FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-            if (session == null || string.IsNullOrEmpty(session.IdentityQRCode))
+            if (session == null)
+                return null;
+
+            // Get master barcode from BarcodeRegistries instead of using IdentityQRCode
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null)
                 return null;
 
             // Get barcode list from database
@@ -33,54 +42,22 @@ namespace ShipmentFinishGood.Services
             var barcodeList = barcodes.Select(b => b.BarcodeValue).ToList();
 
             // Generate QR code image as base64
-            var qrImageBase64 = GenerateQRCodeBase64(session.IdentityQRCode);
+            var qrImageBase64 = GenerateQRCodeBase64(masterBarcode.BarcodeValue);
 
             return new QRManagementDto
             {
                 SessionId = session.SessionId,
                 FileName = session.FileName,
                 SheetName = session.SheetName,
-                QRIdentity = session.IdentityQRCode,
+                QRIdentity = masterBarcode.BarcodeValue,
                 QRImageBase64 = qrImageBase64,
                 Status = "Ready for Scanning",
                 GeneratedDate = session.UploadDate,
                 GeneratedBy = session.UploadedBy ?? "System",
                 TotalBoxes = session.TotalBoxes,
                 BarcodeList = barcodeList,
-                CanRegenerate = true
+                CanRegenerate = false // Remove regenerate functionality
             };
-        }
-
-        public async Task<bool> RegenerateQRAsync(int sessionId, string generatedBy)
-        {
-            var session = await _context.UploadSessions.FindAsync(sessionId);
-            if (session == null) return false;
-
-            // Generate new QR Identity - use consistent format
-            var qrIdentity = $"QR_{sessionId}_{DateTime.Now:yyyyMMddHHmmss}";
-            
-            // Check for QR Identity duplicate
-            var duplicateQR = await _context.UploadSessions
-                .Where(s => s.IdentityQRCode == qrIdentity && 
-                           s.SessionId != sessionId &&
-                           s.Status != "DELETED")
-                .FirstOrDefaultAsync();
-
-            if (duplicateQR != null)
-            {
-                // Add milliseconds to make it unique
-                qrIdentity = $"QR_{sessionId}_{DateTime.Now:yyyyMMddHHmmss_fff}";
-            }
-            
-            session.IdentityQRCode = qrIdentity;
-            session.Status = "QR_GENERATED"; // Update status to ensure it appears in active sessions
-            
-            await _context.SaveChangesAsync();
-
-            // Regenerate barcodes using BarcodeService
-            var regenerateResult = await _barcodeService.GenerateBarcodesForSessionAsync(sessionId, generatedBy);
-            
-            return regenerateResult.IsSuccess;
         }
 
         public async Task<byte[]?> GenerateBarcodesPDFAsync(int sessionId)
@@ -89,23 +66,37 @@ namespace ShipmentFinishGood.Services
                 .Include(s => s.POMasters)
                 .FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-            if (session == null || string.IsNullOrEmpty(session.IdentityQRCode))
+            if (session == null)
                 return null;
+
+            // Get master barcode from BarcodeRegistries
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null)
+                return null;
+
+            // Get all barcodes from BarcodeRegistries instead of generating them
+            var boxBarcodes = await _context.BarcodeRegistries
+                .Where(b => b.SessionId == sessionId && 
+                           b.BarcodeType == "BOX" && 
+                           b.IsActive)
+                .OrderBy(b => b.ModelProduct)
+                .ThenBy(b => b.BoxNumber)
+                .ToListAsync();
 
             // For now, return a simple text-based PDF placeholder
             // In production, use a proper PDF library like iTextSharp or PdfSharpCore
             var content = $"PDF Barcodes for Session {sessionId}\n";
-            content += $"QR Identity: {session.IdentityQRCode}\n";
+            content += $"QR Identity: {masterBarcode.BarcodeValue}\n";
             content += $"Generated: {DateTime.Now}\n\n";
             content += "BOX BARCODES:\n";
             
-            foreach (var poMaster in session.POMasters)
+            foreach (var barcode in boxBarcodes)
             {
-                for (int i = 1; i <= poMaster.QtyBox; i++)
-                {
-                    var barcode = $"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}";
-                    content += $"- {barcode}\n";
-                }
+                content += $"- {barcode.BarcodeValue}\n";
             }
 
             return System.Text.Encoding.UTF8.GetBytes(content);
@@ -113,11 +104,16 @@ namespace ShipmentFinishGood.Services
 
         public async Task<byte[]?> GetQRImageAsync(int sessionId)
         {
-            var session = await _context.UploadSessions.FindAsync(sessionId);
-            if (session == null || string.IsNullOrEmpty(session.IdentityQRCode))
+            // Get master barcode from BarcodeRegistries
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null)
                 return null;
 
-            return GenerateQRCodeBytes(session.IdentityQRCode);
+            return GenerateQRCodeBytes(masterBarcode.BarcodeValue);
         }
 
         private string GenerateQRCodeBase64(string content)

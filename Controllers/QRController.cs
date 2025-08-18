@@ -29,31 +29,6 @@ namespace ShipmentFinishGood.Controllers
             return View(qrData);
         }
 
-        [HttpPost]
-        public async Task<IActionResult> RegenerateQR(int sessionId)
-        {
-            try
-            {
-                var userName = User.Identity?.Name ?? "Unknown";
-                var success = await _qrService.RegenerateQRAsync(sessionId, userName);
-                
-                if (success)
-                {
-                    TempData["Success"] = "QR Identity regenerated successfully.";
-                }
-                else
-                {
-                    TempData["Error"] = "Failed to regenerate QR Identity.";
-                }
-            }
-            catch (Exception ex)
-            {
-                TempData["Error"] = $"Error regenerating QR: {ex.Message}";
-            }
-
-            return RedirectToAction("Manage", new { id = sessionId });
-        }
-
         public async Task<IActionResult> DownloadPDF(int sessionId)
         {
             try
