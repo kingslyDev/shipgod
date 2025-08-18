@@ -12,11 +12,13 @@ namespace ShipmentFinishGood.Controllers
     {
         private readonly IExcelProcessingService _excelService;
         private readonly IFinalProcessingService _finalService;
+        private readonly IBarcodeService _barcodeService;
 
-        public FinalController(IExcelProcessingService excelService, IFinalProcessingService finalService)
+        public FinalController(IExcelProcessingService excelService, IFinalProcessingService finalService, IBarcodeService barcodeService)
         {
             _excelService = excelService;
             _finalService = finalService;
+            _barcodeService = barcodeService;
         }
 
         public async Task<IActionResult> Index(int id)
@@ -108,6 +110,41 @@ namespace ShipmentFinishGood.Controllers
             {
                 TempData["Error"] = $"Error generating QR: {ex.Message}";
                 return RedirectToAction("Index", new { id = sessionId });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetProgress(int sessionId)
+        {
+            try
+            {
+                var progressData = await _barcodeService.GetProgressByPOAsync(sessionId);
+                return Json(new { success = true, data = progressData });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetProgressByPO(int sessionId, int poId)
+        {
+            try
+            {
+                var progressData = await _barcodeService.GetProgressByPOIdAsync(sessionId, poId);
+                if (progressData != null)
+                {
+                    return Json(new { success = true, data = progressData });
+                }
+                else
+                {
+                    return Json(new { success = false, message = "PO not found" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
             }
         }
     }

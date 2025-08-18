@@ -1,5 +1,6 @@
 using ShipmentFinishGood.Repositories;
 using ShipmentFinishGood.Data.Seeders;
+using ShipmentFinishGood.Hubs;
 
 namespace ShipmentFinishGood.Extensions;
 
@@ -20,6 +21,9 @@ public static class WebApplicationExtensions
         app.MapControllerRoute(
             name: "default",
             pattern: "{controller=Home}/{action=Index}/{id?}");
+            
+        app.MapHub<ProgressHub>("/progressHub");
+        
         return app;
     }
 

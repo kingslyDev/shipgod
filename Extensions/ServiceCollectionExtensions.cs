@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddPresentationLayer(this IServiceCollection services)
     {
         services.AddControllersWithViews();
+        services.AddSignalR();
         return services;
     }
 

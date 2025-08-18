@@ -22,5 +22,9 @@ namespace ShipmentFinishGood.Services
         Task<List<string>> GetRemainingCountriesAsync(int sessionId);
         Task<bool> HasAnySubmittedCountriesAsync(int sessionId);
         Task<FileUploadResult> ProcessFileUploadAsync(IFormFile file, string uploadedBy);
+        
+        // Dashboard methods
+        Task<List<UploadSession>> GetAllUploadSessionsAsync();
+        Task<List<UploadSession>> GetActiveSessionsAsync();
     }
 }

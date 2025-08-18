@@ -32,5 +32,9 @@ namespace ShipmentFinishGood.Services
         // Management operations
         Task<Result> CancelExcessBarcodesAsync(int poId, int newQtyBox, string cancelledBy);
         Task<Result> CleanupSessionBarcodesAsync(int sessionId);
+        
+        // Progress tracking
+        Task<List<POProgressDto>> GetProgressByPOAsync(int sessionId);
+        Task<POProgressDto?> GetProgressByPOIdAsync(int sessionId, int poId);
     }
 }

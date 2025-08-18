@@ -189,6 +189,7 @@ namespace ShipmentFinishGood.DTOs
         public string? ShipmentMethod { get; set; }
         public DateTime CreatedDate { get; set; }
         public string? CreatedBy { get; set; }
+        public string? Country { get; set; } // NEW: Country field
         
         // Session info
         public int? SourceSessionId { get; set; }
@@ -326,6 +327,18 @@ namespace ShipmentFinishGood.DTOs
         public string ShipmentType { get; set; } = string.Empty;
         public int TotalBoxes { get; set; }
         public List<ScanHistoryDto> ScanActivities { get; set; } = new();
+    }
+
+    public class POProgressDto
+    {
+        public int POId { get; set; }
+        public string NoPO { get; set; } = string.Empty;
+        public string ModelProduct { get; set; } = string.Empty;
+        public int TotalBoxes { get; set; }
+        public int ScannedBoxes { get; set; }
+        public double ProgressPercentage { get; set; }
+        public DateTime? LastScanTime { get; set; }
+        public string Status { get; set; } = string.Empty; // PENDING, IN_PROGRESS, COMPLETED
     }
 
     // NEW: Upload result for handling file resume functionality

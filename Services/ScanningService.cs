@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Models;
 using ShipmentFinishGood.Repositories;
 using ShipmentFinishGood.Common;
+using ShipmentFinishGood.Hubs;
 
 namespace ShipmentFinishGood.Services
 {
@@ -10,11 +12,13 @@ namespace ShipmentFinishGood.Services
     {
         private readonly AppDbContext _context;
         private readonly IBarcodeService _barcodeService;
+        private readonly IHubContext<ProgressHub> _hubContext;
 
-        public ScanningService(AppDbContext context, IBarcodeService barcodeService)
+        public ScanningService(AppDbContext context, IBarcodeService barcodeService, IHubContext<ProgressHub> hubContext)
         {
             _context = context;
             _barcodeService = barcodeService;
+            _hubContext = hubContext;
         }
 
         public async Task<List<ScanSessionSummaryDto>> GetActiveSessionsAsync()
@@ -244,6 +248,9 @@ namespace ShipmentFinishGood.Services
 
             _context.ScanningActivities.Add(scanActivity);
             await _context.SaveChangesAsync();
+
+            // Send realtime update via SignalR
+            await SendProgressUpdateAsync(sessionId, barcode);
 
             var result = new ScanResultDto
             {
@@ -533,6 +540,51 @@ namespace ShipmentFinishGood.Services
             }
 
             return Result<string>.Success(session.IdentityQRCode);
+        }
+
+        private async Task SendProgressUpdateAsync(int sessionId, string scannedBarcode)
+        {
+            try
+            {
+                // Extract PO information from barcode to get the specific PO that was updated
+                var barcodeRegistry = await _context.BarcodeRegistries
+                    .Include(b => b.POMaster)
+                    .FirstOrDefaultAsync(b => b.BarcodeValue == scannedBarcode && b.SessionId == sessionId);
+
+                if (barcodeRegistry?.POId != null)
+                {
+                    // Get updated progress for the specific PO
+                    var poProgress = await _barcodeService.GetProgressByPOIdAsync(sessionId, barcodeRegistry.POId.Value);
+                    
+                    if (poProgress != null)
+                    {
+                        // Send update to all clients in the session group
+                        await _hubContext.Clients.Group($"Session_{sessionId}")
+                            .SendAsync("ProgressUpdate", new
+                            {
+                                sessionId = sessionId,
+                                poId = barcodeRegistry.POId.Value,
+                                progress = poProgress,
+                                lastScannedBarcode = scannedBarcode
+                            });
+                    }
+                }
+
+                // Also send overall session progress
+                var overallProgress = await _barcodeService.GetProgressByPOAsync(sessionId);
+                await _hubContext.Clients.Group($"Session_{sessionId}")
+                    .SendAsync("SessionProgressUpdate", new
+                    {
+                        sessionId = sessionId,
+                        allProgress = overallProgress,
+                        lastScannedBarcode = scannedBarcode
+                    });
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't fail the scan operation
+                Console.WriteLine($"Error sending progress update: {ex.Message}");
+            }
         }
     }
 }

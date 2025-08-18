@@ -517,6 +517,7 @@ namespace ShipmentFinishGood.Services
                         ShipmentMethod = p.ShipmentMethod,
                         CreatedDate = p.CreatedDate,
                         CreatedBy = p.CreatedBy,
+                        Country = p.Country, // NEW: Include Country
                         SourceSessionId = p.SourceSessionId,
                         FileName = session.FileName,
                         QRIdentity = session.IdentityQRCode
@@ -699,6 +700,24 @@ namespace ShipmentFinishGood.Services
                     Message = $"Error processing file: {ex.Message}"
                 };
             }
+        }
+
+        // Dashboard methods implementation
+        public async Task<List<UploadSession>> GetAllUploadSessionsAsync()
+        {
+            return await _context.UploadSessions
+                .Include(s => s.POMasters)
+                .OrderByDescending(s => s.UploadDate)
+                .ToListAsync();
+        }
+
+        public async Task<List<UploadSession>> GetActiveSessionsAsync()
+        {
+            return await _context.UploadSessions
+                .Include(s => s.POMasters)
+                .Where(s => s.Status == "IN_PROGRESS" || s.Status == "VALIDATED" || s.Status == "QR_GENERATED")
+                .OrderByDescending(s => s.UploadDate)
+                .ToListAsync();
         }
     }
 }

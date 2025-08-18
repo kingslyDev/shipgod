@@ -1,0 +1,328 @@
+@model ShipmentFinishGood.DTOs.ShippingReportDto
+
+@{
+    ViewData["Title"] = "Shipping Reports";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">📊 Shipping Reports</h1>
+            <p class="text-muted mb-0">Detailed analytics and performance metrics</p>
+        </div>
+        <div>
+            <button class="btn btn-primary" onclick="exportReport()">
+                <i class="fas fa-download"></i> Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Sessions</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">@Model.TotalSessions</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Completed Sessions</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">@Model.CompletedSessions</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Total Boxes</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">@Model.TotalBoxes.ToString("N0")</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Success Rate</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                @((Model.TotalSessions > 0 ? (double)Model.CompletedSessions / Model.TotalSessions * 100 : 0).ToString("F1"))%
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Status Breakdown Chart -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Sessions by Status</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusChart" width="400" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Trend Chart -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Monthly Shipping Trend</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="monthlyChart" width="400" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Report Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Monthly Performance Report</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="monthlyTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Total Sessions</th>
+                                    <th>Completed Sessions</th>
+                                    <th>Total Boxes</th>
+                                    <th>Completion Rate</th>
+                                    <th>Avg Boxes/Session</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var month in Model.MonthlyReport)
+                                {
+                                    var completionRate = month.TotalSessions > 0 ? (double)month.CompletedSessions / month.TotalSessions * 100 : 0;
+                                    var avgBoxes = month.TotalSessions > 0 ? (double)month.TotalBoxes / month.TotalSessions : 0;
+                                    
+                                    <tr>
+                                        <td>@month.MonthName @month.Year</td>
+                                        <td>@month.TotalSessions</td>
+                                        <td>@month.CompletedSessions</td>
+                                        <td>@month.TotalBoxes.ToString("N0")</td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar @(completionRate >= 80 ? "bg-success" : completionRate >= 60 ? "bg-warning" : "bg-danger")" 
+                                                     role="progressbar" 
+                                                     style="width: @completionRate%"
+                                                     aria-valuenow="@completionRate" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    @completionRate.ToString("F1")%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>@avgBoxes.ToString("F1")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Status Chart
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        const statusData = @Html.Raw(Json.Serialize(Model.SessionsByStatus));
+        
+        new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statusData),
+                datasets: [{
+                    data: Object.values(statusData),
+                    backgroundColor: [
+                        '#28a745', // Success
+                        '#ffc107', // Warning
+                        '#17a2b8', // Info
+                        '#6c757d', // Secondary
+                        '#dc3545'  // Danger
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Monthly Chart
+        const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+        const monthlyData = @Html.Raw(Json.Serialize(Model.MonthlyReport.Take(12).ToList()));
+        
+        new Chart(monthlyCtx, {
+            type: 'line',
+            data: {
+                labels: monthlyData.map(m => `${m.MonthName} ${m.Year}`),
+                datasets: [{
+                    label: 'Total Sessions',
+                    data: monthlyData.map(m => m.TotalSessions),
+                    borderColor: '#1976d2',
+                    backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                    fill: true
+                }, {
+                    label: 'Completed Sessions',
+                    data: monthlyData.map(m => m.CompletedSessions),
+                    borderColor: '#4caf50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        // Export function
+        function exportReport() {
+            const printWindow = window.open('', '_blank');
+            const reportContent = `
+                <html>
+                <head>
+                    <title>Shipping Report - ${new Date().toLocaleDateString()}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .stats { display: flex; justify-content: space-around; margin-bottom: 30px; }
+                        .stat-box { text-align: center; padding: 15px; border: 1px solid #ddd; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Shipping Performance Report</h1>
+                        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                    </div>
+                    
+                    <div class="stats">
+                        <div class="stat-box">
+                            <h3>@Model.TotalSessions</h3>
+                            <p>Total Sessions</p>
+                        </div>
+                        <div class="stat-box">
+                            <h3>@Model.CompletedSessions</h3>
+                            <p>Completed</p>
+                        </div>
+                        <div class="stat-box">
+                            <h3>@Model.TotalBoxes.ToString("N0")</h3>
+                            <p>Total Boxes</p>
+                        </div>
+                    </div>
+                    
+                    ${document.querySelector('#monthlyTable').outerHTML}
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(reportContent);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        // Initialize DataTable
+        $(document).ready(function() {
+            $('#monthlyTable').DataTable({
+                order: [[0, 'desc']],
+                pageLength: 25
+            });
+        });
+    </script>
+}
+
+<style>
+    .border-left-primary {
+        border-left: 0.25rem solid var(--bs-primary) !important;
+    }
+    
+    .border-left-success {
+        border-left: 0.25rem solid var(--bs-success) !important;
+    }
+    
+    .border-left-info {
+        border-left: 0.25rem solid var(--bs-info) !important;
+    }
+    
+    .border-left-warning {
+        border-left: 0.25rem solid var(--bs-warning) !important;
+    }
+    
+    .text-gray-800 {
+        color: #5a5c69 !important;
+    }
+    
+    .text-gray-300 {
+        color: #dddfeb !important;
+    }
+</style>

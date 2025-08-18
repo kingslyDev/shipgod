@@ -408,5 +408,55 @@ namespace ShipmentFinishGood.Services
                 return Result.Failure($"Error cleaning up session barcodes: {ex.Message}");
             }
         }
+
+        public async Task<List<POProgressDto>> GetProgressByPOAsync(int sessionId)
+        {
+            try
+            {
+                // Get PO data with row mapping from the original session upload
+                var session = await _context.UploadSessions
+                    .Include(s => s.POMasters)
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+                if (session == null) return new List<POProgressDto>();
+
+                var poProgress = await _context.BarcodeRegistries
+                    .Where(b => b.SessionId == sessionId && b.BarcodeType == "BOX" && b.IsActive)
+                    .Include(b => b.POMaster)
+                    .GroupBy(b => new { b.POId, b.POMaster!.NoPO, b.ModelProduct })
+                    .Select(g => new POProgressDto
+                    {
+                        POId = g.Key.POId ?? 0,
+                        NoPO = g.Key.NoPO ?? "",
+                        ModelProduct = g.Key.ModelProduct ?? "",
+                        TotalBoxes = g.Count(),
+                        ScannedBoxes = g.Count(b => b.Status == "SCANNED"),
+                        ProgressPercentage = g.Count() > 0 ? (double)g.Count(b => b.Status == "SCANNED") / g.Count() * 100 : 0,
+                        LastScanTime = g.Where(b => b.Status == "SCANNED").Max(b => b.ScannedDate),
+                        Status = g.Count() > 0 && g.Count(b => b.Status == "SCANNED") == g.Count() ? "COMPLETED" : 
+                                g.Any(b => b.Status == "SCANNED") ? "IN_PROGRESS" : "PENDING"
+                    })
+                    .ToListAsync();
+
+                return poProgress;
+            }
+            catch (Exception)
+            {
+                return new List<POProgressDto>();
+            }
+        }
+
+        public async Task<POProgressDto?> GetProgressByPOIdAsync(int sessionId, int poId)
+        {
+            try
+            {
+                var progressList = await GetProgressByPOAsync(sessionId);
+                return progressList.FirstOrDefault(p => p.POId == poId);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
     }
 }
