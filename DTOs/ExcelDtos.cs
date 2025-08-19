@@ -1,5 +1,13 @@
 namespace ShipmentFinishGood.DTOs
 {
+    public enum ScanItemType
+    {
+        MasterQR,
+        Box,
+        Pallet,
+        Pcs
+    }
+
     public class ExcelRowData
     {
         public string? NoPO { get; set; }
@@ -291,7 +299,8 @@ namespace ShipmentFinishGood.DTOs
     public class ScanResultDto
     {
         public string BarcodeValue { get; set; } = string.Empty;
-        public string ScanType { get; set; } = string.Empty; // MASTER_QR, BOX_BARCODE
+        public ScanItemType ScanType { get; set; } = ScanItemType.Box;
+        public string ScanTypeString => ScanType.ToString().ToUpper();
         public string Message { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
         public string ScannedBy { get; set; } = string.Empty;
@@ -306,6 +315,25 @@ namespace ShipmentFinishGood.DTOs
         public bool IsMasterScanned { get; set; }
         public DateTime? LastScanTime { get; set; }
         public bool CanComplete { get; set; }
+        
+        // Enhanced tracking for Box, Pallet, and Pcs
+        public int TotalBoxes { get; set; }
+        public int ScannedBoxes { get; set; }
+        public int TotalPallets { get; set; }
+        public int ScannedPallets { get; set; }
+        public int TotalPcs { get; set; }
+        public int ScannedPcs { get; set; }
+        
+        // Individual progress percentages
+        public double BoxProgressPercentage => TotalBoxes > 0 ? (double)ScannedBoxes / TotalBoxes * 100 : 0;
+        public double PalletProgressPercentage => TotalPallets > 0 ? (double)ScannedPallets / TotalPallets * 100 : 0;
+        public double PcsProgressPercentage => TotalPcs > 0 ? (double)ScannedPcs / TotalPcs * 100 : 0;
+        
+        // Overall completion check
+        public bool IsBoxComplete => TotalBoxes == 0 || ScannedBoxes >= TotalBoxes;
+        public bool IsPalletComplete => TotalPallets == 0 || ScannedPallets >= TotalPallets;
+        public bool IsPcsComplete => TotalPcs == 0 || ScannedPcs >= TotalPcs;
+        public bool IsAllComplete => IsBoxComplete && IsPalletComplete && IsPcsComplete;
     }
 
     public class ScanHistoryDto

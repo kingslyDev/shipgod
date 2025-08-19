@@ -71,11 +71,11 @@
                                 <input type="text" 
                                        id="mainScanInput" 
                                        class="form-control form-control-lg" 
-                                       placeholder="📱 Scan QR Identity or Box Barcode here..." 
+                                       placeholder="📱 Scan QR Identity, Box, Pallet, or PCS barcode here..." 
                                        autocomplete="off" 
                                        spellcheck="false"
                                        inputmode="text"
-                                       aria-label="Scan input for QR Identity or Box Barcode"
+                                       aria-label="Scan input for QR Identity, Box, Pallet, or PCS barcode"
                                        aria-describedby="scanHelp"
                                        autofocus>
                                 <button class="btn btn-primary btn-lg" type="button" onclick="processScan()" aria-label="Scan input">
@@ -84,7 +84,7 @@
                             </div>
                             <div id="scanHelp" class="form-text">
                                 <strong>Instructions:</strong> 
-                                First scan QR Identity to lock session, then scan box barcodes.
+                                First scan QR Identity to lock session, then scan Box, Pallet, or PCS barcodes.
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -282,13 +282,14 @@
             
             console.log('Is Master QR:', isMasterQR(scannedValue));
             console.log('Is Box Barcode:', isBoxBarcode(scannedValue));
+            console.log('Is Item Barcode:', isItemBarcode(scannedValue));
             console.log('=== END SCAN ATTEMPT ===');
 
             // Determine scan type and process
             if (isMasterQR(scannedValue)) {
                 processMasterQR(scannedValue);
-            } else if (isBoxBarcode(scannedValue)) {
-                processBoxBarcode(scannedValue);
+            } else if (isItemBarcode(scannedValue)) {
+                processItemBarcode(scannedValue);
             } else {
                 // If not recognized, try refreshing sessions first
                 console.log('⚠️ QR/Barcode not recognized, refreshing sessions...');
@@ -352,6 +353,38 @@
             
             console.log('Box barcode is valid:', isValid);
             return isValid;
+        }
+
+        // Check if scanned value is an item barcode (Box, Pallet, or PCS)
+        function isItemBarcode(value) {
+            if (!value) return false;
+            
+            const upperValue = value.toUpperCase();
+            
+            // Check if it contains item type indicators
+            const hasItemType = upperValue.includes('BOX') || 
+                               upperValue.includes('PALLET') || 
+                               upperValue.includes('PCS');
+            
+            if (!hasItemType) return false;
+            
+            // Check if it starts with any QR identity from active sessions (for BOX barcodes)
+            const startsWithQR = activeSessions.some(session => {
+                return value.startsWith(session.qrIdentity + '_BOX_');
+            });
+            
+            // For PALLET and PCS, we accept them if they just contain the keywords
+            // since they might have different barcode formats
+            const isPalletOrPcs = upperValue.includes('PALLET') || upperValue.includes('PCS');
+            
+            console.log('Item barcode validation:', {
+                value: value,
+                hasItemType: hasItemType,
+                startsWithQR: startsWithQR,
+                isPalletOrPcs: isPalletOrPcs
+            });
+            
+            return startsWithQR || isPalletOrPcs;
         }
 
         // Process Master QR scan
@@ -457,6 +490,83 @@
             });
         }
 
+        // Process Item Barcode scan (Universal: Box, Pallet, or PCS)
+        function processItemBarcode(barcode) {
+            if (!currentUserLock) {
+                showAlert('Please scan Master QR first to lock to a session', 'warning');
+                return;
+            }
+
+            const upperBarcode = barcode.toUpperCase();
+            const itemType = upperBarcode.includes('PALLET') ? 'PALLET' : 
+                           upperBarcode.includes('PCS') ? 'PCS' : 
+                           upperBarcode.includes('BOX') ? 'BOX' : 'ITEM';
+
+            // Find which session this barcode belongs to
+            let session = null;
+            
+            if (itemType === 'BOX') {
+                // For BOX barcodes, find by QR identity prefix
+                session = activeSessions.find(s => barcode.startsWith(s.qrIdentity + '_BOX_'));
+                if (session && currentUserLock !== session.qrIdentity) {
+                    showAlert(`This barcode belongs to a different session. You are locked to: ${currentUserLock}`, 'warning');
+                    return;
+                }
+            } else {
+                // For PALLET and PCS, use the currently locked session
+                session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+            }
+
+            if (!session) {
+                showAlert(`Invalid ${itemType.toLowerCase()} barcode format or session not found`, 'danger');
+                return;
+            }
+
+            // Call universal scan endpoint
+            $.ajax({
+                url: '@Url.Action("ScanItem", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: session.sessionId,
+                    barcode: barcode
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert(`✅ ${response.message}`, 'success');
+                        
+                        // Clear input and focus for next scan
+                        $('#mainScanInput').val('').focus();
+                        
+                        // Update enhanced progress display
+                        if (response.data) {
+                            updateEnhancedProgress(response.data);
+                            
+                            // Check if all items are complete and session can be unlocked
+                            if (response.data.isAllComplete) {
+                                showAlert('🎉 All items scanned! Session completed successfully!', 'success');
+                                currentUserLock = null;
+                                updateScanStatus('ready', 'Session completed - Ready for new scan', 'success');
+                                $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity or Item Barcode here...');
+                            }
+                        }
+                    } else {
+                        showAlert(`❌ ${response.message}`, 'danger');
+                        
+                        // Show debug info if available
+                        if (response.debug) {
+                            console.log('Debug info:', response.debug);
+                        }
+                    }
+                },
+                error: function() {
+                    showAlert(`Error scanning ${itemType.toLowerCase()}. Please try again.`, 'danger');
+                }
+            });
+        }
+
         // Check user lock status
         function checkUserLockStatus() {
             $.ajax({
@@ -528,7 +638,7 @@
                     statusDetail.text(message);
                     break;
                 case 'scanning':
-                    statusBadge.text('Scanning Boxes');
+                    statusBadge.text('Scanning Items');
                     statusDetail.text(message);
                     break;
             }
@@ -537,10 +647,10 @@
         // Update UI for locked state
         function updateUIForLockedState(session) {
             // Update placeholder text
-            $('#mainScanInput').attr('placeholder', `📦 Scan box barcodes for: ${session.fileName}`);
+            $('#mainScanInput').attr('placeholder', `📦 Scan Box, Pallet, or PCS barcodes for: ${session.fileName}`);
             
             // Update status
-            updateScanStatus('scanning', `Ready to scan boxes`, 'success');
+            updateScanStatus('scanning', `Ready to scan items`, 'success');
         }
 
         // Update scan progress
@@ -548,6 +658,93 @@
             if (progressData.progressPercentage !== undefined) {
                 const message = `Progress: ${progressData.scannedCount}/${progressData.totalBarcodes} (${progressData.progressPercentage.toFixed(1)}%)`;
                 updateScanStatus('scanning', message, 'success');
+            }
+        }
+
+        // Update enhanced scan progress with individual item type tracking
+        function updateEnhancedProgress(progressData) {
+            // Update legacy progress
+            if (progressData.progressPercentage !== undefined) {
+                const message = `Progress: ${progressData.scannedCount}/${progressData.totalBarcodes} (${progressData.progressPercentage.toFixed(1)}%)`;
+                updateScanStatus('scanning', message, 'success');
+            }
+
+            // Create or update enhanced progress display
+            let progressContainer = $('#enhanced-progress-display');
+            if (progressContainer.length === 0) {
+                // Create enhanced progress display
+                const progressHtml = `
+                    <div id="enhanced-progress-display" class="mt-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card border-info">
+                                    <div class="card-body text-center p-2">
+                                        <h6 class="card-title text-info mb-1">📦 Boxes</h6>
+                                        <div id="box-progress" class="progress mb-1" style="height: 15px;">
+                                            <div class="progress-bar bg-info" role="progressbar"></div>
+                                        </div>
+                                        <small id="box-stats" class="text-muted">0/0 (0%)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-warning">
+                                    <div class="card-body text-center p-2">
+                                        <h6 class="card-title text-warning mb-1">🚚 Pallets</h6>
+                                        <div id="pallet-progress" class="progress mb-1" style="height: 15px;">
+                                            <div class="progress-bar bg-warning" role="progressbar"></div>
+                                        </div>
+                                        <small id="pallet-stats" class="text-muted">0/0 (0%)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-success">
+                                    <div class="card-body text-center p-2">
+                                        <h6 class="card-title text-success mb-1">📋 PCS</h6>
+                                        <div id="pcs-progress" class="progress mb-1" style="height: 15px;">
+                                            <div class="progress-bar bg-success" role="progressbar"></div>
+                                        </div>
+                                        <small id="pcs-stats" class="text-muted">0/0 (0%)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                
+                $('#statusDetail').parent().after(progressHtml);
+                progressContainer = $('#enhanced-progress-display');
+            }
+
+            // Update individual progress bars
+            if (progressData.boxProgress) {
+                const boxProgress = progressData.boxProgress;
+                $('#box-progress .progress-bar').css('width', `${boxProgress.percentage}%`);
+                $('#box-stats').text(`${boxProgress.scanned}/${boxProgress.total} (${boxProgress.percentage.toFixed(1)}%)`);
+                
+                if (boxProgress.complete) {
+                    $('#box-progress .progress-bar').removeClass('bg-info').addClass('bg-success');
+                }
+            }
+
+            if (progressData.palletProgress) {
+                const palletProgress = progressData.palletProgress;
+                $('#pallet-progress .progress-bar').css('width', `${palletProgress.percentage}%`);
+                $('#pallet-stats').text(`${palletProgress.scanned}/${palletProgress.total} (${palletProgress.percentage.toFixed(1)}%)`);
+                
+                if (palletProgress.complete) {
+                    $('#pallet-progress .progress-bar').removeClass('bg-warning').addClass('bg-success');
+                }
+            }
+
+            if (progressData.pcsProgress) {
+                const pcsProgress = progressData.pcsProgress;
+                $('#pcs-progress .progress-bar').css('width', `${pcsProgress.percentage}%`);
+                $('#pcs-stats').text(`${pcsProgress.scanned}/${pcsProgress.total} (${pcsProgress.percentage.toFixed(1)}%)`);
+                
+                if (pcsProgress.complete) {
+                    $('#pcs-progress .progress-bar').removeClass('bg-success').addClass('bg-success');
+                }
             }
         }
 

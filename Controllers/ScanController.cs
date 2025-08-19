@@ -103,7 +103,7 @@ namespace ShipmentFinishGood.Controllers
                         message = "Box scanned successfully!", 
                         data = new {
                             BarcodeValue = result.Value?.BarcodeValue ?? barcode,
-                            ScanType = result.Value?.ScanType ?? "BOX_BARCODE",
+                            ScanType = result.Value?.ScanTypeString ?? "BOX_BARCODE",
                             Message = result.Value?.Message ?? "Box scanned successfully",
                             Timestamp = result.Value?.Timestamp ?? DateTime.Now,
                             ScannedBy = result.Value?.ScannedBy ?? userName,
@@ -137,6 +137,125 @@ namespace ShipmentFinishGood.Controllers
             {
                 return Json(new { success = false, message = $"Error scanning box: {ex.Message}" });
             }
+        }
+
+        /// <summary>
+        /// Universal scan endpoint for Box, Pallet, or PCS items
+        /// Automatically determines item type based on barcode content
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> ScanItem(int sessionId, string barcode)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                
+                // Validate input
+                if (string.IsNullOrWhiteSpace(barcode))
+                {
+                    return Json(new { success = false, message = "Barcode cannot be empty" });
+                }
+                
+                // Enhanced debug logging
+                Console.WriteLine($"=== SCAN ITEM DEBUG ===");
+                Console.WriteLine($"SessionId: {sessionId}");
+                Console.WriteLine($"Barcode: {barcode}");
+                Console.WriteLine($"User: {userName}");
+                Console.WriteLine($"Barcode Length: {barcode.Length}");
+                Console.WriteLine($"Contains PALLET: {barcode.ToUpperInvariant().Contains("PALLET")}");
+                Console.WriteLine($"Contains PCS: {barcode.ToUpperInvariant().Contains("PCS")}");
+                Console.WriteLine($"Contains BOX: {barcode.ToUpperInvariant().Contains("BOX")}");
+                
+                var result = await _scanService.ScanItemBarcodeAsync(sessionId, barcode, userName);
+                
+                Console.WriteLine($"Scan Result Success: {result.IsSuccess}");
+                if (!result.IsSuccess)
+                {
+                    Console.WriteLine($"Scan Error: {result.Error}");
+                }
+                Console.WriteLine($"=== END SCAN ITEM DEBUG ===");
+                
+                if (result.IsSuccess)
+                {
+                    // Get updated progress after successful scan
+                    var progress = await _scanService.GetScanProgressAsync(sessionId);
+                    
+                    return Json(new { 
+                        success = true, 
+                        message = result.Value?.Message ?? "Item scanned successfully!", 
+                        data = new {
+                            BarcodeValue = result.Value?.BarcodeValue ?? barcode,
+                            ScanType = result.Value?.ScanTypeString ?? "ITEM",
+                            Message = result.Value?.Message ?? "Item scanned successfully",
+                            Timestamp = result.Value?.Timestamp ?? DateTime.Now,
+                            ScannedBy = result.Value?.ScannedBy ?? userName,
+                            
+                            // Enhanced progress data
+                            scannedCount = progress.ScannedCount,
+                            totalBarcodes = progress.TotalBarcodes,
+                            progressPercentage = progress.ProgressPercentage,
+                            
+                            // Individual type progress
+                            boxProgress = new {
+                                scanned = progress.ScannedBoxes,
+                                total = progress.TotalBoxes,
+                                percentage = progress.BoxProgressPercentage,
+                                complete = progress.IsBoxComplete
+                            },
+                            palletProgress = new {
+                                scanned = progress.ScannedPallets,
+                                total = progress.TotalPallets,
+                                percentage = progress.PalletProgressPercentage,
+                                complete = progress.IsPalletComplete
+                            },
+                            pcsProgress = new {
+                                scanned = progress.ScannedPcs,
+                                total = progress.TotalPcs,
+                                percentage = progress.PcsProgressPercentage,
+                                complete = progress.IsPcsComplete
+                            },
+                            
+                            canComplete = progress.CanComplete,
+                            isAllComplete = progress.IsAllComplete
+                        }
+                    });
+                }
+                else
+                {
+                    return Json(new { 
+                        success = false, 
+                        message = result.Error,
+                        debug = new {
+                            sessionId = sessionId,
+                            barcode = barcode,
+                            barcodeType = DetermineItemTypeFromBarcode(barcode)
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error scanning item: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Helper method to determine item type from barcode for debugging
+        /// </summary>
+        private string DetermineItemTypeFromBarcode(string barcode)
+        {
+            var upperBarcode = barcode.ToUpperInvariant();
+            
+            if (upperBarcode.Contains("PALLET"))
+                return "PALLET";
+            
+            if (upperBarcode.Contains("PCS"))
+                return "PCS";
+            
+            if (upperBarcode.Contains("BOX"))
+                return "BOX";
+            
+            return "UNKNOWN";
         }
 
 

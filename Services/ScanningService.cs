@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Models;
@@ -223,7 +223,7 @@ namespace ShipmentFinishGood.Services
             var result = new ScanResultDto
             {
                 BarcodeValue = qrCode,
-                ScanType = "MASTER_QR",
+                ScanType = ScanItemType.MasterQR,
                 Message = "Master QR scanned successfully. You are now locked to this session.",
                 Timestamp = DateTime.Now,
                 ScannedBy = scannedBy
@@ -302,13 +302,137 @@ namespace ShipmentFinishGood.Services
             var result = new ScanResultDto
             {
                 BarcodeValue = barcode,
-                ScanType = "BOX_BARCODE",
+                ScanType = ScanItemType.Box,
                 Message = "Box scanned successfully",
                 Timestamp = DateTime.Now,
                 ScannedBy = scannedBy
             };
 
             return Result<ScanResultDto>.Success(result);
+        }
+
+        /// <summary>
+        /// Universal scan method for Box, Pallet, or PCS items
+        /// Determines scan type based on barcode content
+        /// </summary>
+        public async Task<Result<ScanResultDto>> ScanItemBarcodeAsync(int sessionId, string barcode, string scannedBy)
+        {
+            try
+            {
+                // Determine scan type based on barcode content
+                var scanType = DetermineScanType(barcode);
+                
+                switch (scanType)
+                {
+                    case ScanItemType.Box:
+                        return await ScanBoxBarcodeAsync(sessionId, barcode, scannedBy);
+                    
+                    case ScanItemType.Pallet:
+                        return await ScanPalletItemAsync(sessionId, barcode, scannedBy);
+                    
+                    case ScanItemType.Pcs:
+                        return await ScanPcsItemAsync(sessionId, barcode, scannedBy);
+                    
+                    default:
+                        return Result<ScanResultDto>.Failure("Invalid barcode format. Barcode must contain 'BOX', 'PALLET', or 'PCS'");
+                }
+            }
+            catch (Exception ex)
+            {
+                return Result<ScanResultDto>.Failure($"Error processing scan: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Scan a pallet item - simplified for any barcode containing "PALLET"
+        /// </summary>
+        private async Task<Result<ScanResultDto>> ScanPalletItemAsync(int sessionId, string barcode, string scannedBy)
+        {
+            // Basic validation - must be locked to a session first
+            var userLockResult = await CheckUserLockAsync(scannedBy);
+            if (!userLockResult.IsSuccess)
+                return Result<ScanResultDto>.Failure("Please scan Master QR first to lock to a session");
+
+            // Get PO data for this session to validate pallet quantity
+            var poData = await GetPODataForSessionAsync(sessionId);
+            if (!poData.Any())
+                return Result<ScanResultDto>.Failure("No PO data found for this session");
+
+            // Calculate total pallets and scanned pallets
+            var totalPallets = poData.Sum(po => po.QtyPallet);
+            var scannedPallets = await GetScannedItemCountAsync(sessionId, ScanItemType.Pallet);
+
+            // Relaxed validation - allow scanning if we haven't reached max pallets
+            if (totalPallets > 0 && scannedPallets >= totalPallets)
+                return Result<ScanResultDto>.Failure($"All pallets already scanned ({scannedPallets}/{totalPallets})");
+
+            // Check if this specific barcode was already scanned (to prevent duplicates)
+            var alreadyScanned = await IsItemAlreadyScannedAsync(barcode);
+            if (alreadyScanned)
+                return Result<ScanResultDto>.Failure("This pallet barcode has already been scanned");
+
+            // Record the scan - simplified, no complex validation
+            var scanResult = await RecordItemScanAsync(sessionId, barcode, ScanItemType.Pallet, scannedBy);
+            if (!scanResult.IsSuccess)
+                return Result<ScanResultDto>.Failure(scanResult.Error!);
+
+            // Send real-time update
+            await SendProgressUpdateAsync(sessionId, barcode);
+
+            return Result<ScanResultDto>.Success(new ScanResultDto
+            {
+                BarcodeValue = barcode,
+                ScanType = ScanItemType.Pallet,
+                Message = $"Pallet scanned successfully ({scannedPallets + 1}/{totalPallets})",
+                Timestamp = DateTime.Now,
+                ScannedBy = scannedBy
+            });
+        }
+
+        /// <summary>
+        /// Scan a PCS item - simplified for any barcode containing "PCS"
+        /// </summary>
+        private async Task<Result<ScanResultDto>> ScanPcsItemAsync(int sessionId, string barcode, string scannedBy)
+        {
+            // Basic validation - must be locked to a session first
+            var userLockResult = await CheckUserLockAsync(scannedBy);
+            if (!userLockResult.IsSuccess)
+                return Result<ScanResultDto>.Failure("Please scan Master QR first to lock to a session");
+
+            // Get PO data for this session to validate pcs quantity
+            var poData = await GetPODataForSessionAsync(sessionId);
+            if (!poData.Any())
+                return Result<ScanResultDto>.Failure("No PO data found for this session");
+
+            // Calculate total pcs and scanned pcs
+            var totalPcs = poData.Sum(po => po.QtyPcs);
+            var scannedPcs = await GetScannedItemCountAsync(sessionId, ScanItemType.Pcs);
+
+            // Relaxed validation - allow scanning if we haven't reached max PCS
+            if (totalPcs > 0 && scannedPcs >= totalPcs)
+                return Result<ScanResultDto>.Failure($"All PCS items already scanned ({scannedPcs}/{totalPcs})");
+
+            // Check if this specific barcode was already scanned (to prevent duplicates)
+            var alreadyScanned = await IsItemAlreadyScannedAsync(barcode);
+            if (alreadyScanned)
+                return Result<ScanResultDto>.Failure("This PCS barcode has already been scanned");
+
+            // Record the scan - simplified, no complex validation
+            var scanResult = await RecordItemScanAsync(sessionId, barcode, ScanItemType.Pcs, scannedBy);
+            if (!scanResult.IsSuccess)
+                return Result<ScanResultDto>.Failure(scanResult.Error!);
+
+            // Send real-time update
+            await SendProgressUpdateAsync(sessionId, barcode);
+
+            return Result<ScanResultDto>.Success(new ScanResultDto
+            {
+                BarcodeValue = barcode,
+                ScanType = ScanItemType.Pcs,
+                Message = $"PCS item scanned successfully ({scannedPcs + 1}/{totalPcs})",
+                Timestamp = DateTime.Now,
+                ScannedBy = scannedBy
+            });
         }
 
 
@@ -322,19 +446,55 @@ namespace ShipmentFinishGood.Services
             if (session == null)
                 return new ScanProgressDto();
 
+            // Get PO data to calculate quantities
+            var poData = await GetPODataForSessionAsync(sessionId);
+            
+            // Calculate totals from PO data
+            var totalBoxes = poData.Sum(po => po.QtyBox);
+            var totalPallets = poData.Sum(po => po.QtyPallet);
+            var totalPcs = poData.Sum(po => po.QtyPcs);
+            
+            // Calculate scanned counts
+            var scannedBoxes = await GetScannedItemCountAsync(sessionId, ScanItemType.Box);
+            var scannedPallets = await GetScannedItemCountAsync(sessionId, ScanItemType.Pallet);
+            var scannedPcs = await GetScannedItemCountAsync(sessionId, ScanItemType.Pcs);
+            
+            // Legacy barcode system compatibility
             var totalBarcodes = await _barcodeService.GetTotalBarcodeCountAsync(sessionId);
             var scannedCount = await _barcodeService.GetScannedBarcodeCountAsync(sessionId);
             var masterScanned = await IsMasterQRScannedAsync(sessionId);
 
+            // Calculate overall progress including all types
+            var totalItems = totalBoxes + totalPallets + totalPcs;
+            var scannedItems = scannedBoxes + scannedPallets + scannedPcs;
+            var overallProgress = totalItems > 0 ? (double)scannedItems / totalItems * 100 : 0;
+
             return new ScanProgressDto
             {
                 SessionId = sessionId,
-                TotalBarcodes = totalBarcodes,
-                ScannedCount = scannedCount,
-                ProgressPercentage = totalBarcodes > 0 ? (double)scannedCount / totalBarcodes * 100 : 0,
+                // Legacy fields for backward compatibility
+                TotalBarcodes = Math.Max(totalBarcodes, totalItems),
+                ScannedCount = Math.Max(scannedCount, scannedItems),
+                ProgressPercentage = Math.Max(
+                    totalBarcodes > 0 ? (double)scannedCount / totalBarcodes * 100 : 0,
+                    overallProgress
+                ),
                 IsMasterScanned = masterScanned,
                 LastScanTime = await GetLastScanTimeAsync(sessionId),
-                CanComplete = await _barcodeService.IsSessionCompleteAsync(sessionId)
+                
+                // Enhanced tracking fields
+                TotalBoxes = totalBoxes,
+                ScannedBoxes = scannedBoxes,
+                TotalPallets = totalPallets,
+                ScannedPallets = scannedPallets,
+                TotalPcs = totalPcs,
+                ScannedPcs = scannedPcs,
+                
+                // Enhanced completion logic
+                CanComplete = masterScanned && 
+                            (totalBoxes == 0 || scannedBoxes >= totalBoxes) &&
+                            (totalPallets == 0 || scannedPallets >= totalPallets) &&
+                            (totalPcs == 0 || scannedPcs >= totalPcs)
             };
         }
 
@@ -647,6 +807,158 @@ namespace ShipmentFinishGood.Services
 
             return Result<string>.Failure("Failed to generate master QR code");
         }
+
+        #region Helper Methods for Enhanced Scanning
+
+        /// <summary>
+        /// Determines scan type based on barcode content
+        /// </summary>
+        private ScanItemType DetermineScanType(string barcode)
+        {
+            var upperBarcode = barcode.ToUpperInvariant();
+            
+            if (upperBarcode.Contains("PALLET"))
+                return ScanItemType.Pallet;
+            
+            if (upperBarcode.Contains("PCS"))
+                return ScanItemType.Pcs;
+            
+            if (upperBarcode.Contains("BOX"))
+                return ScanItemType.Box;
+            
+            // Default to Box if no specific type found
+            return ScanItemType.Box;
+        }
+
+        /// <summary>
+        /// Validates user lock and session consistency
+        /// </summary>
+        private async Task<Result<bool>> ValidateUserLockAndSession(int sessionId, string scannedBy)
+        {
+            // Get master barcode to check lock session
+            var masterBarcode = await _context.BarcodeRegistries
+                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                        b.BarcodeType == "MASTER" && 
+                                        b.IsActive);
+
+            if (masterBarcode == null)
+                return Result<bool>.Failure("Master QR code not found for this session");
+
+            // Check if user is locked to this session
+            var userLockResult = await CheckUserLockAsync(scannedBy);
+            if (!userLockResult.IsSuccess)
+                return Result<bool>.Failure("You must scan Master QR first to lock to a session");
+
+            var lockedSessionResult = await GetUserLockedSessionAsync(scannedBy);
+            if (!lockedSessionResult.IsSuccess || lockedSessionResult.Value != masterBarcode.BarcodeValue)
+                return Result<bool>.Failure("You can only scan items from your locked session");
+
+            // Check if master QR was scanned first
+            var masterScanned = await IsMasterQRScannedAsync(sessionId);
+            if (!masterScanned)
+                return Result<bool>.Failure("Please scan Master QR first");
+
+            return Result<bool>.Success(true);
+        }
+
+        /// <summary>
+        /// Gets PO data for a specific session
+        /// </summary>
+        private async Task<List<POMaster>> GetPODataForSessionAsync(int sessionId)
+        {
+            return await _context.POMasters
+                .Where(po => po.SourceSessionId == sessionId)
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// Gets count of scanned items for a specific type and session
+        /// </summary>
+        private async Task<int> GetScannedItemCountAsync(int sessionId, ScanItemType itemType)
+        {
+            var actionName = GetActionNameForType(itemType);
+            var sessionAreaTag = $"Session_{sessionId}";
+            
+            if (itemType == ScanItemType.Box)
+            {
+                // For BOX items, we can use the existing barcode registry approach
+                var masterBarcode = await _context.BarcodeRegistries
+                    .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                            b.BarcodeType == "MASTER" && 
+                                            b.IsActive);
+                
+                if (masterBarcode == null) return 0;
+                
+                return await _context.ScanningActivities
+                    .CountAsync(sa => sa.Action == actionName && 
+                                    sa.Result == "SUCCESS" &&
+                                    sa.BarcodeValue.StartsWith(masterBarcode.BarcodeValue));
+            }
+            else
+            {
+                // For PALLET and PCS items, use the AssignedArea field to track session
+                return await _context.ScanningActivities
+                    .CountAsync(sa => sa.Action == actionName && 
+                                    sa.Result == "SUCCESS" &&
+                                    sa.AssignedArea == sessionAreaTag);
+            }
+        }
+
+        /// <summary>
+        /// Gets action name for scan type
+        /// </summary>
+        private string GetActionNameForType(ScanItemType itemType)
+        {
+            return itemType switch
+            {
+                ScanItemType.Box => "SCAN_BOX",
+                ScanItemType.Pallet => "SCAN_PALLET",
+                ScanItemType.Pcs => "SCAN_PCS",
+                _ => "SCAN_ITEM"
+            };
+        }
+
+        /// <summary>
+        /// Checks if a specific barcode has already been scanned
+        /// </summary>
+        private async Task<bool> IsItemAlreadyScannedAsync(string barcode)
+        {
+            return await _context.ScanningActivities
+                .AnyAsync(sa => sa.BarcodeValue == barcode && 
+                              sa.Result == "SUCCESS" &&
+                              (sa.Action == "SCAN_BOX" || sa.Action == "SCAN_PALLET" || sa.Action == "SCAN_PCS"));
+        }
+
+        /// <summary>
+        /// Records an item scan in the database
+        /// </summary>
+        private async Task<Result<bool>> RecordItemScanAsync(int sessionId, string barcode, ScanItemType itemType, string scannedBy)
+        {
+            try
+            {
+                var scanActivity = new ScanningActivity
+                {
+                    BarcodeValue = barcode,
+                    Action = GetActionNameForType(itemType),
+                    UserId = scannedBy,
+                    Timestamp = DateTime.Now,
+                    Result = "SUCCESS",
+                    // Store session info using AssignedArea field for session tracking
+                    AssignedArea = $"Session_{sessionId}"
+                };
+
+                _context.ScanningActivities.Add(scanActivity);
+                await _context.SaveChangesAsync();
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Failed to record scan: {ex.Message}");
+            }
+        }
+
+        #endregion
 
         private async Task SendProgressUpdateAsync(int sessionId, string scannedBarcode)
         {
