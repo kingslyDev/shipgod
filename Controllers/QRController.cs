@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShipmentFinishGood.Services;
 using ShipmentFinishGood.Common;
+using ShipmentFinishGood.ViewModels;
 
 namespace ShipmentFinishGood.Controllers
 {
@@ -72,14 +73,25 @@ namespace ShipmentFinishGood.Controllers
 
         public async Task<IActionResult> Manage(int id)
         {
-            var qrData = await _qrService.GetQRDataAsync(id);
-            if (qrData == null)
+            try
             {
-                TempData["Error"] = "QR data not found. Please generate QR first.";
+                var qrData = await _qrService.GetQRDataAsync(id);
+                if (qrData == null)
+                {
+                    TempData["Error"] = "QR data not found. Please generate QR first.";
+                    return RedirectToAction("Index", "Final", new { id });
+                }
+
+                // Convert to strongly-typed view model to avoid binding issues
+                var viewModel = QRManagementViewModel.FromDto(qrData);
+
+                return View(viewModel);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error loading QR management page: {ex.Message}";
                 return RedirectToAction("Index", "Final", new { id });
             }
-
-            return View(qrData);
         }
 
         public async Task<IActionResult> DownloadPDF(int sessionId)

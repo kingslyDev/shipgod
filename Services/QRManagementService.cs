@@ -23,55 +23,82 @@ namespace ShipmentFinishGood.Services
 
         public async Task<QRManagementDto?> GetQRDataAsync(int sessionId)
         {
-            var session = await _context.UploadSessions
-                .Include(s => s.POMasters)
-                .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+            try
+            {
+                var session = await _context.UploadSessions
+                    .Include(s => s.POMasters)
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-            if (session == null)
-                return null;
+                if (session == null)
+                    return null;
 
-            // Get master barcode from BarcodeRegistries instead of using IdentityQRCode
-            var masterBarcode = await _context.BarcodeRegistries
-                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
-                                        b.BarcodeType == "MASTER" && 
-                                        b.IsActive);
+                // Get master barcode from BarcodeRegistries instead of using IdentityQRCode
+                var masterBarcode = await _context.BarcodeRegistries
+                    .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                            b.BarcodeType == "MASTER" && 
+                                            b.IsActive);
 
-            if (masterBarcode == null)
-                return null;
+                if (masterBarcode == null)
+                    return null;
 
-            // Get barcode list from database
-            var barcodes = await _barcodeService.GetBarcodeListForSessionAsync(sessionId);
-            var barcodeList = barcodes.Select(b => b.BarcodeValue).ToList();
+                // Get barcode list from database
+                var barcodes = await _barcodeService.GetBarcodeListForSessionAsync(sessionId);
+                var barcodeList = barcodes?.Select(b => b.BarcodeValue).ToList() ?? new List<string>();
 
-            // Get PO Master data for this session
-            var poMasters = await _context.POMasters
-                .Where(po => po.SourceSessionId == sessionId)
-                .ToListAsync();
+                // Get PO Master data for this session
+                var poMasters = await _context.POMasters
+                    .Where(po => po.SourceSessionId == sessionId)
+                    .ToListAsync();
 
-            // Calculate totals from PO Masters
-            var totalPallets = poMasters.Sum(po => po.QtyPallet);
-            var totalBoxes = poMasters.Sum(po => po.QtyBox);
-            var totalPcs = poMasters.Sum(po => po.QtyPcs);
-            var totalQty = poMasters.Sum(po => po.QtyTotal);
+                if (poMasters == null)
+                    poMasters = new List<Models.POMaster>();
 
-            // Get ONLY BOX barcodes for scanning activities - EXCLUDE MASTER
-            var sessionBoxBarcodes = await _context.BarcodeRegistries
-                .Where(b => b.SessionId == sessionId && 
-                           b.IsActive && 
-                           b.BarcodeType == "BOX") // ONLY BOX barcodes
-                .Select(b => b.BarcodeValue)
-                .ToListAsync();
+                // Calculate totals from PO Masters
+                var totalPallets = poMasters.Sum(po => po.QtyPallet);
+                var totalBoxes = poMasters.Sum(po => po.QtyBox);
+                var totalPcs = poMasters.Sum(po => po.QtyPcs);
+                var totalQty = poMasters.Sum(po => po.QtyTotal);
 
-            // Get scanning activities for BOX scans only - NO MASTER QR
-            var scannedBoxActivities = await _context.ScanningActivities
-                .Where(sa => sessionBoxBarcodes.Contains(sa.BarcodeValue) && 
-                            sa.Result == "SUCCESS" &&
-                            sa.Action == "SCAN_BOX") // Only SCAN_BOX actions
-                .OrderByDescending(sa => sa.Timestamp)
-                .ToListAsync();
+                // Get ONLY BOX barcodes for scanning activities - EXCLUDE MASTER
+                var sessionBoxBarcodes = await _context.BarcodeRegistries
+                    .Where(b => b.SessionId == sessionId && 
+                               b.IsActive && 
+                               b.BarcodeType == "BOX") // ONLY BOX barcodes
+                    .Select(b => b.BarcodeValue)
+                    .ToListAsync();
+
+                if (sessionBoxBarcodes == null)
+                    sessionBoxBarcodes = new List<string>();
+
+                // Get scanning activities for BOX scans only - NO MASTER QR
+                var scannedBoxActivities = await _context.ScanningActivities
+                    .Where(sa => sessionBoxBarcodes.Contains(sa.BarcodeValue) && 
+                                sa.Result == "SUCCESS" &&
+                                sa.Action == "SCAN_BOX") // Only SCAN_BOX actions
+                    .OrderByDescending(sa => sa.Timestamp)
+                    .ToListAsync();
+
+                if (scannedBoxActivities == null)
+                    scannedBoxActivities = new List<Models.ScanningActivity>();
 
             // Get complete scan progress including all types (BOX, PALLET, PCS)
             var scanProgress = await _scanningService.GetScanProgressAsync(sessionId);
+
+            // Ensure scanProgress is not null and has valid values
+            if (scanProgress == null)
+            {
+                scanProgress = new ScanProgressDto
+                {
+                    SessionId = sessionId,
+                    TotalBoxes = totalBoxes,
+                    TotalPallets = totalPallets,
+                    TotalPcs = totalPcs,
+                    ScannedBoxes = 0,
+                    ScannedPallets = 0,
+                    ScannedPcs = 0,
+                    CanComplete = false
+                };
+            }
 
             // Use comprehensive scanning data
             var totalScanned = scanProgress.ScannedBoxes + scanProgress.ScannedPallets + scanProgress.ScannedPcs;
@@ -85,22 +112,27 @@ namespace ShipmentFinishGood.Services
             var poSummaries = new List<POSummaryInfo>();
             foreach (var po in poMasters)
             {
+                // Ensure PO properties are not null
+                var modelProduct = po.ModelProduk ?? "";
+                var poNumber = po.NoPO ?? "";
+                var status = po.Status ?? "PENDING";
+                
                 // Get scan count for this specific PO by matching model product in barcode
                 var poScannedCount = scannedBoxActivities.Count(sa => 
-                    sessionBoxBarcodes.Any(bc => bc.Contains(po.ModelProduk?.Replace(" ", "") ?? "") && bc == sa.BarcodeValue));
+                    sessionBoxBarcodes.Any(bc => bc.Contains(modelProduct.Replace(" ", "")) && bc == sa.BarcodeValue));
                 
                 var poScanPercentage = po.QtyBox > 0 ? 
                     Math.Round((decimal)poScannedCount / po.QtyBox * 100, 1) : 0;
 
                 poSummaries.Add(new POSummaryInfo
                 {
-                    PONumber = po.NoPO ?? "",
-                    ModelProduct = po.ModelProduk ?? "",
+                    PONumber = poNumber,
+                    ModelProduct = modelProduct,
                     QtyTotal = po.QtyTotal,
                     QtyPallet = po.QtyPallet,
                     QtyBox = po.QtyBox,
                     QtyPcs = po.QtyPcs,
-                    Status = po.Status ?? "PENDING",
+                    Status = status,
                     ScannedCount = poScannedCount,
                     ScannedPercentage = poScanPercentage
                 });
@@ -112,10 +144,10 @@ namespace ShipmentFinishGood.Services
             return new QRManagementDto
             {
                 SessionId = session.SessionId,
-                FileName = session.FileName,
-                SheetName = session.SheetName,
-                QRIdentity = masterBarcode.BarcodeValue,
-                QRImageBase64 = qrImageBase64,
+                FileName = session.FileName ?? "",
+                SheetName = session.SheetName ?? "",
+                QRIdentity = masterBarcode.BarcodeValue ?? "",
+                QRImageBase64 = qrImageBase64 ?? "",
                 Status = "Ready for Scanning",
                 GeneratedDate = session.UploadDate,
                 GeneratedBy = session.UploadedBy ?? "System",
@@ -134,10 +166,17 @@ namespace ShipmentFinishGood.Services
                 
                 LastScannedDate = lastScanned?.Timestamp,
                 LastScannedBy = lastScanned?.UserId,
-                BarcodeList = barcodeList,
-                POSummaries = poSummaries,
+                BarcodeList = barcodeList ?? new List<string>(),
+                POSummaries = poSummaries ?? new List<POSummaryInfo>(),
                 CanRegenerate = false // Remove regenerate functionality
             };
+            }
+            catch (Exception ex)
+            {
+                // Log the exception (you might want to add proper logging here)
+                Console.WriteLine($"Error in GetQRDataAsync: {ex.Message}");
+                return null;
+            }
         }
 
         public async Task<byte[]?> GenerateBarcodesPDFAsync(int sessionId)

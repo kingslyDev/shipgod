@@ -1,13 +1,75 @@
-w@model ShipmentFinishGood.DTOs.QRManagementDto
+@model ShipmentFinishGood.ViewModels.QRManagementViewModel
 @{
-    ViewData["Title"] = "QR Code Management - " + Model.FileName;
+    ViewData["Title"] = "QR Code Management - " + (Model?.FileName ?? "Unknown");
 }
-@section Styles {<link rel="stylesheet" href="~/css/qr.css" asp-append-version="true" />}
+@section Styles {
+    <link rel="stylesheet" href="~/css/qr.css" asp-append-version="true" />
+    <style>
+        .qr-container {
+            border-top: 1px solid #e9ecef;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+        
+        .qr-code-placeholder {
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .barcode-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        
+        .barcode-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .qr-container canvas,
+        .qr-container table {
+            margin: 0 auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        
+        @@keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .qr-container {
+            animation: fadeInUp 0.3s ease-out;
+        }
+    </style>
+}
+
+@if (Model == null)
+{
+    <div class="container py-4">
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            QR data not found. Please generate QR first.
+        </div>
+        <a asp-controller="Final" asp-action="Index" class="btn btn-primary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Final Table
+        </a>
+    </div>
+    return;
+}
 
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0 text-info">
-            <i class="fas fa-qrcode me-2"></i>QR Code Management - @Model.SheetName
+            <i class="fas fa-qrcode me-2"></i>QR Code Management - @(Model.SheetName ?? "Unknown")
         </h2>
         <div class="btn-group">
             <a asp-controller="Final" asp-action="Index" asp-route-id="@Model.SessionId" class="btn btn-outline-secondary">
@@ -305,8 +367,10 @@ w@model ShipmentFinishGood.DTOs.QRManagementDto
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var po in Model.POSummaries)
+                                    @if (Model.POSummaries != null)
                                     {
+                                        @foreach (var po in Model.POSummaries)
+                                        {
                                         <tr>
                                             <td class="fw-bold">@po.PONumber</td>
                                             <td>@po.ModelProduct</td>
@@ -341,6 +405,7 @@ w@model ShipmentFinishGood.DTOs.QRManagementDto
                                                 </span>
                                             </td>
                                         </tr>
+                                    }
                                     }
                                 </tbody>
                                 <tfoot class="table-light">
@@ -410,45 +475,144 @@ w@model ShipmentFinishGood.DTOs.QRManagementDto
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-3">
+                    <button type="button" class="btn btn-success btn-sm me-2" onclick="copyAllBarcodes()">
+                        <i class="fas fa-copy me-1"></i>Copy All Barcodes
+                    </button>
+                    <button type="button" class="btn btn-info btn-sm" onclick="toggleQRDisplay()">
+                        <i class="fas fa-qrcode me-1"></i>
+                        <span id="qrToggleText">Show QR Codes</span>
+                    </button>
+                </div>
                 <div class="row">
-                    @foreach (var barcode in Model.BarcodeList)
+                    @if (Model.BarcodeList != null)
                     {
-                        <div class="col-md-6 mb-2">
-                            <div class="card card-body bg-light">
-                                <small class="text-muted">Box Barcode:</small>
-                                <code class="small">@barcode</code>
-                                <button class="btn btn-link btn-sm p-0" onclick="copyToClipboard('barcode-@barcode.GetHashCode()')">
-                                    <i class="fas fa-copy"></i> Copy
-                                </button>
-                                <span id="barcode-@barcode.GetHashCode()" style="display: none;">@barcode</span>
+                        @foreach (var barcode in Model.BarcodeList)
+                        {
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card barcode-card">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <small class="text-muted">Box Barcode:</small>
+                                        <button class="btn btn-link btn-sm p-0" onclick="copyToClipboard('barcode-@barcode.GetHashCode()', '@barcode')">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <div class="mb-3">
+                                        <code class="small d-block text-break">@barcode</code>
+                                    </div>
+                                    <!-- QR Code Container (initially hidden) -->
+                                    <div class="qr-container text-center" style="display: none;">
+                                        <div class="qr-code-placeholder" data-barcode="@barcode">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Generating QR...</span>
+                                            </div>
+                                            <small class="d-block text-muted mt-1">Generating QR Code...</small>
+                                        </div>
+                                    </div>
+                                    <span id="barcode-@barcode.GetHashCode()" style="display: none;">@barcode</span>
+                                </div>
                             </div>
                         </div>
+                        }
                     }
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="copyAllBarcodes()">
-                    <i class="fas fa-copy me-2"></i>Copy All Barcodes
-                </button>
+                <div class="d-flex justify-content-between w-100">
+                    <div>
+                        <small class="text-muted">Total: @Model.TotalBoxes box barcodes</small>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
+    <!-- QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="~/js/qr.js" asp-append-version="true"></script>
     <script>
+        let qrCodesVisible = false;
+        
         function showBarcodeModal() {
             const modal = new bootstrap.Modal(document.getElementById('barcodeModal'));
             modal.show();
         }
 
-        function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            const text = element.textContent || element.innerText;
+        function toggleQRDisplay() {
+            const qrContainers = document.querySelectorAll('.qr-container');
+            const toggleText = document.getElementById('qrToggleText');
             
-            navigator.clipboard.writeText(text).then(function() {
+            if (!qrCodesVisible) {
+                // Show QR codes and generate them
+                qrContainers.forEach(container => {
+                    container.style.display = 'block';
+                    const placeholder = container.querySelector('.qr-code-placeholder');
+                    const barcode = placeholder.getAttribute('data-barcode');
+                    
+                    if (!placeholder.querySelector('canvas') && !placeholder.querySelector('table')) {
+                        // Clear placeholder content
+                        placeholder.innerHTML = '';
+                        
+                        // Generate QR code
+                        try {
+                            new QRCode(placeholder, {
+                                text: barcode,
+                                width: 120,
+                                height: 120,
+                                colorDark: "#000000",
+                                colorLight: "#ffffff",
+                                correctLevel: QRCode.CorrectLevel.M
+                            });
+                            
+                            // Add download button
+                            const downloadBtn = document.createElement('button');
+                            downloadBtn.className = 'btn btn-outline-primary btn-sm mt-2';
+                            downloadBtn.innerHTML = '<i class="fas fa-download me-1"></i>Download';
+                            downloadBtn.onclick = () => downloadQRCode(placeholder, barcode);
+                            placeholder.appendChild(downloadBtn);
+                            
+                        } catch (error) {
+                            placeholder.innerHTML = '<small class="text-danger">Failed to generate QR</small>';
+                            console.error('QR generation error:', error);
+                        }
+                    }
+                });
+                toggleText.textContent = 'Hide QR Codes';
+                qrCodesVisible = true;
+            } else {
+                // Hide QR codes
+                qrContainers.forEach(container => {
+                    container.style.display = 'none';
+                });
+                toggleText.textContent = 'Show QR Codes';
+                qrCodesVisible = false;
+            }
+        }
+
+        function downloadQRCode(container, barcode) {
+            const canvas = container.querySelector('canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `QR_${barcode.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showAlert('QR code downloaded!', 'success');
+            } else {
+                showAlert('QR code not found', 'danger');
+            }
+        }
+
+        function copyToClipboard(elementId, text) {
+            // Use the text parameter directly if provided, otherwise get from element
+            const textToCopy = text || document.getElementById(elementId)?.textContent || document.getElementById(elementId)?.innerText;
+            
+            navigator.clipboard.writeText(textToCopy).then(function() {
                 showAlert('Copied to clipboard!', 'success');
             }, function(err) {
                 console.error('Could not copy text: ', err);
