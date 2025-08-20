@@ -12,5 +12,6 @@ namespace ShipmentFinishGood.Services
         
         // 🧠 SMART AUTO-CALCULATION ENGINE
         Task<SmartUpdateResult> SmartUpdateRowAsync(int sessionId, int rowIndex, SmartUpdateRequest request);
+        Task<Result<FinalRowData>> AddFinalRowAsync(int sessionId, FinalRowUpdateRequest request, string createdBy);
     }
 }

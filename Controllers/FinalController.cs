@@ -124,6 +124,32 @@ namespace ShipmentFinishGood.Controllers
             }
         }
 
+            [HttpPost]
+            [ValidateAntiForgeryToken]
+            public async Task<IActionResult> AddRow([FromBody] AddRowCommand cmd)
+            {
+                try
+                {
+                    if (cmd == null)
+                        return Json(new { success = false, message = "Invalid payload" });
+
+                    var userName = User.Identity?.Name ?? "Unknown";
+                    var result = await _finalService.AddFinalRowAsync(cmd.SessionId, cmd.Request, userName);
+                    if (result.IsSuccess)
+                    {
+                        return Json(new { success = true, data = result.Value });
+                    }
+                    else
+                    {
+                        return Json(new { success = false, message = result.Error });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return Json(new { success = false, message = $"Error adding row: {ex.Message}" });
+                }
+            }
+
         [HttpGet]
         public async Task<IActionResult> GetProgress(int sessionId)
         {

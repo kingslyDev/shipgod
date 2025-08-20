@@ -160,6 +160,12 @@ namespace ShipmentFinishGood.DTOs
         public FinalRowUpdateRequest Request { get; set; } = new();
     }
 
+        public class AddRowCommand
+        {
+            public int SessionId { get; set; }
+            public FinalRowUpdateRequest Request { get; set; } = new();
+        }
+
     public class SaveMetadataCommand
     {
         public int SessionId { get; set; }

@@ -119,16 +119,91 @@
         </div>
     </div>
 
+    <!-- Add Row Modal -->
+    <div class="modal fade" id="addRowModal" tabindex="-1" aria-labelledby="addRowModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addRowModalLabel">
+                        <i class="fas fa-plus me-2"></i>Add New Row
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addRowForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="newNoPO" class="form-label">No PO</label>
+                                    <input type="text" class="form-control" id="newNoPO" placeholder="Enter PO Number" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="newModel" class="form-label">Model</label>
+                                    <input type="text" class="form-control" id="newModel" placeholder="Enter Model" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="newTotalQty" class="form-label">Total Qty</label>
+                                    <input type="number" class="form-control" id="newTotalQty" min="1" placeholder="Enter Quantity" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="newContainer" class="form-label">Container</label>
+                                    <input type="text" class="form-control" id="newContainer" placeholder="Container Info">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="newNoInvoice" class="form-label">Invoice</label>
+                                    <input type="text" class="form-control" id="newNoInvoice" placeholder="Invoice Number">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="newShipmentDetail" class="form-label">Shipment Detail</label>
+                                    <input type="text" class="form-control" id="newShipmentDetail" placeholder="Shipment Details">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Auto Generate:</strong> Barcode will be automatically generated based on SmartBarcode pattern when you add this row.
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addNewRow()">
+                        <i class="fas fa-plus me-2"></i>Add Row & Generate Barcode
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Final Data Table -->
     <div class="card shadow-sm">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="fas fa-table me-2"></i>Final Processed Data</h5>
-            <button type="button" class="btn btn-sm btn-success" onclick="saveAllMetadata()">
-                <i class="fas fa-save me-2"></i>Save All Metadata
-            </button>
-            <button type="button" class="btn btn-sm btn-info" onclick="debugBarcodes()">
-                <i class="fas fa-bug me-2"></i>Debug Barcodes
-            </button>
+            <div>
+                <button type="button" class="btn btn-sm btn-primary me-2" onclick="showAddRowModal()">
+                    <i class="fas fa-plus me-2"></i>Add Row
+                </button>
+                <button type="button" class="btn btn-sm btn-success me-2" onclick="saveAllMetadata()">
+                    <i class="fas fa-save me-2"></i>Save All Metadata
+                </button>
+                <button type="button" class="btn btn-sm btn-info" onclick="debugBarcodes()">
+                    <i class="fas fa-bug me-2"></i>Debug Barcodes
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -516,6 +591,152 @@
             } catch (error) {
                 alert('Debug error: ' + error.message);
             }
+        }
+
+        // 🆕 ADD ROW FUNCTIONALITY
+        function showAddRowModal() {
+            // Reset form
+            document.getElementById('addRowForm').reset();
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('addRowModal'));
+            modal.show();
+        }
+
+        async function addNewRow() {
+            // Get form values
+            const noPO = document.getElementById('newNoPO').value.trim();
+            const model = document.getElementById('newModel').value.trim();
+            const totalQty = parseInt(document.getElementById('newTotalQty').value) || 0;
+            const container = document.getElementById('newContainer').value.trim();
+            const noInvoice = document.getElementById('newNoInvoice').value.trim();
+            const shipmentDetail = document.getElementById('newShipmentDetail').value.trim();
+
+            // Validation
+            if (!noPO || !model || totalQty <= 0) {
+                showAlert('Please fill in required fields: No PO, Model, and Total Qty', 'warning');
+                return;
+            }
+
+            // Show loading
+            const addButton = document.querySelector('#addRowModal .btn-primary');
+            const originalText = addButton.innerHTML;
+            addButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adding...';
+            addButton.disabled = true;
+
+            try {
+                const response = await fetch('/Final/AddRow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': antiForgeryToken
+                    },
+                    body: JSON.stringify({
+                        sessionId: sessionId,
+                        request: {
+                            totalQty: totalQty,
+                            container: noPO, // Pass PO via container field temporarily
+                            noInvoice: noInvoice || noPO,
+                            shipmentDetail: model // Pass model via shipmentDetail field temporarily
+                        }
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // ✅ SUCCESS - Add new row to table
+                    addRowToTable(result.data, noPO, model);
+                    
+                    // Update summary
+                    updateSummary();
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addRowModal'));
+                    modal.hide();
+                    
+                    // Show success with barcode info
+                    showAlert(`Row added successfully! Barcode automatically generated with SmartBarcode pattern.`, 'success');
+                    
+                } else {
+                    showAlert(result.message || 'Failed to add row', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error adding row: ' + error.message, 'danger');
+            } finally {
+                // Reset button
+                addButton.innerHTML = originalText;
+                addButton.disabled = false;
+            }
+        }
+
+        function addRowToTable(rowData, noPO, model) {
+            const tableBody = document.getElementById('finalTableBody');
+            const newRow = document.createElement('tr');
+            newRow.setAttribute('data-row-index', rowData.rowIndex);
+            newRow.className = rowData.isEditable ? 'editable-row' : '';
+            
+            // Get original form values for display
+            const originalContainer = document.getElementById('newContainer').value.trim();
+            const originalShipmentDetail = document.getElementById('newShipmentDetail').value.trim();
+            
+            newRow.innerHTML = `
+                <td>
+                    <span class="fw-bold">${noPO}</span>
+                </td>
+                <td>
+                    <span class="badge bg-primary">${model}</span>
+                </td>
+                <td>
+                    ${rowData.isEditable ? 
+                        `<input type="number" class="form-control form-control-sm qty-input" 
+                                value="${rowData.totalQty}" min="0" data-field="totalQty" 
+                                onchange="smartUpdateRow(${rowData.rowIndex})" />` :
+                        `<span class="fw-bold text-primary">${rowData.totalQty.toLocaleString()}</span>`
+                    }
+                </td>
+                <td>
+                    <span class="badge bg-success qty-pallet">${rowData.qtyPallet}</span>
+                </td>
+                <td>
+                    <span class="badge bg-warning text-dark qty-box">${rowData.qtyBox}</span>
+                </td>
+                <td>
+                    <span class="badge bg-info qty-pcs">${rowData.qtyPcs}</span>
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm metadata-input" 
+                           value="${rowData.noInvoice || ''}" placeholder="Invoice..." data-field="noInvoice" />
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm metadata-input" 
+                           value="${originalContainer || ''}" placeholder="Container..." data-field="container" />
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm metadata-input" 
+                           value="${originalShipmentDetail || ''}" placeholder="Detail..." data-field="shipmentDetail" />
+                </td>
+                <td>
+                    ${rowData.isEditable ? 
+                        `<button type="button" class="btn btn-sm btn-outline-primary update-row-btn" 
+                                onclick="updateRow(${rowData.rowIndex})">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>` :
+                        `<span class="text-muted">
+                            <i class="fas fa-lock"></i>
+                        </span>`
+                    }
+                </td>
+            `;
+            
+            // Add to table
+            tableBody.appendChild(newRow);
+            
+            // Animate new row
+            newRow.style.backgroundColor = '#d1ecf1';
+            setTimeout(() => {
+                newRow.style.backgroundColor = '';
+            }, 2000);
         }
     </script>
 }

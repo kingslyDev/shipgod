@@ -210,7 +210,88 @@ namespace ShipmentFinishGood.Services
             return await _smartEngine.ExecuteSmartUpdateAsync(sessionId, rowIndex, request);
         }
 
-        private async Task RecalculateBreakdownAsync(POMaster poMaster, string shipmentType)
+        public async Task<Result<FinalRowData>> AddFinalRowAsync(int sessionId, FinalRowUpdateRequest request, string createdBy)
+        {
+            var session = await _context.UploadSessions
+                .Include(s => s.POMasters)
+                .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+            if (session == null)
+                return Result<FinalRowData>.Failure("Session not found");
+
+            // Extract PO and Model from NoInvoice and Container (UI will pass these)
+            // In JavaScript, we'll pass noPO via Container field and model via ShipmentDetail field temporarily
+            var noPO = request.Container ?? $"PO_{DateTime.Now:yyyyMMdd_HHmmss}";
+            var modelProduk = request.ShipmentDetail ?? "NEW_MODEL";
+            
+            // Create new PO Master
+            var newPOMaster = new Models.POMaster
+            {
+                NoPO = noPO,
+                ModelProduk = modelProduk,
+                QtyTotal = request.TotalQty,
+                Container = request.Container,
+                NoInvoice = request.NoInvoice,
+                ShipmentDetail = request.ShipmentDetail,
+                CreatedDate = DateTime.Now,
+                CreatedBy = createdBy
+            };
+
+            // Recalculate breakdown
+            await RecalculateBreakdownAsync(newPOMaster, session.ShipmentType ?? "LOOSE");
+
+            session.POMasters.Add(newPOMaster);
+            await _context.SaveChangesAsync(); // Save first to get POId
+
+            // Generate barcode (smartbarcode pattern) if QR already exists
+            if (!string.IsNullOrEmpty(session.IdentityQRCode))
+            {
+                var qrIdentity = session.IdentityQRCode;
+                var barcodeList = new List<string>();
+                for (int i = 1; i <= newPOMaster.QtyBox; i++)
+                {
+                    var barcode = $"{qrIdentity}_BOX_{newPOMaster.ModelProduk}_{i:D3}";
+                    barcodeList.Add(barcode);
+                    
+                    // Save to BarcodeRegistry
+                    var barcodeRegistry = new Models.BarcodeRegistry
+                    {
+                        BarcodeValue = barcode,
+                        BarcodeType = "BOX",
+                        SessionId = sessionId,
+                        POId = newPOMaster.POId,
+                        ModelProduct = newPOMaster.ModelProduk,
+                        BoxNumber = i,
+                        GeneratedDate = DateTime.Now,
+                        GeneratedBy = createdBy,
+                        Status = "GENERATED"
+                    };
+                    _context.BarcodeRegistries.Add(barcodeRegistry);
+                }
+                
+                // Update total boxes in session
+                session.TotalBoxes = session.POMasters.Sum(p => p.QtyBox);
+                await _context.SaveChangesAsync(); // Save barcode registries
+            }
+
+            var rowIndex = session.POMasters.Count - 1;
+            var newRow = new DTOs.FinalRowData
+            {
+                RowIndex = rowIndex,
+                NoPO = newPOMaster.NoPO,
+                Model = newPOMaster.ModelProduk,
+                TotalQty = newPOMaster.QtyTotal,
+                QtyPallet = newPOMaster.QtyPallet,
+                QtyBox = newPOMaster.QtyBox,
+                QtyPcs = newPOMaster.QtyPcs,
+                Container = newPOMaster.Container,
+                NoInvoice = newPOMaster.NoInvoice,
+                ShipmentDetail = newPOMaster.ShipmentDetail,
+                IsEditable = session.Status == "PROCESSED"
+            };
+
+            return Result<FinalRowData>.Success(newRow);
+        }        private async Task RecalculateBreakdownAsync(POMaster poMaster, string shipmentType)
         {
             var modelConfigs = await _modelConfigService.GetAllAsync();
             var configDict = modelConfigs
