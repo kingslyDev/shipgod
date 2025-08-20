@@ -12,11 +12,13 @@ namespace ShipmentFinishGood.Controllers
     {
         private readonly IScanningService _scanService;
         private readonly IExcelProcessingService _excelService;
+        private readonly IBarcodeService _barcodeService;
 
-        public ScanController(IScanningService scanService, IExcelProcessingService excelService)
+        public ScanController(IScanningService scanService, IExcelProcessingService excelService, IBarcodeService barcodeService)
         {
             _scanService = scanService;
             _excelService = excelService;
+            _barcodeService = barcodeService;
         }
 
         public async Task<IActionResult> Index()
@@ -281,6 +283,33 @@ namespace ShipmentFinishGood.Controllers
             {
                 var barcodes = await _scanService.GetBarcodeListAsync(sessionId);
                 return Json(new { success = true, data = barcodes });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ResolveSessionByBarcode(string barcode)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(barcode))
+                    return Json(new { success = false, message = "Barcode is required" });
+
+                var registry = await _barcodeService.GetBarcodeByValueAsync(barcode);
+                if (registry == null)
+                    return Json(new { success = false, message = "Barcode not found" });
+
+                var sessionId = registry.SessionId;
+                var qrIdentity = registry.Session?.IdentityQRCode ?? string.Empty;
+                var fileName = registry.Session?.FileName ?? string.Empty;
+
+                if (string.IsNullOrEmpty(qrIdentity))
+                    return Json(new { success = false, message = "Master QR not found for this barcode" });
+
+                return Json(new { success = true, data = new { sessionId, qrIdentity, fileName } });
             }
             catch (Exception ex)
             {

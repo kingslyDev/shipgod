@@ -191,7 +191,7 @@ namespace ShipmentFinishGood.Services
 
             // Check if user is already locked to another session
             var userLockCheck = await CheckUserLockAsync(scannedBy);
-            if (!userLockCheck.IsSuccess)
+            if (userLockCheck.IsSuccess)
             {
                 var lockedSessionResult = await GetUserLockedSessionAsync(scannedBy);
                 if (lockedSessionResult.IsSuccess && lockedSessionResult.Value != qrCode)
@@ -200,7 +200,36 @@ namespace ShipmentFinishGood.Services
 
             // Check if already scanned
             if (masterBarcode.Status == "SCANNED")
-                return Result<ScanResultDto>.Failure("Master QR already scanned");
+            {
+                // Allow additional users to join the existing session by recording their lock
+                var alreadyLockedByUser = await _context.ScanningActivities
+                    .AnyAsync(sa => sa.UserId == scannedBy && sa.Action == "SCAN_MASTER" && sa.BarcodeValue == qrCode);
+
+                if (!alreadyLockedByUser)
+                {
+                    var joinActivity = new ScanningActivity
+                    {
+                        BarcodeValue = qrCode,
+                        Action = "SCAN_MASTER",
+                        UserId = scannedBy,
+                        Timestamp = DateTime.Now,
+                        Result = "SUCCESS"
+                    };
+                    _context.ScanningActivities.Add(joinActivity);
+                    await _context.SaveChangesAsync();
+                }
+
+                var joinedResult = new ScanResultDto
+                {
+                    BarcodeValue = qrCode,
+                    ScanType = ScanItemType.MasterQR,
+                    Message = "Master QR already scanned. You've been joined to this session.",
+                    Timestamp = DateTime.Now,
+                    ScannedBy = scannedBy
+                };
+
+                return Result<ScanResultDto>.Success(joinedResult);
+            }
 
             // Mark the master QR barcode as scanned in BarcodeRegistry
             var markMasterResult = await _barcodeService.MarkBarcodeAsScannedAsync(qrCode, scannedBy);

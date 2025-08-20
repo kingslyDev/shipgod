@@ -220,6 +220,7 @@
     <script>
         let currentUserLock = null;
         let activeSessions = [];
+        let resolvedBarcodes = new Map(); // Cache for resolved barcodes
 
         // Initialize on page load
         $(document).ready(function() {
@@ -291,28 +292,9 @@
             } else if (isItemBarcode(scannedValue)) {
                 processItemBarcode(scannedValue);
             } else {
-                // If not recognized, try refreshing sessions first
-                console.log('⚠️ QR/Barcode not recognized, refreshing sessions...');
-                showAlert('QR not recognized, refreshing data...', 'info');
-                
-                refreshSessions().then(() => {
-                    console.log('🔄 Retrying validation after refresh...');
-                    console.log('Updated sessions count:', activeSessions.length);
-                    console.log('Updated QR identities:', activeSessions.map(s => s.qrIdentity));
-                    
-                    // Try again after refresh
-                    if (isMasterQR(scannedValue)) {
-                        console.log('✅ Master QR recognized after refresh');
-                        processMasterQR(scannedValue);
-                    } else if (isBoxBarcode(scannedValue)) {
-                        console.log('✅ Box Barcode recognized after refresh');
-                        processBoxBarcode(scannedValue);
-                    } else {
-                        console.log('❌ Still not recognized after refresh');
-                        showAlert('Invalid QR/Barcode format. Please scan a valid QR Identity or Box Barcode.', 'danger');
-                        input.focus();
-                    }
-                });
+                // Always try server resolution first for unrecognized barcodes
+                console.log('❓ Barcode not recognized locally, resolving on server...');
+                resolveAndProcess(scannedValue, input);
                 return;
             }
 
@@ -320,74 +302,105 @@
             input.val('').focus();
         }
 
-        // Check if scanned value is Master QR
+        // Check if scanned value is Master QR (simplified)
         function isMasterQR(value) {
-            // Master QR format: QR_sessionId_timestamp (exact match with available sessions)
-            // Also check if it's a valid QR format that starts with QR_
+            // Basic format check: starts with QR_ and doesn't contain item indicators
             if (!value.startsWith('QR_')) return false;
+            if (value.includes('_BOX_') || value.includes('PALLET') || value.includes('PCS')) return false;
             
-            // Debug logging for exact matches
-            console.log('Checking Master QR:', value);
-            console.log('Available QR identities:', activeSessions.map(s => s.qrIdentity));
+            // If we have activeSessions loaded, try exact match
+            if (activeSessions.length > 0) {
+                const exactMatch = activeSessions.some(session => session.qrIdentity === value);
+                console.log('Master QR exact match in activeSessions:', exactMatch);
+                if (exactMatch) return true;
+            }
             
-            const exactMatch = activeSessions.some(session => session.qrIdentity === value);
-            console.log('Exact match found:', exactMatch);
+            // If cache has it, it's valid
+            if (resolvedBarcodes.has(value)) {
+                console.log('Master QR found in cache');
+                return true;
+            }
             
-            return exactMatch;
+            // Fallback: looks like master QR format but needs server validation
+            console.log('Master QR format detected, needs server validation');
+            return false; // Let it go to server resolution
         }
 
-        // Check if scanned value is Box Barcode
+        // Check if scanned value is Box Barcode (simplified)
         function isBoxBarcode(value) {
-            // Box barcode format: QR_sessionId_timestamp_BOX_model_number
+            // Basic format check
             if (!value.includes('_BOX_')) return false;
             
-            // Debug logging for barcode validation
-            console.log('Checking Box Barcode:', value);
-            console.log('Available sessions for barcode validation:', activeSessions.length);
+            // If cache has it, it's valid
+            if (resolvedBarcodes.has(value)) {
+                console.log('Box barcode found in cache');
+                return true;
+            }
             
-            const isValid = activeSessions.some(session => {
-                const startsWithQR = value.startsWith(session.qrIdentity + '_BOX_');
-                console.log(`Session ${session.sessionId}: ${session.qrIdentity} -> ${startsWithQR}`);
-                return startsWithQR;
-            });
+            // If user is locked and barcode starts with locked QR, it's likely valid
+            if (currentUserLock && value.startsWith(currentUserLock + '_BOX_')) {
+                console.log('Box barcode matches current lock');
+                return true;
+            }
             
-            console.log('Box barcode is valid:', isValid);
-            return isValid;
+            // Check against activeSessions if available
+            if (activeSessions.length > 0) {
+                const isValid = activeSessions.some(session => {
+                    return value.startsWith(session.qrIdentity + '_BOX_');
+                });
+                console.log('Box barcode validation against activeSessions:', isValid);
+                if (isValid) return true;
+            }
+            
+            console.log('Box barcode needs server validation');
+            return false; // Let it go to server resolution
         }
 
-        // Check if scanned value is an item barcode (Box, Pallet, or PCS)
+        // Check if scanned value is an item barcode (simplified)
         function isItemBarcode(value) {
             if (!value) return false;
             
             const upperValue = value.toUpperCase();
             
-            // Check if it contains item type indicators
+            // Basic format checks
             const hasItemType = upperValue.includes('BOX') || 
                                upperValue.includes('PALLET') || 
                                upperValue.includes('PCS');
             
             if (!hasItemType) return false;
             
-            // Check if it starts with any QR identity from active sessions (for BOX barcodes)
-            const startsWithQR = activeSessions.some(session => {
-                return value.startsWith(session.qrIdentity + '_BOX_');
-            });
+            // Check cache first - most reliable
+            if (resolvedBarcodes.has(value)) {
+                console.log('✅ Item barcode found in cache');
+                return true;
+            }
             
-            // For PALLET and PCS, we accept them if they just contain the keywords
-            // since they might have different barcode formats
-            const isPalletOrPcs = upperValue.includes('PALLET') || upperValue.includes('PCS');
+            // For BOX items, check if matches current lock
+            if (upperValue.includes('BOX') && currentUserLock && value.startsWith(currentUserLock + '_BOX_')) {
+                console.log('✅ BOX barcode matches current session lock');
+                return true;
+            }
             
-            console.log('Item barcode validation:', {
-                value: value,
-                hasItemType: hasItemType,
-                startsWithQR: startsWithQR,
-                isPalletOrPcs: isPalletOrPcs
-            });
+            // For PALLET and PCS, allow if user is locked to a session
+            if ((upperValue.includes('PALLET') || upperValue.includes('PCS')) && currentUserLock) {
+                console.log('✅ PALLET/PCS barcode and user has active session');
+                return true;
+            }
             
-            return startsWithQR || isPalletOrPcs;
-        }
-
-        // Process Master QR scan
+            // Check against activeSessions as backup
+            if (activeSessions.length > 0 && upperValue.includes('BOX')) {
+                const startsWithQR = activeSessions.some(session => {
+                    return value.startsWith(session.qrIdentity + '_BOX_');
+                });
+                if (startsWithQR) {
+                    console.log('✅ BOX barcode matches activeSessions');
+                    return true;
+                }
+            }
+            
+            console.log('❓ Item barcode needs server validation');
+            return false; // Let it go to server resolution
+        }        // Process Master QR scan
         function processMasterQR(qrCode) {
             const session = activeSessions.find(s => s.qrIdentity === qrCode);
             if (!session) {
@@ -415,6 +428,11 @@
                 success: function(response) {
                     if (response.success) {
                         currentUserLock = qrCode;
+                        
+                        // Clear barcode cache when switching sessions
+                        resolvedBarcodes.clear();
+                        console.log('🗑️ Cleared barcode cache for new session');
+                        
                         updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
                         showAlert(`✅ ${response.message}`, 'success');
                         
@@ -475,6 +493,8 @@
                         if (response.data) {
                             updateScanProgress(response.data);
                         }
+                        
+                        // No need to refresh - cache and local state are sufficient
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                         
@@ -552,6 +572,8 @@
                                 $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity or Item Barcode here...');
                             }
                         }
+                        
+                        // No need to refresh - direct resolution handles sync
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                         
@@ -565,6 +587,207 @@
                     showAlert(`Error scanning ${itemType.toLowerCase()}. Please try again.`, 'danger');
                 }
             });
+        }
+
+        // Resolve barcode on server and process accordingly
+        function resolveAndProcess(scannedValue, inputElement) {
+            // Check cache first
+            if (resolvedBarcodes.has(scannedValue)) {
+                const cached = resolvedBarcodes.get(scannedValue);
+                console.log('✅ Using cached resolution:', cached);
+                processResolvedBarcode(scannedValue, cached, inputElement);
+                return;
+            }
+
+            console.log('🔍 Resolving barcode on server:', scannedValue);
+            showAlert('Validating barcode...', 'info');
+            
+            $.ajax({
+                url: '@Url.Action("ResolveSessionByBarcode", "Scan")',
+                type: 'GET',
+                data: { barcode: scannedValue },
+                success: function(resp) {
+                    if (resp.success && resp.data) {
+                        console.log('✅ Server resolved session:', resp.data);
+                        const resolved = resp.data;
+                        
+                        // Cache the resolution
+                        resolvedBarcodes.set(scannedValue, resolved);
+                        
+                        // Update local session data
+                        updateActiveSessions(resolved);
+                        
+                        // Process the resolved barcode
+                        processResolvedBarcode(scannedValue, resolved, inputElement);
+                    } else {
+                        console.log('❌ Barcode not found on server');
+                        showAlert('Invalid QR/Barcode format. Please scan a valid QR Identity or Box Barcode.', 'danger');
+                        inputElement.focus();
+                    }
+                },
+                error: function() {
+                    console.error('❌ Server error during barcode resolution');
+                    showAlert('Error validating barcode. Please try again.', 'danger');
+                    inputElement.focus();
+                }
+            });
+        }
+
+        // Process a resolved barcode
+        function processResolvedBarcode(scannedValue, resolved, inputElement) {
+            // Clear input first
+            inputElement.val('').focus();
+            
+            // Determine action based on barcode type
+            if (scannedValue === resolved.qrIdentity) {
+                // This is a Master QR
+                console.log('🔓 Processing as Master QR');
+                processMasterQRDirect(resolved.sessionId, resolved.qrIdentity, resolved.fileName);
+            } else if (scannedValue.includes('_BOX_') || scannedValue.includes('BOX') || 
+                       scannedValue.includes('PALLET') || scannedValue.includes('PCS')) {
+                // This is an item barcode
+                console.log('📦 Processing as item barcode');
+                processItemBarcodeDirect(resolved.sessionId, scannedValue);
+            } else {
+                console.log('❓ Unknown barcode type after resolution');
+                showAlert('Unable to determine barcode type', 'warning');
+            }
+        }
+
+        // Process Master QR directly with known session data
+        function processMasterQRDirect(sessionId, qrIdentity, fileName) {
+            // Check if user is already locked to different session
+            if (currentUserLock && currentUserLock !== qrIdentity) {
+                showAlert(`You are already locked to session: ${currentUserLock}. Complete that session first.`, 'warning');
+                return;
+            }
+
+            // Call backend to scan Master QR
+            $.ajax({
+                url: '@Url.Action("ScanMasterQR", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: sessionId,
+                    qrCode: qrIdentity
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        currentUserLock = qrIdentity;
+                        
+                        // Clear barcode cache when switching sessions
+                        resolvedBarcodes.clear();
+                        console.log('🗑️ Cleared barcode cache for new session');
+                        
+                        updateScanStatus('locked', `Locked to: ${fileName}`, 'success');
+                        showAlert(`✅ ${response.message}`, 'success');
+                        
+                        // Update UI to show locked state
+                        updateUIForLockedState({ sessionId, fileName, qrIdentity });
+                    } else {
+                        showAlert(`❌ ${response.message}`, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Error scanning Master QR. Please try again.', 'danger');
+                }
+            });
+        }
+
+        // Process Item Barcode directly with known session
+        function processItemBarcodeDirect(sessionId, barcode) {
+            if (!currentUserLock) {
+                showAlert('Please scan Master QR first to lock to a session', 'warning');
+                return;
+            }
+
+            // Call universal scan endpoint
+            $.ajax({
+                url: '@Url.Action("ScanItem", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: sessionId,
+                    barcode: barcode
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert(`✅ ${response.message}`, 'success');
+                        
+                        // Update enhanced progress display
+                        if (response.data) {
+                            updateEnhancedProgress(response.data);
+                            
+                            // Check if all items are complete
+                            if (response.data.isAllComplete) {
+                                showAlert('🎉 All items scanned! Session completed successfully!', 'success');
+                                currentUserLock = null;
+                                resolvedBarcodes.clear(); // Clear cache on completion
+                                updateScanStatus('ready', 'Session completed - Ready for new scan', 'success');
+                                $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity or Item Barcode here...');
+                            }
+                        }
+                    } else {
+                        showAlert(`❌ ${response.message}`, 'danger');
+                        
+                        // Show debug info if available
+                        if (response.debug) {
+                            console.log('Debug info:', response.debug);
+                        }
+                    }
+                },
+                error: function() {
+                    showAlert('Error scanning item. Please try again.', 'danger');
+                }
+            });
+        }
+
+        // Lightweight session update - only update if we have current lock context
+        function lightweightUpdateSession() {
+            if (currentUserLock) {
+                // If we know the current session, just make sure it exists in activeSessions
+                const hasCurrentSession = activeSessions.some(s => s.qrIdentity === currentUserLock);
+                if (!hasCurrentSession) {
+                    console.log('🔄 Current session not in list, triggering full refresh...');
+                    refreshSessions();
+                } else {
+                    console.log('✅ Session data already current, skipping refresh');
+                }
+            } else {
+                // If no current lock, we might need fresh data for next scan
+                console.log('🔄 No current lock, refreshing sessions for next scan...');
+                refreshSessions();
+            }
+        }
+
+        // Update activeSessions with new session data if not already present
+        function updateActiveSessions(sessionData) {
+            if (!sessionData || !sessionData.qrIdentity) return;
+            
+            // Check if session already exists
+            const existingIndex = activeSessions.findIndex(s => s.sessionId === sessionData.sessionId);
+            
+            if (existingIndex >= 0) {
+                // Update existing session
+                activeSessions[existingIndex] = {
+                    sessionId: sessionData.sessionId,
+                    fileName: sessionData.fileName || activeSessions[existingIndex].fileName,
+                    qrIdentity: sessionData.qrIdentity
+                };
+            } else {
+                // Add new session
+                activeSessions.push({
+                    sessionId: sessionData.sessionId,
+                    fileName: sessionData.fileName || 'Unknown',
+                    qrIdentity: sessionData.qrIdentity
+                });
+            }
+            
+            console.log('✅ Active sessions updated:', activeSessions.length, 'sessions');
         }
 
         // Check user lock status
@@ -601,7 +824,7 @@
                         @:{
                         @:    sessionId: @session.SessionId,
                         @:    fileName: '@Html.Raw(session.FileName.Replace("'", "\\'"))',
-                        @:    qrIdentity: '@session.QRIdentity'
+                        @:    qrIdentity: '@Html.Raw((session.QRIdentity ?? string.Empty).Replace("'", "\\'"))'
                         @:},
                     }
                 }
