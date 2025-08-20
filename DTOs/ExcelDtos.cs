@@ -177,8 +177,42 @@ namespace ShipmentFinishGood.DTOs
         public DateTime GeneratedDate { get; set; }
         public string GeneratedBy { get; set; } = string.Empty;
         public int TotalBoxes { get; set; }
+        
+        // NEW: Dynamic quantity information from PO Master
+        public int TotalPallets { get; set; }
+        public int TotalPcs { get; set; }
+        public int TotalQty { get; set; }
+        
+        // NEW: Comprehensive scan count information (BOX + PALLET + PCS)
+        public int TotalScanned { get; set; }
+        public int ScannedBoxes { get; set; }
+        public int ScannedPallets { get; set; }
+        public int ScannedPcs { get; set; }
+        public int ScanPercentage { get; set; }
+        public DateTime? LastScannedDate { get; set; }
+        public string? LastScannedBy { get; set; }
+        
         public List<string> BarcodeList { get; set; } = new();
         public bool CanRegenerate { get; set; } = true;
+        
+        // NEW: PO Details breakdown
+        public List<POSummaryInfo> POSummaries { get; set; } = new();
+        
+        // NEW: Scan completion status
+        public bool CanComplete { get; set; }
+    }
+    
+    public class POSummaryInfo
+    {
+        public string PONumber { get; set; } = string.Empty;
+        public string ModelProduct { get; set; } = string.Empty;
+        public int QtyTotal { get; set; }
+        public int QtyPallet { get; set; }
+        public int QtyBox { get; set; }
+        public int QtyPcs { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public int ScannedCount { get; set; }
+        public decimal ScannedPercentage { get; set; }
     }
 
     // 🧠 SMART AUTO-CALCULATION ENGINE DTOs

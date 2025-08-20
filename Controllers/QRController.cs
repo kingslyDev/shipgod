@@ -31,6 +31,45 @@ namespace ShipmentFinishGood.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetScanningStats(int sessionId)
+        {
+            try
+            {
+                var qrData = await _qrService.GetQRDataAsync(sessionId);
+                if (qrData == null)
+                    return Json(new { success = false, message = "QR data not found" });
+
+                return Json(new
+                {
+                    success = true,
+                    totalScanned = qrData.TotalScanned,
+                    scannedBoxes = qrData.ScannedBoxes,
+                    scannedPallets = qrData.ScannedPallets,
+                    scannedPcs = qrData.ScannedPcs,
+                    totalBoxes = qrData.TotalBoxes,
+                    totalPallets = qrData.TotalPallets,
+                    totalPcs = qrData.TotalPcs,
+                    totalItems = qrData.TotalBoxes + qrData.TotalPallets + qrData.TotalPcs,
+                    scanPercentage = qrData.ScanPercentage,
+                    canComplete = qrData.CanComplete,
+                    lastScannedDate = qrData.LastScannedDate?.ToString("dd/MM/yyyy HH:mm:ss"),
+                    lastScannedBy = qrData.LastScannedBy,
+                    poSummaries = qrData.POSummaries.Select(po => new
+                    {
+                        poNumber = po.PONumber,
+                        scannedCount = po.ScannedCount,
+                        qtyBox = po.QtyBox,
+                        scannedPercentage = po.ScannedPercentage
+                    })
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         public async Task<IActionResult> Manage(int id)
         {
             var qrData = await _qrService.GetQRDataAsync(id);

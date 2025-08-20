@@ -9,3 +9,90 @@
   border-radius: 12px 12px 0 0;
   padding: 14px;
 }
+
+/* PO Details Breakdown Styles */
+.po-breakdown-table {
+  font-size: 0.9rem;
+}
+
+.po-breakdown-table th {
+  background-color: #495057;
+  color: white;
+  font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.po-breakdown-table td {
+  vertical-align: middle;
+}
+
+.po-breakdown-table .progress {
+  background-color: #e9ecef;
+  border-radius: 10px;
+}
+
+.po-breakdown-table .progress-bar {
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.scan-stats-summary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.quantity-card {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 0.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.quantity-card:hover {
+  background: #e9ecef;
+  transform: translateY(-2px);
+}
+
+.progress-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-ring-value {
+  position: absolute;
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .po-breakdown-table {
+    font-size: 0.8rem;
+  }
+  
+  .progress {
+    min-width: 60px !important;
+  }
+  
+  .badge {
+    font-size: 0.7rem !important;
+  }
+}
+
+/* Animation for progress bars */
+.progress-bar {
+  animation: progressFill 1.5s ease-in-out;
+}
+
+@keyframes progressFill {
+  0% { width: 0%; }
+  100% { width: var(--progress-width); }
+}

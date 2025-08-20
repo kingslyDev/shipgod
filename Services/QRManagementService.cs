@@ -12,11 +12,13 @@ namespace ShipmentFinishGood.Services
     {
         private readonly AppDbContext _context;
         private readonly IBarcodeService _barcodeService;
+        private readonly IScanningService _scanningService;
 
-        public QRManagementService(AppDbContext context, IBarcodeService barcodeService)
+        public QRManagementService(AppDbContext context, IBarcodeService barcodeService, IScanningService scanningService)
         {
             _context = context;
             _barcodeService = barcodeService;
+            _scanningService = scanningService;
         }
 
         public async Task<QRManagementDto?> GetQRDataAsync(int sessionId)
@@ -41,6 +43,69 @@ namespace ShipmentFinishGood.Services
             var barcodes = await _barcodeService.GetBarcodeListForSessionAsync(sessionId);
             var barcodeList = barcodes.Select(b => b.BarcodeValue).ToList();
 
+            // Get PO Master data for this session
+            var poMasters = await _context.POMasters
+                .Where(po => po.SourceSessionId == sessionId)
+                .ToListAsync();
+
+            // Calculate totals from PO Masters
+            var totalPallets = poMasters.Sum(po => po.QtyPallet);
+            var totalBoxes = poMasters.Sum(po => po.QtyBox);
+            var totalPcs = poMasters.Sum(po => po.QtyPcs);
+            var totalQty = poMasters.Sum(po => po.QtyTotal);
+
+            // Get ONLY BOX barcodes for scanning activities - EXCLUDE MASTER
+            var sessionBoxBarcodes = await _context.BarcodeRegistries
+                .Where(b => b.SessionId == sessionId && 
+                           b.IsActive && 
+                           b.BarcodeType == "BOX") // ONLY BOX barcodes
+                .Select(b => b.BarcodeValue)
+                .ToListAsync();
+
+            // Get scanning activities for BOX scans only - NO MASTER QR
+            var scannedBoxActivities = await _context.ScanningActivities
+                .Where(sa => sessionBoxBarcodes.Contains(sa.BarcodeValue) && 
+                            sa.Result == "SUCCESS" &&
+                            sa.Action == "SCAN_BOX") // Only SCAN_BOX actions
+                .OrderByDescending(sa => sa.Timestamp)
+                .ToListAsync();
+
+            // Get complete scan progress including all types (BOX, PALLET, PCS)
+            var scanProgress = await _scanningService.GetScanProgressAsync(sessionId);
+
+            // Use comprehensive scanning data
+            var totalScanned = scanProgress.ScannedBoxes + scanProgress.ScannedPallets + scanProgress.ScannedPcs;
+            var totalItems = scanProgress.TotalBoxes + scanProgress.TotalPallets + scanProgress.TotalPcs;
+            var lastScanned = scannedBoxActivities.FirstOrDefault(); // Keep BOX for last scanned info
+
+            // Calculate scan percentage based on total items (BOX + PALLET + PCS)
+            var scanPercentage = totalItems > 0 ? (int)Math.Round((double)totalScanned / totalItems * 100) : 0;
+
+            // Create PO summaries with scan count per PO
+            var poSummaries = new List<POSummaryInfo>();
+            foreach (var po in poMasters)
+            {
+                // Get scan count for this specific PO by matching model product in barcode
+                var poScannedCount = scannedBoxActivities.Count(sa => 
+                    sessionBoxBarcodes.Any(bc => bc.Contains(po.ModelProduk?.Replace(" ", "") ?? "") && bc == sa.BarcodeValue));
+                
+                var poScanPercentage = po.QtyBox > 0 ? 
+                    Math.Round((decimal)poScannedCount / po.QtyBox * 100, 1) : 0;
+
+                poSummaries.Add(new POSummaryInfo
+                {
+                    PONumber = po.NoPO ?? "",
+                    ModelProduct = po.ModelProduk ?? "",
+                    QtyTotal = po.QtyTotal,
+                    QtyPallet = po.QtyPallet,
+                    QtyBox = po.QtyBox,
+                    QtyPcs = po.QtyPcs,
+                    Status = po.Status ?? "PENDING",
+                    ScannedCount = poScannedCount,
+                    ScannedPercentage = poScanPercentage
+                });
+            }
+
             // Generate QR code image as base64
             var qrImageBase64 = GenerateQRCodeBase64(masterBarcode.BarcodeValue);
 
@@ -54,8 +119,23 @@ namespace ShipmentFinishGood.Services
                 Status = "Ready for Scanning",
                 GeneratedDate = session.UploadDate,
                 GeneratedBy = session.UploadedBy ?? "System",
-                TotalBoxes = session.TotalBoxes,
+                TotalBoxes = totalBoxes,
+                TotalPallets = totalPallets,
+                TotalPcs = totalPcs,
+                TotalQty = totalQty,
+                
+                // Comprehensive scanning information
+                TotalScanned = totalScanned,
+                ScannedBoxes = scanProgress.ScannedBoxes,
+                ScannedPallets = scanProgress.ScannedPallets,
+                ScannedPcs = scanProgress.ScannedPcs,
+                ScanPercentage = scanPercentage,
+                CanComplete = scanProgress.CanComplete,
+                
+                LastScannedDate = lastScanned?.Timestamp,
+                LastScannedBy = lastScanned?.UserId,
                 BarcodeList = barcodeList,
+                POSummaries = poSummaries,
                 CanRegenerate = false // Remove regenerate functionality
             };
         }
