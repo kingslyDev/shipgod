@@ -41,7 +41,8 @@ namespace ShipmentFinishGood.Services
             throw new InvalidOperationException($"File '{file.FileName}' dengan konten yang sama sudah diupload pada {duplicateCheck.UploadDate:dd/MM/yyyy HH:mm}. Session ID: {duplicateCheck.SessionId}");
         }
 
-        var rawData = ParseExcelFileAsync(file);
+        // 🎯 ENHANCED PARSING WITH FORMAT DETECTION
+        var (rawData, formatInfo) = ParseExcelFileWithFormatDetection(file);
         
         // Group by country first
         var dataByCountry = rawData
@@ -97,21 +98,113 @@ namespace ShipmentFinishGood.Services
             ProcessedData = allProcessedData,
             ProcessedDataByCountry = processedDataByCountry,
             PendingCountries = dataByCountry.Keys.ToList(),
-            SubmittedCountries = new List<string>()
+            SubmittedCountries = new List<string>(),
+            FormatInfo = formatInfo  // 🆕 ADD FORMAT INFO
         };
         }
 
     private List<ExcelRowData> ParseExcelFileAsync(IFormFile file)
     {
-        var rawData = new List<ExcelRowData>();
+        return ParseMultiSheetFormat(file);
+    }
 
+    // 🎯 ENHANCED PARSING WITH FORMAT DETECTION
+    private (List<ExcelRowData> rawData, ExcelFormatInfo formatInfo) ParseExcelFileWithFormatDetection(IFormFile file)
+    {
         using var stream = file.OpenReadStream();
         using var workbook = new XLWorkbook(stream);
-        var worksheet = workbook.Worksheet(1);
 
+        var formatInfo = new ExcelFormatInfo
+        {
+            FormatType = "MULTI_SHEET",
+            TotalSheets = workbook.Worksheets.Count,
+            SheetNames = workbook.Worksheets.Select(w => w.Name).ToList(),
+            Description = $"Multi-sheet format: {workbook.Worksheets.Count} sheets with 3 columns per sheet (PO | Model | Qty)"
+        };
+
+        var rawData = ParseMultiSheetFormat(workbook);
+
+        // Enhanced format info
+        formatInfo.DetectedCountries = rawData.Select(r => r.Country).Distinct().Where(c => !string.IsNullOrEmpty(c)).ToList()!;
+        formatInfo.TotalRows = rawData.Count;
+
+        return (rawData, formatInfo);
+    }
+
+    private List<ExcelRowData> ParseMultiSheetFormat(IFormFile file)
+    {
+        using var stream = file.OpenReadStream();
+        using var workbook = new XLWorkbook(stream);
+        return ParseMultiSheetFormat(workbook);
+    }
+
+    private bool IsOldFormat(IXLWorkbook workbook)
+    {
+        try
+        {
+            // Check if single sheet and has "COUNTRY" header in first column
+            if (workbook.Worksheets.Count == 1)
+            {
+                var worksheet = workbook.Worksheet(1);
+                
+                // Check header row first (row 1)
+                var headerCell = worksheet.Cell(1, 1).GetString().Trim().ToUpper();
+                
+                // Check if first column header contains "COUNTRY" or similar
+                if (headerCell.Contains("COUNTRY") || headerCell.Contains("NEGARA") || 
+                    headerCell.Contains("NATION") || headerCell.Contains("PAIS") ||
+                    headerCell.Contains("PAÍSES") || headerCell.Contains("LAND"))
+                {
+                    return true;
+                }
+
+                // Additional check: if first data row (row 2) has 4 columns with data
+                try
+                {
+                    var col1 = worksheet.Cell(2, 1).GetString().Trim();
+                    var col2 = worksheet.Cell(2, 2).GetString().Trim();
+                    var col3 = worksheet.Cell(2, 3).GetString().Trim();
+                    var col4 = worksheet.Cell(2, 4).GetString().Trim();
+                    
+                    // If all 4 columns have data and looks like old format
+                    if (!string.IsNullOrEmpty(col1) && !string.IsNullOrEmpty(col2) && 
+                        !string.IsNullOrEmpty(col3) && !string.IsNullOrEmpty(col4))
+                    {
+                        // Additional validation: check if col1 looks like a country name
+                        var potentialCountry = col1.ToUpper();
+                        var commonCountries = new[] { "AUSTRALIA", "CANADA", "GERMANY", "USA", "UK", "FRANCE", 
+                                                    "JAPAN", "SINGAPORE", "MALAYSIA", "INDONESIA", "THAILAND",
+                                                    "PHILIPPINES", "VIETNAM", "INDIA", "CHINA", "KOREA", "BRAZIL" };
+                        
+                        if (commonCountries.Any(country => potentialCountry.Contains(country)))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                catch
+                {
+                    // If error reading data rows, continue with other checks
+                }
+            }
+            
+            return false;
+        }
+        catch (Exception)
+        {
+            // Log error if needed, but don't throw - assume new format
+            // TODO: Add logging here if needed
+            return false;
+        }
+    }
+
+    private List<ExcelRowData> ParseSingleSheetFormat(IXLWorkbook workbook)
+    {
+        var rawData = new List<ExcelRowData>();
+        var worksheet = workbook.Worksheet(1);
         var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
         var currentPO = string.Empty;
-    var currentCountry = string.Empty;  // NEW: Track current country
+        var currentCountry = string.Empty;
 
         for (int row = 2; row <= lastRowUsed; row++)
         {
@@ -150,11 +243,70 @@ namespace ShipmentFinishGood.Services
             rawData.Add(new ExcelRowData
             {
                 NoPO = currentPO,
-                Country = currentCountry,  // NEW: Add country (already normalized)
+                Country = currentCountry,
                 Model = modelCell,
                 Qty = qty,
                 RowIndex = row
             });
+        }
+
+        return rawData;
+    }
+
+    private List<ExcelRowData> ParseMultiSheetFormat(IXLWorkbook workbook)
+    {
+        var rawData = new List<ExcelRowData>();
+        int globalRowIndex = 1; // Global row counter across all sheets
+
+        foreach (var worksheet in workbook.Worksheets)
+        {
+            var countryFromSheetName = CountryNormalizer.Normalize(worksheet.Name);
+            var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+            var currentPO = string.Empty;
+
+            // Skip empty sheets
+            if (lastRowUsed <= 1) continue;
+
+            for (int row = 2; row <= lastRowUsed; row++)
+            {
+                globalRowIndex++;
+                
+                var noPOCell = worksheet.Cell(row, 1).GetString().Trim();     // Column 1: No PO
+                var modelCell = worksheet.Cell(row, 2).GetString().Trim();    // Column 2: Model
+                var qtyCell = worksheet.Cell(row, 3).GetString().Trim();      // Column 3: Qty
+
+                // Skip empty rows
+                if (string.IsNullOrEmpty(modelCell) && string.IsNullOrEmpty(qtyCell))
+                    continue;
+
+                // Inherit PO if empty (same logic as before)
+                if (!string.IsNullOrEmpty(noPOCell))
+                {
+                    currentPO = noPOCell;
+                }
+
+                // Parse quantity with same logic
+                if (!int.TryParse(qtyCell.Replace(".", "").Replace(",", ""), out int qty))
+                {
+                    if (decimal.TryParse(qtyCell, out decimal decimalQty))
+                    {
+                        qty = (int)Math.Round(decimalQty);
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+                rawData.Add(new ExcelRowData
+                {
+                    NoPO = currentPO,
+                    Country = countryFromSheetName, // Country dari nama sheet
+                    Model = modelCell,
+                    Qty = qty,
+                    RowIndex = globalRowIndex
+                });
+            }
         }
 
         return rawData;

@@ -8,6 +8,18 @@ namespace ShipmentFinishGood.DTOs
         Pcs
     }
 
+    // 🆕 FORMAT DETECTION INFO
+    public class ExcelFormatInfo
+    {
+        public string FormatType { get; set; } = string.Empty; // "SINGLE_SHEET" or "MULTI_SHEET"
+        public string Description { get; set; } = string.Empty;
+        public int TotalSheets { get; set; }
+        public List<string> SheetNames { get; set; } = new();
+        public List<string> DetectedCountries { get; set; } = new();
+        public int TotalRows { get; set; }
+        public string FormatDetectedAt { get; set; } = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
     public class ExcelRowData
     {
         public string? NoPO { get; set; }
@@ -44,6 +56,9 @@ namespace ShipmentFinishGood.DTOs
         public Dictionary<string, List<ProcessedPOData>> ProcessedDataByCountry { get; set; } = new();
         public List<string> SubmittedCountries { get; set; } = new();
         public List<string> PendingCountries { get; set; } = new();
+        
+        // 🆕 FORMAT DETECTION INFO
+        public ExcelFormatInfo? FormatInfo { get; set; }
         
         public string? ShipmentType { get; set; }
         public DateTime? ShipmentDate { get; set; }
