@@ -565,5 +565,95 @@ namespace ShipmentFinishGood.Controllers
 
             return allCountries.Where(c => !submittedCountries.Contains(c)).ToList();
         }
+
+        /// <summary>
+        /// Delete session and all related data (clean delete)
+        /// </summary>
+        [HttpDelete]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+
+                // Find the session with all related data
+                var session = await _context.UploadSessions
+                    .Include(s => s.POMasters)
+                    .Include(s => s.ChildSessions)
+                        .ThenInclude(cs => cs.POMasters)
+                    .FirstOrDefaultAsync(s => s.SessionId == id);
+
+                if (session == null)
+                {
+                    return Json(new { success = false, message = "Session not found" });
+                }
+
+                // Delete all child sessions and their related data
+                foreach (var childSession in session.ChildSessions.ToList())
+                {
+                    await DeleteSessionDataAsync(childSession.SessionId);
+                }
+
+                // Delete main session data
+                await DeleteSessionDataAsync(session.SessionId);
+
+                // Remove the main session
+                _context.UploadSessions.Remove(session);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Json(new { success = true, message = "Session deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error deleting session: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Helper method to delete all data related to a specific session
+        /// </summary>
+        private async Task DeleteSessionDataAsync(int sessionId)
+        {
+            // Delete scanning activities related to barcodes from this session
+            var barcodeValues = await _context.BarcodeRegistries
+                .Where(br => br.SessionId == sessionId)
+                .Select(br => br.BarcodeValue)
+                .ToListAsync();
+
+            if (barcodeValues.Any())
+            {
+                var scanningActivities = await _context.ScanningActivities
+                    .Where(sa => barcodeValues.Contains(sa.BarcodeValue))
+                    .ToListAsync();
+
+                _context.ScanningActivities.RemoveRange(scanningActivities);
+            }
+
+            // Delete barcode registries
+            var barcodeRegistries = await _context.BarcodeRegistries
+                .Where(br => br.SessionId == sessionId)
+                .ToListAsync();
+
+            _context.BarcodeRegistries.RemoveRange(barcodeRegistries);
+
+            // Delete PO Masters
+            var poMasters = await _context.POMasters
+                .Where(pm => pm.SourceSessionId == sessionId)
+                .ToListAsync();
+
+            _context.POMasters.RemoveRange(poMasters);
+
+            // Delete session details if exists
+            var sessionDetails = await _context.UploadSessionDetails
+                .Where(usd => usd.SessionId == sessionId)
+                .ToListAsync();
+
+            if (sessionDetails.Any())
+            {
+                _context.UploadSessionDetails.RemoveRange(sessionDetails);
+            }
+        }
     }
 }
