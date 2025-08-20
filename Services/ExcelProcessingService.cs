@@ -495,6 +495,7 @@ namespace ShipmentFinishGood.Services
                     QRIdentity = session.IdentityQRCode,
                     CreatedDate = session.UploadDate,
                     CreatedBy = session.UploadedBy,
+                    Country = session.POMasters.FirstOrDefault(p => !string.IsNullOrEmpty(p.Country))?.Country, // Add country
                     
                     // Summary data
                     TotalPOs = session.POMasters.Count,

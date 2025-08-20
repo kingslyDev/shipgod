@@ -17,6 +17,20 @@ namespace ShipmentFinishGood.Controllers
             _finalService = finalService;
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetQRIdentity(int sessionId)
+        {
+            try
+            {
+                var qrData = await _qrService.GetQRDataAsync(sessionId);
+                return Json(new { qrIdentity = qrData?.QRIdentity ?? "Not Generated" });
+            }
+            catch (Exception)
+            {
+                return Json(new { qrIdentity = "Error Loading" });
+            }
+        }
+
         public async Task<IActionResult> Manage(int id)
         {
             var qrData = await _qrService.GetQRDataAsync(id);

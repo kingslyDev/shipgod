@@ -224,6 +224,7 @@ namespace ShipmentFinishGood.DTOs
         public string? QRIdentity { get; set; }
         public DateTime CreatedDate { get; set; }
         public string? CreatedBy { get; set; }
+        public string? Country { get; set; } // Added country field
         
         // Summary data
         public int TotalPOs { get; set; }

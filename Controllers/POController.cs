@@ -23,10 +23,191 @@ namespace ShipmentFinishGood.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index()
+        public IActionResult Index()
         {
-            var poSessions = await _excelService.GetAllPOSessionsAsync();
-            return View(poSessions);
+            // For the initial page load, return empty data since we'll load via AJAX
+            var emptyList = new List<POSessionSummaryDto>();
+            return View(emptyList);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetPaginatedSessions(
+            int page = 1, 
+            int pageSize = 12,
+            string dateRange = "",
+            string shipmentType = "",
+            string country = "",
+            string startDate = "",
+            string endDate = "")
+        {
+            try
+            {
+                var query = _context.UploadSessions
+                    .Include(s => s.POMasters)
+                    .Where(s => s.POMasters.Any(p => !string.IsNullOrEmpty(p.Country))) // Only sessions with country data
+                    .AsQueryable();
+
+                // Apply filters
+                if (!string.IsNullOrEmpty(shipmentType))
+                {
+                    query = query.Where(s => s.ShipmentType == shipmentType);
+                }
+
+                // Apply date filters
+                if (!string.IsNullOrEmpty(dateRange))
+                {
+                    var now = DateTime.Now;
+                    switch (dateRange.ToLower())
+                    {
+                        case "today":
+                            query = query.Where(s => s.UploadDate.Date == now.Date);
+                            break;
+                        case "week":
+                            var weekStart = now.AddDays(-(int)now.DayOfWeek);
+                            query = query.Where(s => s.UploadDate >= weekStart);
+                            break;
+                        case "month":
+                            var monthStart = new DateTime(now.Year, now.Month, 1);
+                            query = query.Where(s => s.UploadDate >= monthStart);
+                            break;
+                        case "custom":
+                            if (DateTime.TryParse(startDate, out var start))
+                                query = query.Where(s => s.UploadDate >= start);
+                            if (DateTime.TryParse(endDate, out var end))
+                                query = query.Where(s => s.UploadDate <= end.AddDays(1));
+                            break;
+                    }
+                }
+
+                // Country filter
+                if (!string.IsNullOrEmpty(country))
+                {
+                    query = query.Where(s => s.Country == country || 
+                                           (s.Countries != null && s.Countries.Contains(country)) ||
+                                           s.POMasters.Any(p => p.Country == country));
+                }
+
+                // Get total count for pagination
+                var totalItems = await query.CountAsync();
+                var totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+
+                // Apply pagination and convert to DTOs
+                var sessions = await query
+                    .OrderByDescending(s => s.UploadDate)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                var sessionDtos = new List<POSessionSummaryDto>();
+                foreach (var session in sessions)
+                {
+                    // Additional check: only add sessions that have PO Masters with country data
+                    if (!session.POMasters.Any(p => !string.IsNullOrEmpty(p.Country)))
+                        continue;
+
+                    var scanCounts = await GetScanCountsAsync(session.SessionId);
+                    
+                    // Get the first valid country from POMasters
+                    var sessionCountry = session.POMasters
+                        .Where(p => !string.IsNullOrEmpty(p.Country))
+                        .Select(p => p.Country)
+                        .FirstOrDefault();
+
+                    // Skip if no country found
+                    if (string.IsNullOrEmpty(sessionCountry))
+                        continue;
+                    
+                    sessionDtos.Add(new POSessionSummaryDto
+                    {
+                        SessionId = session.SessionId,
+                        FileName = session.FileName,
+                        ShipmentType = session.ShipmentType,
+                        ShipmentDate = session.ShipmentDate,
+                        Status = session.Status,
+                        QRIdentity = session.IdentityQRCode,
+                        CreatedDate = session.UploadDate,
+                        CreatedBy = session.UploadedBy,
+                        TotalPOs = session.POMasters.Count,
+                        TotalQty = session.POMasters.Sum(p => p.QtyTotal),
+                        TotalBoxes = session.POMasters.Sum(p => p.QtyBox),
+                        TotalPallets = session.POMasters.Sum(p => p.QtyPallet),
+                        TotalItemsToScan = scanCounts.TotalItems,
+                        ScannedItems = scanCounts.ScannedItems,
+                        // Add country field to DTO
+                        Country = sessionCountry
+                    });
+                }
+
+                // Calculate summary
+                var summary = new
+                {
+                    TotalSessions = totalItems,
+                    TotalPOs = sessionDtos.Sum(s => s.TotalPOs),
+                    TotalBoxes = sessionDtos.Sum(s => s.TotalBoxes),
+                    CompletedSessions = sessionDtos.Count(s => s.ScanProgress >= 100)
+                };
+
+                return Json(new
+                {
+                    sessions = sessionDtos,
+                    totalPages = totalPages,
+                    currentPage = page,
+                    totalItems = totalItems,
+                    summary = summary
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { error = ex.Message });
+            }
+        }
+
+        private async Task<decimal> CalculateScanProgressAsync(int sessionId)
+        {
+            var totalItems = await _context.BarcodeRegistries
+                .Where(br => br.SessionId == sessionId)
+                .CountAsync();
+
+            if (totalItems == 0) return 0;
+
+            var scannedItems = await _context.BarcodeRegistries
+                .Where(br => br.SessionId == sessionId && br.Status == "SCANNED")
+                .CountAsync();
+
+            return Math.Round((decimal)scannedItems / totalItems * 100, 1);
+        }
+
+        private async Task<(int TotalItems, int ScannedItems)> GetScanCountsAsync(int sessionId)
+        {
+            var totalItems = await _context.BarcodeRegistries
+                .Where(br => br.SessionId == sessionId)
+                .CountAsync();
+
+            var scannedItems = await _context.BarcodeRegistries
+                .Where(br => br.SessionId == sessionId && br.Status == "SCANNED")
+                .CountAsync();
+
+            return (totalItems, scannedItems);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetCountries()
+        {
+            try
+            {
+                var countries = await _context.POMasters
+                    .Where(p => !string.IsNullOrEmpty(p.Country))
+                    .Select(p => p.Country)
+                    .Distinct()
+                    .OrderBy(c => c)
+                    .ToListAsync();
+
+                return Json(countries);
+            }
+            catch (Exception)
+            {
+                return Json(new List<string>());
+            }
         }
 
         public IActionResult Create()
