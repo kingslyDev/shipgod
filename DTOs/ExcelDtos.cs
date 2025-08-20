@@ -181,6 +181,155 @@ namespace ShipmentFinishGood.DTOs
         public bool CanRegenerate { get; set; } = true;
     }
 
+    // 🧠 SMART AUTO-CALCULATION ENGINE DTOs
+    public class SmartUpdateRequest
+    {
+        public int NewTotalQty { get; set; }
+        public string? Container { get; set; }
+        public string? NoInvoice { get; set; }
+        public string? ShipmentDetail { get; set; }
+        public bool ForceRecalculation { get; set; } = false;
+        public string OperatorId { get; set; } = string.Empty;
+    }
+
+    public class SmartUpdateResult
+    {
+        public bool IsSuccess { get; set; }
+        public FinalRowData? UpdatedRow { get; set; }
+        public BarcodeChangeResult? BarcodeChanges { get; set; }
+        public List<string> Notifications { get; set; } = new();
+        public SmartUpdateMetadata? Metadata { get; set; }
+        public string? ErrorMessage { get; set; }
+
+        public static SmartUpdateResult Success(
+            FinalRowData updatedRow, 
+            BarcodeChangeResult barcodeChanges,
+            List<string> notifications)
+        {
+            return new SmartUpdateResult
+            {
+                IsSuccess = true,
+                UpdatedRow = updatedRow,
+                BarcodeChanges = barcodeChanges,
+                Notifications = notifications
+            };
+        }
+
+        public static SmartUpdateResult Failure(string errorMessage)
+        {
+            return new SmartUpdateResult
+            {
+                IsSuccess = false,
+                ErrorMessage = errorMessage
+            };
+        }
+    }
+
+    public class SmartUpdateMetadata
+    {
+        public string CalculationStrategy { get; set; } = string.Empty;
+        public bool BoxCountChanged { get; set; }
+        public int BoxCountDifference { get; set; }
+        public DateTime UpdateTimestamp { get; set; }
+        public string UpdatedBy { get; set; } = string.Empty;
+    }
+
+    public class SmartCalculationContext
+    {
+        public bool IsValid { get; set; }
+        public int SessionId { get; set; }
+        public Models.UploadSession Session { get; set; } = null!;
+        public Models.POMaster POMaster { get; set; } = null!;
+        public int RowIndex { get; set; }
+        public string QRIdentity { get; set; } = string.Empty;
+        public string ModelName { get; set; } = string.Empty;
+        public string ShipmentType { get; set; } = string.Empty;
+        public int CurrentTotalQty { get; set; }
+        public int CurrentBoxCount { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
+
+        public static SmartCalculationContext Invalid(string errorMessage)
+        {
+            return new SmartCalculationContext
+            {
+                IsValid = false,
+                ErrorMessage = errorMessage
+            };
+        }
+    }
+
+    public class SmartCalculationResult
+    {
+        public int OldTotalQty { get; set; }
+        public int NewTotalQty { get; set; }
+        public int OldBoxCount { get; set; }
+        public int NewQtyPallet { get; set; }
+        public int NewQtyBox { get; set; }
+        public int NewQtyPcs { get; set; }
+        public bool BoxCountChanged { get; set; }
+        public int BoxCountDifference { get; set; }
+        public string CalculationStrategy { get; set; } = string.Empty;
+        public Models.ModelConfiguration? UsedConfiguration { get; set; }
+        
+        // Helper property untuk barcode management
+        public int NewBoxCount => NewQtyBox;
+    }
+
+    public class BarcodeChangeResult
+    {
+        public List<string>? NewBarcodes { get; set; }
+        public List<string>? RemovedBarcodes { get; set; }
+        public bool HasChanges => (NewBarcodes?.Count ?? 0) > 0 || (RemovedBarcodes?.Count ?? 0) > 0;
+        public string? ErrorMessage { get; set; }
+
+        public static BarcodeChangeResult CreateSuccess(List<string>? newBarcodes = null, List<string>? removedBarcodes = null)
+        {
+            return new BarcodeChangeResult
+            {
+                NewBarcodes = newBarcodes,
+                RemovedBarcodes = removedBarcodes
+            };
+        }
+
+        public static BarcodeChangeResult CreateFailure(string errorMessage)
+        {
+            return new BarcodeChangeResult
+            {
+                ErrorMessage = errorMessage
+            };
+        }
+    }
+
+    public class ConflictResolutionResult
+    {
+        public bool HasConflict { get; set; }
+        public string ConflictMessage { get; set; } = string.Empty;
+        public List<string> ConflictingBarcodes { get; set; } = new();
+
+        public static ConflictResolutionResult NoConflict()
+        {
+            return new ConflictResolutionResult { HasConflict = false };
+        }
+
+        public static ConflictResolutionResult CreateConflict(string message, List<string> conflictingBarcodes)
+        {
+            return new ConflictResolutionResult
+            {
+                HasConflict = true,
+                ConflictMessage = message,
+                ConflictingBarcodes = conflictingBarcodes
+            };
+        }
+    }
+
+    // Smart Command untuk Controller
+    public class SmartUpdateCommand
+    {
+        public int SessionId { get; set; }
+        public int RowIndex { get; set; }
+        public SmartUpdateRequest Request { get; set; } = new();
+    }
+
     public class POMasterDto
     {
         public int POId { get; set; }

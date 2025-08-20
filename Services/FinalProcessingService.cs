@@ -3,6 +3,7 @@ using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Models;
 using ShipmentFinishGood.Repositories;
 using ShipmentFinishGood.Common;
+using ShipmentFinishGood.Data;
 
 namespace ShipmentFinishGood.Services
 {
@@ -10,11 +11,16 @@ namespace ShipmentFinishGood.Services
     {
         private readonly AppDbContext _context;
         private readonly IModelConfigurationService _modelConfigService;
+        private readonly ISmartCalculationEngine _smartEngine;
 
-        public FinalProcessingService(AppDbContext context, IModelConfigurationService modelConfigService)
+        public FinalProcessingService(
+            AppDbContext context, 
+            IModelConfigurationService modelConfigService,
+            ISmartCalculationEngine smartEngine)
         {
             _context = context;
             _modelConfigService = modelConfigService;
+            _smartEngine = smartEngine;
         }
 
         public async Task<FinalTableDto?> GetFinalDataAsync(int sessionId)
@@ -196,6 +202,12 @@ namespace ShipmentFinishGood.Services
                 BarcodeList = barcodeList,
                 CanRegenerate = true
             };
+        }
+
+        // 🧠 SMART AUTO-CALCULATION ENGINE INTEGRATION
+        public async Task<SmartUpdateResult> SmartUpdateRowAsync(int sessionId, int rowIndex, SmartUpdateRequest request)
+        {
+            return await _smartEngine.ExecuteSmartUpdateAsync(sessionId, rowIndex, request);
         }
 
         private async Task RecalculateBreakdownAsync(POMaster poMaster, string shipmentType)

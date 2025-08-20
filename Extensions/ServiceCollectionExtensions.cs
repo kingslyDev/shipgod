@@ -40,6 +40,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScanningService, ScanningService>();
         services.AddScoped<IBarcodeService, BarcodeService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        
+        // 🧠 SMART AUTO-CALCULATION ENGINE SERVICES
+        services.AddScoped<ISmartCalculationEngine, SmartCalculationEngine>();
+        services.AddScoped<ISmartBarcodeManager, SmartBarcodeManager>();
+        services.AddScoped<IScanningProtectionService, ScanningProtectionService>();
+        
         return services;
     }    public static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration config)
     {

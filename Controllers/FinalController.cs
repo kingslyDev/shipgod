@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Services;
 using ShipmentFinishGood.Common;
+using ShipmentFinishGood.Repositories;
 using System.Security.Claims;
 
 namespace ShipmentFinishGood.Controllers
@@ -13,12 +15,21 @@ namespace ShipmentFinishGood.Controllers
         private readonly IExcelProcessingService _excelService;
         private readonly IFinalProcessingService _finalService;
         private readonly IBarcodeService _barcodeService;
+        private readonly ISmartBarcodeManager _smartBarcodeManager;
+        private readonly AppDbContext _context;
 
-        public FinalController(IExcelProcessingService excelService, IFinalProcessingService finalService, IBarcodeService barcodeService)
+        public FinalController(
+            IExcelProcessingService excelService, 
+            IFinalProcessingService finalService, 
+            IBarcodeService barcodeService,
+            ISmartBarcodeManager smartBarcodeManager,
+            AppDbContext context)
         {
             _excelService = excelService;
             _finalService = finalService;
             _barcodeService = barcodeService;
+            _smartBarcodeManager = smartBarcodeManager;
+            _context = context;
         }
 
         public async Task<IActionResult> Index(int id)
@@ -145,6 +156,82 @@ namespace ShipmentFinishGood.Controllers
             catch (Exception ex)
             {
                 return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // 🧠 SMART AUTO-CALCULATION ENGINE ENDPOINT
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SmartUpdate([FromBody] SmartUpdateCommand cmd)
+        {
+            try 
+            {
+                if (cmd == null)
+                    return Json(new { success = false, message = "Invalid payload" });
+
+                // 🎯 SET OPERATOR ID FROM CURRENT USER
+                cmd.Request.OperatorId = User.Identity?.Name ?? "Unknown";
+
+                var result = await _finalService.SmartUpdateRowAsync(
+                    cmd.SessionId, 
+                    cmd.RowIndex, 
+                    cmd.Request);
+                    
+                if (result.IsSuccess)
+                {
+                    return Json(new { 
+                        success = true, 
+                        data = result.UpdatedRow,
+                        barcodeChanges = new {
+                            added = result.BarcodeChanges?.NewBarcodes?.Count ?? 0,
+                            removed = result.BarcodeChanges?.RemovedBarcodes?.Count ?? 0,
+                            newBarcodes = result.BarcodeChanges?.NewBarcodes,
+                            removedBarcodes = result.BarcodeChanges?.RemovedBarcodes
+                        },
+                        notifications = result.Notifications,
+                        metadata = new {
+                            calculationStrategy = result.Metadata?.CalculationStrategy,
+                            boxCountChanged = result.Metadata?.BoxCountChanged ?? false,
+                            updateTimestamp = DateTime.Now
+                        }
+                    });
+                }
+                
+                return Json(new { success = false, message = result.ErrorMessage });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Smart Engine Error: {ex.Message}" });
+            }
+        }
+
+        // 🔍 DEBUG ENDPOINT FOR BARCODE STATUS
+        [HttpGet]
+        public async Task<IActionResult> DebugBarcodes(int sessionId, string modelName)
+        {
+            try
+            {
+                // Get session info
+                var session = await _context.UploadSessions
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+                
+                if (session == null)
+                    return Json(new { success = false, message = "Session not found" });
+
+                if (string.IsNullOrEmpty(session.IdentityQRCode))
+                    return Json(new { success = false, message = "QR Identity not generated yet" });
+
+                var debugInfo = await _smartBarcodeManager.GetBarcodeStatusDebugInfo(session.IdentityQRCode, modelName);
+                
+                return Json(new { 
+                    success = true, 
+                    debugInfo = debugInfo,
+                    timestamp = DateTime.Now
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Debug Error: {ex.Message}" });
             }
         }
     }
