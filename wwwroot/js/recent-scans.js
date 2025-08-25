@@ -129,11 +129,15 @@ class RecentScansManager {
         console.log('🔍 Rendering scans:', recentScans.length, 'items');
         console.log('📊 Status counts - Done:', scannedCount, 'Todo:', pendingCount, 'Total:', totalCount);
 
-        const scanItemsHtml = recentScans.map((scan, index) => `
+        const scanItemsHtml = recentScans.map((scan, index) => {
+            // Extract shortened display text like PDF generation
+            const displayText = this.extractBarcodeDisplayText(scan.barcodeValue);
+            
+            return `
             <div class="recent-scan-item ${scan.itemType.toLowerCase()}" onclick="toggleScanDetails(${index})">
                 <div class="recent-scan-left">
-                                        <div class="recent-scan-barcode">
-                        <span class="barcode-text">${scan.barcodeValue}</span>
+                    <div class="recent-scan-barcode">
+                        <span class="barcode-text" title="${scan.barcodeValue}">${displayText}</span>
                     </div>
                     <div class="recent-scan-meta">
                         ${scan.isCompleted ? 
@@ -143,8 +147,8 @@ class RecentScansManager {
                     </div>
                 </div>
                 <div class="recent-scan-type">${scan.itemType}</div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
 
         $(this.containerId).html(`
             <div class="recent-scans-container">
@@ -222,6 +226,51 @@ class RecentScansManager {
         }
         this.hide();
         console.log('🗑️ Professional RecentScansManager destroyed');
+    }
+
+    // 🔧 Utility Methods
+    extractBarcodeDisplayText(fullBarcode) {
+        if (!fullBarcode) return 'N/A';
+
+        // Find BOX pattern and extract the meaningful part
+        // Example: QR_3_20250825115813_BOX_RP-2400DBG-K_001 -> BOX_RP-2400DBG-K_001
+        const boxIndex = fullBarcode.toLowerCase().indexOf('_box_');
+        if (boxIndex >= 0) {
+            // Return from BOX onwards (skip the first underscore)
+            return fullBarcode.substring(boxIndex + 1);
+        }
+
+        // Handle other patterns like PALLET or PCS
+        const palletIndex = fullBarcode.toLowerCase().indexOf('pallet');
+        if (palletIndex >= 0) {
+            const parts = fullBarcode.split('_');
+            // Find the part with PALLET and return from there
+            const palletPartIndex = parts.findIndex(part => part.toLowerCase().includes('pallet'));
+            if (palletPartIndex >= 0) {
+                return parts.slice(palletPartIndex).join('_');
+            }
+        }
+
+        const pcsIndex = fullBarcode.toLowerCase().indexOf('pcs');
+        if (pcsIndex >= 0) {
+            const parts = fullBarcode.split('_');
+            // Find the part with PCS and return from there
+            const pcsPartIndex = parts.findIndex(part => part.toLowerCase().includes('pcs'));
+            if (pcsPartIndex >= 0) {
+                return parts.slice(pcsPartIndex).join('_');
+            }
+        }
+
+        // Fallback: if no specific pattern, try to find last meaningful part
+        const parts = fullBarcode.split('_');
+        if (parts.length >= 3) {
+            // Return last 2-3 parts joined
+            const lastParts = parts.slice(-Math.min(3, parts.length));
+            return lastParts.join('_');
+        }
+
+        // Final fallback: return as is
+        return fullBarcode;
     }
 }
 

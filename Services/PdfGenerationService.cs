@@ -466,89 +466,156 @@ namespace ShipmentFinishGood.Services
         {
             if (qrData.BarcodeList?.Any() != true) return;
 
-            // Start barcode list on new page if needed
-            if (document.GetRenderer().GetCurrentArea().GetBBox().GetHeight() < 200)
-            {
-                document.Add(new AreaBreak());
-            }
-
             document.Add(new Paragraph($"BOX BARCODES ({qrData.BarcodeList.Count} items)")
                 .SetFont(headerFont)
                 .SetFontSize(14)
                 .SetFontColor(accentColor)
                 .SetMarginBottom(15));
 
-            // Create table with 3 columns: Number, Barcode, QR Code
-            var barcodeTable = new Table(new float[] { 1, 4, 2 }); // Column widths
-            barcodeTable.SetWidth(UnitValue.CreatePercentValue(100));
-
-            // Add table headers
-            barcodeTable.AddHeaderCell(CreateStyledHeaderCell("No.", headerFont, new DeviceRgb(248, 249, 250)));
-            barcodeTable.AddHeaderCell(CreateStyledHeaderCell("Barcode", headerFont, new DeviceRgb(248, 249, 250)));
-            barcodeTable.AddHeaderCell(CreateStyledHeaderCell("QR Code", headerFont, new DeviceRgb(248, 249, 250)));
-
-            for (int i = 0; i < qrData.BarcodeList.Count; i++)
+            // Process barcodes in groups of 4 per page
+            for (int pageStart = 0; pageStart < qrData.BarcodeList.Count; pageStart += 4)
             {
-                var barcode = qrData.BarcodeList[i];
-
-                // Number cell
-                var numberCell = new Cell();
-                numberCell.Add(new Paragraph($"{i + 1}.")
-                    .SetFont(bodyFont)
-                    .SetFontSize(10)
-                    .SetTextAlignment(TextAlignment.CENTER));
-                numberCell.SetBorder(new SolidBorder(ColorConstants.LIGHT_GRAY, 0.5f));
-                numberCell.SetPadding(8);
-                numberCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                barcodeTable.AddCell(numberCell);
-
-                // Barcode cell
-                var barcodeCell = new Cell();
-                barcodeCell.Add(new Paragraph(barcode)
-                    .SetFont(PdfFontFactory.CreateFont(StandardFonts.COURIER_BOLD))
-                    .SetFontSize(9));
-                barcodeCell.SetBorder(new SolidBorder(ColorConstants.LIGHT_GRAY, 0.5f));
-                barcodeCell.SetPadding(8);
-                barcodeCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                barcodeTable.AddCell(barcodeCell);
-
-                // QR Code cell
-                var qrCell = new Cell();
-                try
+                // Add new page if not the first page
+                if (pageStart > 0)
                 {
-                    // Generate QR code for this specific barcode
-                    var qrGenerator = new QRCodeGenerator();
-                    var qrCodeData = qrGenerator.CreateQrCode(barcode, QRCodeGenerator.ECCLevel.Q);
-                    var qrCode = new BitmapByteQRCode(qrCodeData);
-                    var qrBytes = qrCode.GetGraphic(8); // Smaller QR for list
-
-                    var qrImage = ImageDataFactory.Create(qrBytes);
-                    qrCell.Add(new Image(qrImage)
-                        .SetAutoScale(true)
-                        .SetMaxWidth(60)
-                        .SetMaxHeight(60)
-                        .SetHorizontalAlignment(HorizontalAlignment.CENTER));
+                    document.Add(new AreaBreak());
                     
-                    Console.WriteLine($"[PDF DEBUG] Generated QR for barcode: {barcode}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[PDF DEBUG] Failed to generate QR for {barcode}: {ex.Message}");
-                    // Fallback: show placeholder text
-                    qrCell.Add(new Paragraph("[QR]")
-                        .SetFont(bodyFont)
-                        .SetFontSize(8)
-                        .SetTextAlignment(TextAlignment.CENTER));
+                    // Add page header for continuation pages
+                    document.Add(new Paragraph($"BOX BARCODES (continued) - Page {(pageStart / 4) + 1}")
+                        .SetFont(headerFont)
+                        .SetFontSize(14)
+                        .SetFontColor(accentColor)
+                        .SetMarginBottom(15));
                 }
 
-                qrCell.SetBorder(new SolidBorder(ColorConstants.LIGHT_GRAY, 0.5f));
-                qrCell.SetPadding(8);
-                qrCell.SetTextAlignment(TextAlignment.CENTER);
-                qrCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                barcodeTable.AddCell(qrCell);
+                // Create table with 2 columns and 2 rows (4 items max)
+                var barcodeTable = new Table(2);
+                barcodeTable.SetWidth(UnitValue.CreatePercentValue(100));
+
+                // Get items for this page (max 4)
+                var pageItems = qrData.BarcodeList.Skip(pageStart).Take(4).ToList();
+
+                for (int i = 0; i < pageItems.Count; i++)
+                {
+                    var barcode = pageItems[i];
+                    var itemNumber = pageStart + i + 1;
+
+                    // Extract display text (everything after the last underscore before _BOX_)
+                    string displayText = ExtractBarcodeDisplayText(barcode);
+
+                    // Create cell for QR + Text
+                    var barcodeCell = new Cell();
+                    barcodeCell.SetBorder(new SolidBorder(ColorConstants.LIGHT_GRAY, 1f));
+                    barcodeCell.SetPadding(15);
+                    barcodeCell.SetTextAlignment(TextAlignment.CENTER);
+                    barcodeCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
+                    barcodeCell.SetMinHeight(200); // Fixed height for consistency
+
+                    // Add item number FIRST (at the top)
+                    barcodeCell.Add(new Paragraph($"{itemNumber}.")
+                        .SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD))
+                        .SetFontSize(14)
+                        .SetTextAlignment(TextAlignment.CENTER)
+                        .SetMarginBottom(10));
+
+                    try
+                    {
+                        // Generate QR code with FULL barcode value
+                        var qrGenerator = new QRCodeGenerator();
+                        var qrCodeData = qrGenerator.CreateQrCode(barcode, QRCodeGenerator.ECCLevel.Q);
+                        var qrCode = new BitmapByteQRCode(qrCodeData);
+                        var qrBytes = qrCode.GetGraphic(10); // Optimal size for page layout
+
+                        if (qrBytes != null && qrBytes.Length > 0)
+                        {
+                            var qrImage = ImageDataFactory.Create(qrBytes);
+                            
+                            // Add QR Image with proper sizing
+                            barcodeCell.Add(new Image(qrImage)
+                                .SetAutoScale(true)
+                                .SetWidth(120)
+                                .SetHeight(120)
+                                .SetHorizontalAlignment(HorizontalAlignment.CENTER)
+                                .SetMarginBottom(10));
+                            
+                            Console.WriteLine($"[PDF DEBUG] ✅ Generated QR for barcode: {barcode} ({qrBytes.Length} bytes)");
+                        }
+                        else
+                        {
+                            throw new Exception("QR bytes is null or empty");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[PDF DEBUG] ❌ Failed to generate QR for {barcode}: {ex.Message}");
+                        Console.WriteLine($"[PDF DEBUG] Exception details: {ex}");
+                        
+                        // Fallback: show placeholder rectangle
+                        var placeholder = new Table(1);
+                        placeholder.SetWidth(120);
+                        placeholder.SetHeight(120);
+                        var placeholderCell = new Cell();
+                        placeholderCell.Add(new Paragraph("[QR ERROR]")
+                            .SetFont(bodyFont)
+                            .SetFontSize(10)
+                            .SetTextAlignment(TextAlignment.CENTER));
+                        placeholderCell.SetBackgroundColor(ColorConstants.LIGHT_GRAY);
+                        placeholderCell.SetBorder(new SolidBorder(ColorConstants.GRAY, 1f));
+                        placeholderCell.SetMinHeight(120);
+                        placeholderCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
+                        placeholder.AddCell(placeholderCell);
+                        
+                        barcodeCell.Add(placeholder.SetMarginBottom(10));
+                    }
+
+                    // Add display text below QR (shortened version)
+                    barcodeCell.Add(new Paragraph(displayText)
+                        .SetFont(PdfFontFactory.CreateFont(StandardFonts.COURIER_BOLD))
+                        .SetFontSize(11)
+                        .SetTextAlignment(TextAlignment.CENTER)
+                        .SetMarginTop(5));
+
+                    barcodeTable.AddCell(barcodeCell);
+                }
+
+                // Fill empty cells if less than 4 items on last page
+                int emptyCellsNeeded = 4 - pageItems.Count;
+                for (int j = 0; j < emptyCellsNeeded; j++)
+                {
+                    var emptyCell = new Cell();
+                    emptyCell.SetBorder(Border.NO_BORDER);
+                    emptyCell.SetMinHeight(200);
+                    barcodeTable.AddCell(emptyCell);
+                }
+
+                document.Add(barcodeTable.SetMarginBottom(20));
+            }
+        }
+
+        // Helper method to extract display text from barcode
+        private string ExtractBarcodeDisplayText(string fullBarcode)
+        {
+            if (string.IsNullOrEmpty(fullBarcode)) return "N/A";
+
+            // Find BOX pattern and extract the meaningful part
+            // Example: QR_3_20250825115813_BOX_RP-2400DBG-K_001 -> BOX_RP-2400DBG-K_001
+            var boxIndex = fullBarcode.IndexOf("_BOX_", StringComparison.OrdinalIgnoreCase);
+            if (boxIndex >= 0)
+            {
+                // Return from BOX onwards
+                return fullBarcode.Substring(boxIndex + 1); // Skip the first underscore
             }
 
-            document.Add(barcodeTable);
+            // Fallback: if no BOX pattern, try to find last meaningful part
+            var parts = fullBarcode.Split('_');
+            if (parts.Length >= 3)
+            {
+                // Return last 2-3 parts joined
+                return string.Join("_", parts.TakeLast(Math.Min(3, parts.Length)));
+            }
+
+            // Final fallback: return as is
+            return fullBarcode;
         }
 
         private void AddFooter(Document document, PdfFont bodyFont, DeviceRgb primaryColor)

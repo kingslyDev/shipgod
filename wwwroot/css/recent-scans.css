@@ -197,4 +197,24 @@
     font-weight: 500;
     font-size: 0.75rem;
     color: #495057;
+    cursor: help;
+    position: relative;
+}
+
+.recent-scan-barcode .barcode-text:hover::after {
+    content: attr(title);
+    position: absolute;
+    top: -2.5rem;
+    left: 0;
+    background: #212529;
+    color: white;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
