@@ -2,7 +2,10 @@
 @{
     ViewData["Title"] = "Scanner Dashboard";
 }
-@section Styles {<link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />}
+@section Styles {
+<link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/recent-scans.css" asp-append-version="true" />
+}
 
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -106,63 +109,13 @@
         </div>
     </div>
 
+    <!-- Recent Scans Container - Shows when locked to session -->
+    <div id="recent-scans-container" class="recent-scans-container" style="display: none;">
+        <!-- Content will be populated by JavaScript -->
+    </div>
+
     @if (Model?.Any() == true)
     {
-        <!-- Summary Cards -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="h5 mb-0">@Model.Count</div>
-                                <div class="small">Available Sessions</div>
-                            </div>
-                            <i class="fas fa-layer-group fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="h5 mb-0">@Model.Count(s => s.Status == "Ready")</div>
-                                <div class="small">Ready to Scan</div>
-                            </div>
-                            <i class="fas fa-play-circle fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="h5 mb-0">@Model.Count(s => s.Status == "In Progress")</div>
-                                <div class="small">In Progress</div>
-                            </div>
-                            <i class="fas fa-spinner fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="h5 mb-0">@Model.Sum(s => s.TotalBoxes)</div>
-                                <div class="small">Total Boxes</div>
-                            </div>
-                            <i class="fas fa-boxes fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Quick Guide (replaces per-session list) -->
         <div class="row g-3">
@@ -221,12 +174,14 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/recent-scans.js" asp-append-version="true"></script>
     <script>
         let currentUserLock = null;
         let activeSessions = [];
         let resolvedBarcodes = new Map(); // Cache for resolved barcodes
         let signalRConnection = null; // SignalR connection
         let currentSessionGroup = null; // Track current session group
+        let recentScansManager = null; // Recent scans manager
 
         // Initialize SignalR connection
         function initializeSignalR() {
@@ -236,6 +191,9 @@
 
             // Set up event handlers
             setupSignalREventHandlers();
+
+            // Make SignalR connection available globally for recent scans
+            window.signalRConnection = signalRConnection;
 
             // Start connection
             signalRConnection.start().then(function () {
@@ -431,6 +389,15 @@
 
         // Initialize on page load
         $(document).ready(function() {
+            // Initialize Recent Scans Manager - Simplified
+            recentScansManager = new RecentScansManager({
+                containerId: '#recent-scans-container',
+                maxItems: 8
+            });
+            
+            // Make recent scans manager available globally
+            window.recentScansManager = recentScansManager;
+            
             // Load available sessions first (needed for session restoration)
             loadAvailableSessions();
             
@@ -685,6 +652,11 @@
                         
                         // Show emergency unlock button
                         updateUILockState(true, session.fileName);
+                        
+                        // Show recent scans for this session
+                        if (recentScansManager) {
+                            recentScansManager.show(session.sessionId);
+                        }
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                     }
@@ -942,6 +914,11 @@
                         
                         // Show emergency unlock button
                         updateUILockState(true, fileName);
+                        
+                        // Show recent scans for this session
+                        if (recentScansManager) {
+                            recentScansManager.show(sessionId);
+                        }
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                     }
@@ -1128,6 +1105,11 @@
             // Update UI lock state
             updateUILockState(false);
             
+            // Hide recent scans
+            if (recentScansManager) {
+                recentScansManager.hide();
+            }
+            
             console.log('✨ Session cleanup completed');
         }
 
@@ -1278,6 +1260,11 @@
                     // Update UI immediately for fast response
                     updateScanStatus('locked', `Locked to: ${sessionData.fileName}`, 'success');
                     updateUIForLockedState(sessionData);
+                    
+                    // Show recent scans for restored session
+                    if (recentScansManager) {
+                        recentScansManager.show(sessionData.sessionId);
+                    }
                     
                     // Rejoin SignalR group
                     if (signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
@@ -1495,6 +1482,11 @@
                                 updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
                                 updateUIForLockedState(session);
                                 
+                                // Show recent scans
+                                if (recentScansManager) {
+                                    recentScansManager.show(session.sessionId);
+                                }
+                                
                                 // Join SignalR group if not already
                                 if (currentSessionGroup !== session.sessionId) {
                                     joinSessionGroup(session.sessionId);
@@ -1510,6 +1502,12 @@
                                 saveUserLockState(currentUserLock, session);
                                 updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
                                 updateUIForLockedState(session);
+                                
+                                // Show recent scans
+                                if (recentScansManager) {
+                                    recentScansManager.show(session.sessionId);
+                                }
+                                
                                 joinSessionGroup(session.sessionId);
                                 currentSessionGroup = session.sessionId;
                             }

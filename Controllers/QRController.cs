@@ -11,11 +11,13 @@ namespace ShipmentFinishGood.Controllers
     {
         private readonly IQRManagementService _qrService;
         private readonly IFinalProcessingService _finalService;
+        private readonly IPdfGenerationService _pdfService;
 
-        public QRController(IQRManagementService qrService, IFinalProcessingService finalService)
+        public QRController(IQRManagementService qrService, IFinalProcessingService finalService, IPdfGenerationService pdfService)
         {
             _qrService = qrService;
             _finalService = finalService;
+            _pdfService = pdfService;
         }
 
         [HttpGet]
@@ -117,6 +119,52 @@ namespace ShipmentFinishGood.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<IActionResult> DownloadQRIdentityPDF(int sessionId)
+        {
+            try
+            {
+                var qrData = await _qrService.GetQRDataAsync(sessionId);
+                if (qrData == null)
+                {
+                    TempData["Error"] = "QR data not found.";
+                    return RedirectToAction("Manage", new { id = sessionId });
+                }
+
+                var pdfData = await _pdfService.GenerateQRIdentityPdfAsync(qrData);
+                var fileName = $"QR_Identity_{sessionId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+                return File(pdfData, "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error generating QR Identity PDF: {ex.Message}";
+                return RedirectToAction("Manage", new { id = sessionId });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadComprehensiveReportPDF(int sessionId)
+        {
+            try
+            {
+                var qrData = await _qrService.GetQRDataAsync(sessionId);
+                if (qrData == null)
+                {
+                    TempData["Error"] = "QR data not found.";
+                    return RedirectToAction("Manage", new { id = sessionId });
+                }
+
+                var pdfData = await _pdfService.GenerateComprehensiveReportPdfAsync(qrData);
+                var fileName = $"Comprehensive_Report_{sessionId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+                return File(pdfData, "application/pdf", fileName);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error generating comprehensive report PDF: {ex.Message}";
+                return RedirectToAction("Manage", new { id = sessionId });
+            }
+        }
+
         public async Task<IActionResult> PrintQR(int sessionId)
         {
             var qrData = await _qrService.GetQRDataAsync(sessionId);
@@ -147,6 +195,35 @@ namespace ShipmentFinishGood.Controllers
             catch (Exception ex)
             {
                 return BadRequest($"Error generating QR image: {ex.Message}");
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RegenerateQR(int sessionId)
+        {
+            try
+            {
+                var qrData = await _qrService.GetQRDataAsync(sessionId);
+                if (qrData == null)
+                {
+                    return Json(new { success = false, message = "Session not found" });
+                }
+
+                // Force regenerate QR code
+                var newQRImage = await _qrService.RegenerateQRCodeAsync(sessionId);
+                
+                return Json(new { 
+                    success = true, 
+                    qrImageBase64 = newQRImage,
+                    message = "QR Code regenerated successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { 
+                    success = false, 
+                    message = $"Error regenerating QR: {ex.Message}"
+                });
             }
         }
     }

@@ -1034,6 +1034,127 @@ namespace ShipmentFinishGood.Services
 
         #endregion
 
+        /// <summary>
+        /// Get recent scanned items for a specific session - Simplified
+        /// </summary>
+        public async Task<RecentScansResponseDto> GetRecentScansAsync(int sessionId, int limit = 10)
+        {
+            try
+            {
+                // Get session information
+                var session = await _context.UploadSessions
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+                if (session == null)
+                    return new RecentScansResponseDto();
+
+                // Get master barcode for this session
+                var masterBarcode = await _context.BarcodeRegistries
+                    .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                            b.BarcodeType == "MASTER" && 
+                                            b.IsActive);
+
+                if (masterBarcode == null)
+                    return new RecentScansResponseDto();
+
+                // Get recent scans with rich information
+                var recentActivities = await _context.ScanningActivities
+                    .Where(sa => (sa.BarcodeValue.StartsWith(masterBarcode.BarcodeValue + "_") || 
+                                sa.AssignedArea == $"Session_{sessionId}") && 
+                               sa.Action != "SCAN_MASTER" && 
+                               sa.Result == "SUCCESS")
+                    .OrderByDescending(sa => sa.Timestamp)
+                    .Take(limit)
+                    .ToListAsync();
+
+                // Enrich with barcode registry and PO data
+                var enrichedScans = new List<RecentScanDto>();
+                
+                foreach (var activity in recentActivities.Select((activity, index) => new { activity, index }))
+                {
+                    var barcode = await _context.BarcodeRegistries
+                        .Include(b => b.POMaster)
+                        .FirstOrDefaultAsync(b => b.BarcodeValue == activity.activity.BarcodeValue);
+
+                    var recentScan = new RecentScanDto
+                    {
+                        BarcodeValue = activity.activity.BarcodeValue,
+                        ItemType = GetItemTypeFromAction(activity.activity.Action),
+                        ScannedAt = activity.activity.Timestamp,
+                        ScannedBy = activity.activity.UserId ?? "Unknown",
+                        SequenceNumber = recentActivities.Count - activity.index,
+                        
+                        // Enhanced information from barcode registry and PO
+                        PONumber = barcode?.POMaster?.NoPO ?? "N/A",
+                        ModelProduct = barcode?.ModelProduct ?? 
+                                     barcode?.POMaster?.ModelProduk ?? 
+                                     GetItemTypeFromAction(activity.activity.Action),
+                        Description = barcode?.POMaster?.ShipmentDetail ?? "",
+                        Quantity = barcode?.POMaster?.QtyTotal,
+                        Status = barcode?.Status ?? "PENDING",
+                        Container = barcode?.POMaster?.Container ?? "",
+                        ShipmentDetail = barcode?.POMaster?.ShipmentDetail ?? "",
+                        IsCompleted = barcode?.Status == "SCANNED"
+                    };
+
+                    enrichedScans.Add(recentScan);
+                }
+
+                // Get total count
+                var totalCount = await _context.ScanningActivities
+                    .CountAsync(sa => (sa.BarcodeValue.StartsWith(masterBarcode.BarcodeValue + "_") || 
+                                     sa.AssignedArea == $"Session_{sessionId}") && 
+                                    sa.Action != "SCAN_MASTER" && 
+                                    sa.Result == "SUCCESS");
+
+                // Get today's scan count
+                var today = DateTime.Today;
+                var totalToday = await _context.ScanningActivities
+                    .CountAsync(sa => sa.Timestamp >= today && 
+                                    sa.Result == "SUCCESS" && 
+                                    sa.Action != "SCAN_MASTER");
+
+                // Get last scan time
+                var lastScan = enrichedScans.FirstOrDefault();
+                var lastScanTime = lastScan?.ScannedAt.ToString("HH:mm:ss") ?? "N/A";
+
+                return new RecentScansResponseDto
+                {
+                    RecentScans = enrichedScans,
+                    TotalCount = totalCount,
+                    TotalScannedToday = totalToday,
+                    SessionInfo = $"{session.FileName} ({session.SheetName})",
+                    LastScanTime = lastScanTime
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting recent scans: {ex.Message}");
+                return new RecentScansResponseDto
+                {
+                    RecentScans = new List<RecentScanDto>(),
+                    TotalCount = 0,
+                    TotalScannedToday = 0,
+                    SessionInfo = "Error loading session",
+                    LastScanTime = "N/A"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Helper method to get item type from action name
+        /// </summary>
+        private string GetItemTypeFromAction(string action)
+        {
+            return action switch
+            {
+                "SCAN_BOX" => "BOX",
+                "SCAN_PALLET" => "PALLET", 
+                "SCAN_PCS" => "PCS",
+                _ => "BOX"
+            };
+        }
+
         private async Task SendProgressUpdateAsync(int sessionId, string scannedBarcode)
         {
             try

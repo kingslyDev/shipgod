@@ -40,6 +40,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScanningService, ScanningService>();
         services.AddScoped<IBarcodeService, BarcodeService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IPdfGenerationService, PdfGenerationService>();
         
         // 🧠 SMART AUTO-CALCULATION ENGINE SERVICES
         services.AddScoped<ISmartCalculationEngine, SmartCalculationEngine>();

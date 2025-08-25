@@ -18,5 +18,6 @@ namespace ShipmentFinishGood.Services
         Task<Result<bool>> CheckUserLockAsync(string userId);
         Task<Result<string>> GetUserLockedSessionAsync(string userId);
         Task<Result<string>> GenerateQRForSessionAsync(int sessionId);
+        Task<RecentScansResponseDto> GetRecentScansAsync(int sessionId, int limit = 10);
     }
 }

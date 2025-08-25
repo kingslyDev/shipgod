@@ -13,12 +13,15 @@ namespace ShipmentFinishGood.Services
         private readonly AppDbContext _context;
         private readonly IBarcodeService _barcodeService;
         private readonly IScanningService _scanningService;
+        private readonly IPdfGenerationService _pdfGenerationService;
 
-        public QRManagementService(AppDbContext context, IBarcodeService barcodeService, IScanningService scanningService)
+        public QRManagementService(AppDbContext context, IBarcodeService barcodeService, 
+            IScanningService scanningService, IPdfGenerationService pdfGenerationService)
         {
             _context = context;
             _barcodeService = barcodeService;
             _scanningService = scanningService;
+            _pdfGenerationService = pdfGenerationService;
         }
 
         public async Task<QRManagementDto?> GetQRDataAsync(int sessionId)
@@ -181,44 +184,21 @@ namespace ShipmentFinishGood.Services
 
         public async Task<byte[]?> GenerateBarcodesPDFAsync(int sessionId)
         {
-            var session = await _context.UploadSessions
-                .Include(s => s.POMasters)
-                .FirstOrDefaultAsync(s => s.SessionId == sessionId);
-
-            if (session == null)
-                return null;
-
-            // Get master barcode from BarcodeRegistries
-            var masterBarcode = await _context.BarcodeRegistries
-                .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
-                                        b.BarcodeType == "MASTER" && 
-                                        b.IsActive);
-
-            if (masterBarcode == null)
-                return null;
-
-            // Get all barcodes from BarcodeRegistries instead of generating them
-            var boxBarcodes = await _context.BarcodeRegistries
-                .Where(b => b.SessionId == sessionId && 
-                           b.BarcodeType == "BOX" && 
-                           b.IsActive)
-                .OrderBy(b => b.ModelProduct)
-                .ThenBy(b => b.BoxNumber)
-                .ToListAsync();
-
-            // For now, return a simple text-based PDF placeholder
-            // In production, use a proper PDF library like iTextSharp or PdfSharpCore
-            var content = $"PDF Barcodes for Session {sessionId}\n";
-            content += $"QR Identity: {masterBarcode.BarcodeValue}\n";
-            content += $"Generated: {DateTime.Now}\n\n";
-            content += "BOX BARCODES:\n";
-            
-            foreach (var barcode in boxBarcodes)
+            try
             {
-                content += $"- {barcode.BarcodeValue}\n";
-            }
+                // Get QR data for PDF generation
+                var qrData = await GetQRDataAsync(sessionId);
+                if (qrData == null)
+                    return null;
 
-            return System.Text.Encoding.UTF8.GetBytes(content);
+                // Use the professional PDF generation service
+                return await _pdfGenerationService.GenerateBarcodesPdfAsync(qrData);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating PDF: {ex.Message}");
+                return null;
+            }
         }
 
         public async Task<byte[]?> GetQRImageAsync(int sessionId)
@@ -264,6 +244,32 @@ namespace ShipmentFinishGood.Services
             }
             catch
             {
+                return null;
+            }
+        }
+
+        public async Task<string?> RegenerateQRCodeAsync(int sessionId)
+        {
+            try
+            {
+                var session = await _context.UploadSessions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+                if (session == null) return null;
+
+                var qrIdentity = session.IdentityQRCode;
+                if (string.IsNullOrEmpty(qrIdentity)) return null;
+
+                // Generate new QR code using the private method
+                var qrImageBytes = GenerateQRCodeBase64(qrIdentity);
+                if (string.IsNullOrEmpty(qrImageBytes)) return null;
+
+                return qrImageBytes;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error regenerating QR code: {ex.Message}");
                 return null;
             }
         }

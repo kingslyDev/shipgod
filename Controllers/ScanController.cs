@@ -521,5 +521,19 @@ namespace ShipmentFinishGood.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetRecentScans(int sessionId, int limit = 10)
+        {
+            try
+            {
+                var recentScans = await _scanService.GetRecentScansAsync(sessionId, limit);
+                return Json(new { success = true, data = recentScans });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
     }
 }
