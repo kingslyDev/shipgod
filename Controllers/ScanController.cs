@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ShipmentFinishGood.DTOs;
 using ShipmentFinishGood.Services;
 using ShipmentFinishGood.Common;
+using ShipmentFinishGood.Repositories;
 using System.Security.Claims;
 
 namespace ShipmentFinishGood.Controllers
@@ -13,12 +15,14 @@ namespace ShipmentFinishGood.Controllers
         private readonly IScanningService _scanService;
         private readonly IExcelProcessingService _excelService;
         private readonly IBarcodeService _barcodeService;
+        private readonly AppDbContext _context;
 
-        public ScanController(IScanningService scanService, IExcelProcessingService excelService, IBarcodeService barcodeService)
+        public ScanController(IScanningService scanService, IExcelProcessingService excelService, IBarcodeService barcodeService, AppDbContext context)
         {
             _scanService = scanService;
             _excelService = excelService;
             _barcodeService = barcodeService;
+            _context = context;
         }
 
         public async Task<IActionResult> Index()
@@ -303,13 +307,30 @@ namespace ShipmentFinishGood.Controllers
                     return Json(new { success = false, message = "Barcode not found" });
 
                 var sessionId = registry.SessionId;
-                var qrIdentity = registry.Session?.IdentityQRCode ?? string.Empty;
+                
+                // Get the master QR from BarcodeRegistry instead of IdentityQRCode
+                var masterBarcodeRegistry = await _context.BarcodeRegistries
+                    .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
+                                            b.BarcodeType == "MASTER" && 
+                                            b.IsActive);
+
+                var qrIdentity = masterBarcodeRegistry?.BarcodeValue ?? registry.Session?.IdentityQRCode ?? string.Empty;
                 var fileName = registry.Session?.FileName ?? string.Empty;
 
                 if (string.IsNullOrEmpty(qrIdentity))
                     return Json(new { success = false, message = "Master QR not found for this barcode" });
 
-                return Json(new { success = true, data = new { sessionId, qrIdentity, fileName } });
+                // Return additional debug info for troubleshooting
+                return Json(new { 
+                    success = true, 
+                    data = new { 
+                        sessionId, 
+                        qrIdentity, 
+                        fileName,
+                        barcodeType = registry.BarcodeType,
+                        status = registry.Status
+                    } 
+                });
             }
             catch (Exception ex)
             {
@@ -464,6 +485,36 @@ namespace ShipmentFinishGood.Controllers
                 }
                 
                 return Json(new { success = false, message = "User is not locked to any session" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        [Route("api/scan/active-sessions")]
+        public async Task<IActionResult> GetActiveSessionsJson()
+        {
+            try
+            {
+                var sessions = await _scanService.GetActiveSessionsAsync();
+                
+                var sessionData = sessions.Select(s => new
+                {
+                    sessionId = s.SessionId,
+                    fileName = s.FileName,
+                    qrIdentity = s.QRIdentity,
+                    shipmentType = s.ShipmentType,
+                    shipmentDate = s.ShipmentDate,
+                    totalBoxes = s.TotalBoxes,
+                    totalPOs = s.TotalPOs,
+                    createdDate = s.CreatedDate,
+                    createdBy = s.CreatedBy,
+                    status = s.Status
+                }).ToList();
+
+                return Json(new { success = true, data = sessionData });
             }
             catch (Exception ex)
             {

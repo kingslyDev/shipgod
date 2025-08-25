@@ -59,6 +59,10 @@
                         <button class="btn btn-outline-light btn-sm" onclick="debugScanSystem()" title="Debug scan system">
                             <i class="fas fa-bug me-1"></i>Debug
                         </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="emergencyUnlock()" title="Emergency unlock if stuck in session" 
+                                style="display: none;" id="emergencyUnlockBtn">
+                            <i class="fas fa-unlock me-1"></i>Emergency Unlock
+                        </button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -221,9 +225,221 @@
         let currentUserLock = null;
         let activeSessions = [];
         let resolvedBarcodes = new Map(); // Cache for resolved barcodes
+        let signalRConnection = null; // SignalR connection
+        let currentSessionGroup = null; // Track current session group
+
+        // Initialize SignalR connection
+        function initializeSignalR() {
+            signalRConnection = new signalR.HubConnectionBuilder()
+                .withUrl("/progressHub")
+                .build();
+
+            // Set up event handlers
+            setupSignalREventHandlers();
+
+            // Start connection
+            signalRConnection.start().then(function () {
+                console.log('✅ SignalR connected successfully');
+                
+                // Join session group if user is locked to a session
+                if (currentUserLock) {
+                    const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                    if (session) {
+                        joinSessionGroup(session.sessionId);
+                    }
+                }
+            }).catch(function (err) {
+                console.error('❌ SignalR connection failed:', err);
+            });
+
+            // Reconnection logic
+            signalRConnection.onreconnecting(() => {
+                console.log('🔄 SignalR reconnecting...');
+            });
+
+            signalRConnection.onreconnected(() => {
+                console.log('✅ SignalR reconnected');
+                // Rejoin session group if needed
+                if (currentSessionGroup) {
+                    joinSessionGroup(currentSessionGroup);
+                }
+            });
+        }
+
+        function setupSignalREventHandlers() {
+            // Session locked event
+            signalRConnection.on("SessionLocked", function (data) {
+                console.log('🔒 Session locked:', data);
+                
+                // Update UI if this affects current user
+                if (data.lockedBy !== getCurrentUserName()) {
+                    showAlert(`Session locked by ${data.lockedBy}`, 'info');
+                }
+                
+                // Sync session data
+                syncSessionDataFromServer();
+            });
+
+            // Barcode scanned event
+            signalRConnection.on("BarcodeScanned", function (data) {
+                console.log('📦 Barcode scanned:', data);
+                
+                // Update cache to include this barcode
+                if (!resolvedBarcodes.has(data.barcode)) {
+                    const session = activeSessions.find(s => s.sessionId === data.sessionId);
+                    if (session) {
+                        resolvedBarcodes.set(data.barcode, {
+                            sessionId: data.sessionId,
+                            qrIdentity: session.qrIdentity,
+                            fileName: session.fileName
+                        });
+                    }
+                }
+                
+                // Show notification if scanned by other user
+                if (data.scannedBy !== getCurrentUserName()) {
+                    showAlert(`📦 ${data.barcode} scanned by ${data.scannedBy}`, 'info');
+                }
+            });
+
+            // Barcode state changed event
+            signalRConnection.on("BarcodeStateChanged", function (data) {
+                console.log('🔄 Barcode state changed:', data);
+                
+                // Update local cache based on action
+                if (data.action === 'scanned') {
+                    // Mark barcode as scanned in cache
+                    if (resolvedBarcodes.has(data.barcode)) {
+                        const cached = resolvedBarcodes.get(data.barcode);
+                        cached.scannedBy = data.by;
+                        cached.scannedAt = data.timestamp;
+                        cached.status = 'SCANNED';
+                        resolvedBarcodes.set(data.barcode, cached);
+                    }
+                }
+            });
+
+            // Progress updated event
+            signalRConnection.on("ProgressUpdated", function (progressData) {
+                console.log('📊 Progress updated:', progressData);
+                updateEnhancedProgress(progressData);
+            });
+
+            // Force session sync event
+            signalRConnection.on("ForceSessionSync", function (sessionId) {
+                console.log('🔄 Force session sync for:', sessionId);
+                syncSessionDataFromServer();
+            });
+
+            // Session unlocked event
+            signalRConnection.on("SessionUnlocked", function (data) {
+                console.log('🔓 Session unlocked:', data);
+                
+                // Clear user lock if it's current user
+                if (data.unlockedBy === getCurrentUserName() || data.sessionId === currentSessionGroup) {
+                    // Leave the SignalR session group
+                    if (currentSessionGroup) {
+                        leaveSessionGroup(currentSessionGroup);
+                    }
+                    
+                    // Clear session storage
+                    clearUserLockState();
+                    
+                    currentUserLock = null;
+                    currentSessionGroup = null;
+                    updateScanStatus('ready', 'Session completed - Ready for new scan', 'success');
+                }
+                
+                showAlert(`Session unlocked by ${data.unlockedBy}`, 'success');
+            });
+
+            // User joined/left session events
+            signalRConnection.on("UserJoinedSession", function (userName) {
+                if (userName !== getCurrentUserName()) {
+                    console.log(`👤 ${userName} joined the session`);
+                }
+            });
+
+            signalRConnection.on("UserLeftSession", function (userName) {
+                if (userName !== getCurrentUserName()) {
+                    console.log(`👤 ${userName} left the session`);
+                }
+            });
+
+            // Session state changed (for overview)
+            signalRConnection.on("SessionStateChanged", function (data) {
+                console.log('🔄 Session state changed:', data);
+                // Refresh sessions overview
+                lightweightRefreshSessions();
+            });
+        }
+
+        function joinSessionGroup(sessionId) {
+            if (signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
+                currentSessionGroup = sessionId;
+                signalRConnection.invoke("JoinSessionGroup", sessionId.toString())
+                    .then(() => {
+                        console.log(`✅ Joined session group: ${sessionId}`);
+                    })
+                    .catch(err => {
+                        console.error('❌ Failed to join session group:', err);
+                    });
+            }
+        }
+
+        function leaveSessionGroup(sessionId) {
+            if (signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
+                signalRConnection.invoke("LeaveSessionGroup", sessionId.toString())
+                    .then(() => {
+                        console.log(`✅ Left session group: ${sessionId}`);
+                        currentSessionGroup = null;
+                    })
+                    .catch(err => {
+                        console.error('❌ Failed to leave session group:', err);
+                    });
+            }
+        }
+
+        function getCurrentUserName() {
+            // Get current user name from server-side
+            return '@(User.Identity?.Name ?? "Unknown")';
+        }
+
+        function syncSessionDataFromServer() {
+            // Lightweight sync without full page refresh
+            $.ajax({
+                url: '@Url.Action("GetActiveSessionsJson", "Scan")', // We need to add this endpoint
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        activeSessions = response.data;
+                        console.log('✅ Sessions synced from server');
+                    }
+                },
+                error: function() {
+                    console.log('⚠️ Failed to sync sessions, using local cache');
+                }
+            });
+        }
+
+        function lightweightRefreshSessions() {
+            // Non-blocking refresh that doesn't interfere with current scanning
+            if (!currentUserLock) {
+                syncSessionDataFromServer();
+            }
+        }
 
         // Initialize on page load
         $(document).ready(function() {
+            // Load available sessions first (needed for session restoration)
+            loadAvailableSessions();
+            
+            // Try to restore session immediately for fast UX
+            const wasRestored = restoreUserLockState();
+            
+            // Initialize SignalR connection
+            initializeSignalR();
+            
             // Focus on main scan input
             $('#mainScanInput').focus();
             
@@ -234,17 +450,31 @@
                 }
             });
 
-            // Check user lock status on load
+            // Verify lock status with server (after trying local restore)
             checkUserLockStatus();
             
-            // Load available sessions for reference
-            loadAvailableSessions();
-            
-            // Auto-refresh sessions every 30 seconds to keep data current
+            // Professional session monitoring with smart intervals
             setInterval(function() {
-                console.log('🔄 Auto-refreshing sessions (30s interval)...');
-                refreshSessions();
-            }, 30000);
+                if (!currentUserLock) { 
+                    // Only refresh sessions when not actively scanning
+                    console.log('🔄 Auto-refreshing sessions (60s interval)...');
+                    refreshSessions();
+                } else {
+                    // When locked to session, monitor completion status
+                    console.log('🔍 Monitoring active session completion status...');
+                    synchronizeSessionState();
+                }
+            }, 30000); // 30 seconds for active monitoring
+            
+            // Additional completion check on focus return (user comes back to tab)
+            $(window).on('focus', function() {
+                if (currentUserLock && currentSessionGroup) {
+                    console.log('👀 Window focused, checking session completion status...');
+                    setTimeout(() => {
+                        validateSessionCompletionStatus(currentSessionGroup);
+                    }, 1000);
+                }
+            });
         });
 
         // Main scanning function
@@ -321,9 +551,10 @@
                 return true;
             }
             
-            // Fallback: looks like master QR format but needs server validation
-            console.log('Master QR format detected, needs server validation');
-            return false; // Let it go to server resolution
+            // If it looks like a master QR format, treat it as such
+            // Let the backend validate the actual existence
+            console.log('Master QR format detected, treating as Master QR');
+            return true; // Changed from false to true
         }
 
         // Check if scanned value is Box Barcode (simplified)
@@ -404,7 +635,10 @@
         function processMasterQR(qrCode) {
             const session = activeSessions.find(s => s.qrIdentity === qrCode);
             if (!session) {
-                showAlert('QR Identity not found in available sessions', 'danger');
+                console.log('⚠️ QR not found in local activeSessions, trying server resolution...');
+                
+                // Try server resolution as fallback
+                resolveAndProcess(qrCode, $('#mainScanInput'));
                 return;
             }
 
@@ -428,6 +662,13 @@
                 success: function(response) {
                     if (response.success) {
                         currentUserLock = qrCode;
+                        currentSessionGroup = session.sessionId;
+                        
+                        // Save to session storage for persistence across refreshes
+                        saveUserLockState(qrCode, session);
+                        
+                        // Join SignalR session group
+                        joinSessionGroup(session.sessionId);
                         
                         // Clear barcode cache when switching sessions
                         resolvedBarcodes.clear();
@@ -441,6 +682,9 @@
                         
                         // Update UI to show locked state
                         updateUIForLockedState(session);
+                        
+                        // Show emergency unlock button
+                        updateUILockState(true, session.fileName);
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                     }
@@ -566,10 +810,11 @@
                             
                             // Check if all items are complete and session can be unlocked
                             if (response.data.isAllComplete) {
-                                showAlert('🎉 All items scanned! Session completed successfully!', 'success');
-                                currentUserLock = null;
-                                updateScanStatus('ready', 'Session completed - Ready for new scan', 'success');
-                                $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity or Item Barcode here...');
+                                const session = activeSessions.find(s => s.sessionId === currentSessionGroup);
+                                const sessionName = session ? session.fileName : `Session ${currentSessionGroup}`;
+                                
+                                console.log('🎯 All items complete, triggering professional completion');
+                                completeSessionAutomatically(currentSessionGroup, sessionName);
                             }
                         }
                         
@@ -676,6 +921,14 @@
                 success: function(response) {
                     if (response.success) {
                         currentUserLock = qrIdentity;
+                        currentSessionGroup = sessionId;
+                        
+                        // Save to session storage for persistence
+                        const sessionData = { sessionId, fileName, qrIdentity };
+                        saveUserLockState(qrIdentity, sessionData);
+                        
+                        // Join SignalR session group
+                        joinSessionGroup(sessionId);
                         
                         // Clear barcode cache when switching sessions
                         resolvedBarcodes.clear();
@@ -686,6 +939,9 @@
                         
                         // Update UI to show locked state
                         updateUIForLockedState({ sessionId, fileName, qrIdentity });
+                        
+                        // Show emergency unlock button
+                        updateUILockState(true, fileName);
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                     }
@@ -724,11 +980,11 @@
                             
                             // Check if all items are complete
                             if (response.data.isAllComplete) {
-                                showAlert('🎉 All items scanned! Session completed successfully!', 'success');
-                                currentUserLock = null;
-                                resolvedBarcodes.clear(); // Clear cache on completion
-                                updateScanStatus('ready', 'Session completed - Ready for new scan', 'success');
-                                $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity or Item Barcode here...');
+                                const session = activeSessions.find(s => s.sessionId === currentSessionGroup);
+                                const sessionName = session ? session.fileName : `Session ${currentSessionGroup}`;
+                                
+                                console.log('🎯 All items complete, triggering professional completion');
+                                completeSessionAutomatically(currentSessionGroup, sessionName);
                             }
                         }
                     } else {
@@ -791,23 +1047,491 @@
         }
 
         // Check user lock status
+        // ==================== PROFESSIONAL SESSION MANAGEMENT ====================
+        
+        /**
+         * Complete scanning session automatically when all items are scanned
+         * Best Practice: Automatic completion with proper cleanup and notifications
+         */
+        function completeSessionAutomatically(sessionId, sessionName) {
+            console.log('🎯 Auto-completing session:', sessionId, sessionName);
+            showAlert('🔄 Completing session automatically...', 'info');
+            
+            $.ajax({
+                url: '@Url.Action("CompleteScan", "Scan")',
+                type: 'POST',
+                data: { sessionId: sessionId },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        console.log('✅ Session completed successfully on server');
+                        
+                        // Professional cleanup sequence
+                        performSessionCleanup(sessionName, true);
+                        
+                        // Show professional success message
+                        showAlert(`🎉 Session "${sessionName}" completed successfully! Ready for next session.`, 'success');
+                        
+                        // Auto-focus for next session
+                        setTimeout(() => {
+                            $('#mainScanInput').focus();
+                        }, 1000);
+                        
+                    } else {
+                        console.error('❌ Failed to complete session:', response.message);
+                        showAlert(`⚠️ Session completion failed: ${response.message}`, 'warning');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error completing session:', error);
+                    showAlert('🔧 Error completing session. Please try manual completion.', 'danger');
+                }
+            });
+        }
+
+        /**
+         * Perform comprehensive session cleanup
+         * Best Practice: Centralized cleanup with proper state management
+         */
+        function performSessionCleanup(sessionName, isCompleted = false) {
+            console.log('🧹 Performing session cleanup for:', sessionName);
+            
+            // Leave SignalR session group
+            if (currentSessionGroup) {
+                leaveSessionGroup(currentSessionGroup);
+                console.log('📡 Left SignalR group:', currentSessionGroup);
+            }
+            
+            // Clear session storage
+            clearUserLockState();
+            console.log('💾 Cleared session storage');
+            
+            // Reset state variables
+            currentUserLock = null;
+            currentSessionGroup = null;
+            resolvedBarcodes.clear();
+            console.log('🗑️ Cleared runtime state');
+            
+            // Update UI professionally
+            if (isCompleted) {
+                updateScanStatus('completed', `✅ Session "${sessionName}" completed successfully`, 'success');
+            } else {
+                updateScanStatus('ready', '🚀 Ready to scan new QR Identity', 'info');
+            }
+            
+            // Reset input placeholder
+            $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity to start new session...');
+            $('#mainScanInput').val('').removeClass('is-invalid is-valid');
+            
+            // Update UI lock state
+            updateUILockState(false);
+            
+            console.log('✨ Session cleanup completed');
+        }
+
+        /**
+         * Check if current session should be auto-completed
+         * Best Practice: Proactive session state validation
+         */
+        function validateSessionCompletionStatus(sessionId) {
+            if (!sessionId || !currentUserLock) return;
+            
+            console.log('🔍 Validating session completion status:', sessionId);
+            
+            $.ajax({
+                url: '@Url.Action("GetScanProgress", "Scan")',
+                type: 'GET',
+                data: { sessionId: sessionId },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const progress = response.data;
+                        console.log('📊 Session progress:', progress);
+                        
+                        // Check if session should be completed
+                        if (progress.isComplete && currentUserLock) {
+                            console.log('🎯 Session is complete, triggering auto-completion');
+                            const session = activeSessions.find(s => s.sessionId === sessionId);
+                            const sessionName = session ? session.fileName : `Session ${sessionId}`;
+                            completeSessionAutomatically(sessionId, sessionName);
+                        }
+                        
+                        // Update progress display
+                        updateEnhancedProgress(progress);
+                    }
+                },
+                error: function() {
+                    console.warn('⚠️ Failed to validate session completion status');
+                }
+            });
+        }
+
+        /**
+         * Professional session state synchronization
+         * Best Practice: Periodic validation with smart refresh intervals
+         */
+        function synchronizeSessionState() {
+            if (!currentUserLock || !currentSessionGroup) return;
+            
+            console.log('🔄 Synchronizing session state...');
+            validateSessionCompletionStatus(currentSessionGroup);
+        }
+
+        /**
+         * Emergency unlock function for stuck sessions
+         * Best Practice: Emergency fallback with user confirmation
+         */
+        function emergencyUnlock() {
+            if (!currentUserLock) {
+                showAlert('⚠️ No active session to unlock', 'warning');
+                return;
+            }
+            
+            const sessionName = activeSessions.find(s => s.qrIdentity === currentUserLock)?.fileName || currentUserLock;
+            
+            if (!confirm(`🚨 Emergency Unlock\n\nAre you sure you want to force unlock from "${sessionName}"?\n\nThis should only be used if the session is stuck or completed but not auto-unlocked.\n\nClick OK to proceed.`)) {
+                return;
+            }
+            
+            console.log('🚨 Emergency unlock triggered for:', sessionName);
+            showAlert('🔧 Performing emergency unlock...', 'warning');
+            
+            // Try server-side unlock first
+            $.ajax({
+                url: '@Url.Action("UnlockUser", "Scan")',
+                type: 'POST',
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        console.log('✅ Server unlock successful');
+                        performSessionCleanup(sessionName, false);
+                        showAlert(`✅ Emergency unlock successful! You are now free to start a new session.`, 'success');
+                    } else {
+                        console.warn('⚠️ Server unlock failed, performing local cleanup');
+                        performSessionCleanup(sessionName, false);
+                        showAlert(`⚠️ Server unlock failed, but local state cleared. You can try scanning again.`, 'warning');
+                    }
+                },
+                error: function() {
+                    console.warn('❌ Server unlock error, performing local cleanup');
+                    performSessionCleanup(sessionName, false);
+                    showAlert(`🔧 Emergency unlock completed with local cleanup. Try scanning again.`, 'info');
+                }
+            });
+        }
+
+        /**
+         * Update UI state based on lock status
+         * Best Practice: Centralized UI state management
+         */
+        function updateUILockState(isLocked, sessionName = '') {
+            const emergencyBtn = $('#emergencyUnlockBtn');
+            
+            if (isLocked) {
+                emergencyBtn.show().attr('title', `Emergency unlock from: ${sessionName}`);
+            } else {
+                emergencyBtn.hide();
+            }
+        }
+
+        // ==================== END PROFESSIONAL SESSION MANAGEMENT ====================
+        // Session storage keys
+        const SESSION_KEYS = {
+            USER_LOCK: 'scannerUserLock',
+            CURRENT_SESSION: 'scannerCurrentSession',
+            LOCKED_SESSION_DATA: 'scannerLockedSessionData'
+        };
+
+        // Save user lock state to session storage
+        function saveUserLockState(qrIdentity, sessionData) {
+            try {
+                sessionStorage.setItem(SESSION_KEYS.USER_LOCK, qrIdentity);
+                sessionStorage.setItem('lockTimestamp', Date.now().toString());
+                if (sessionData) {
+                    sessionStorage.setItem(SESSION_KEYS.LOCKED_SESSION_DATA, JSON.stringify(sessionData));
+                    sessionStorage.setItem(SESSION_KEYS.CURRENT_SESSION, sessionData.sessionId.toString());
+                }
+                console.log('💾 Saved user lock state:', qrIdentity);
+            } catch (error) {
+                console.warn('Failed to save user lock state:', error);
+            }
+        }
+
+        // Restore user lock state from session storage
+        function restoreUserLockState() {
+            try {
+                const savedLock = sessionStorage.getItem(SESSION_KEYS.USER_LOCK);
+                const savedSessionData = sessionStorage.getItem(SESSION_KEYS.LOCKED_SESSION_DATA);
+                const savedSessionId = sessionStorage.getItem(SESSION_KEYS.CURRENT_SESSION);
+                
+                if (savedLock && savedSessionData) {
+                    const sessionData = JSON.parse(savedSessionData);
+                    console.log('🔄 Restoring user lock state:', savedLock, sessionData);
+                    
+                    // Restore state
+                    currentUserLock = savedLock;
+                    currentSessionGroup = parseInt(savedSessionId);
+                    
+                    // Update UI immediately for fast response
+                    updateScanStatus('locked', `Locked to: ${sessionData.fileName}`, 'success');
+                    updateUIForLockedState(sessionData);
+                    
+                    // Rejoin SignalR group
+                    if (signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
+                        joinSessionGroup(sessionData.sessionId);
+                    }
+                    
+                    // Show restoration message
+                    showAlert(`✅ Session restored: ${sessionData.fileName}. Continue scanning boxes.`, 'success');
+                    
+                    return true; // State was restored
+                }
+                
+                return false; // No state to restore
+            } catch (error) {
+                console.warn('Failed to restore user lock state:', error);
+                clearUserLockState();
+                return false;
+            }
+        }
+
+        // Clear user lock state from session storage
+        function clearUserLockState() {
+            try {
+                sessionStorage.removeItem(SESSION_KEYS.USER_LOCK);
+                sessionStorage.removeItem(SESSION_KEYS.LOCKED_SESSION_DATA);
+                sessionStorage.removeItem(SESSION_KEYS.CURRENT_SESSION);
+                sessionStorage.removeItem('lockTimestamp');
+                console.log('🗑️ Cleared user lock state from storage');
+            } catch (error) {
+                console.warn('Failed to clear user lock state:', error);
+            }
+        }
+
+        // ==================== END SESSION PERSISTENCE ====================
+
+        // ==================== SMART SCAN VALIDATION ====================
+        
+        /**
+         * Validate scan environment before processing
+         * Best Practice: Proactive validation to prevent issues
+         */
+        function validateScanEnvironment() {
+            const issues = [];
+            
+            // Check SignalR connection
+            if (!signalRConnection || signalRConnection.state !== signalR.HubConnectionState.Connected) {
+                issues.push('SignalR connection not active - real-time updates may not work');
+            }
+            
+            // Check session data availability
+            if (!activeSessions || activeSessions.length === 0) {
+                issues.push('No active sessions loaded - session resolution may fail');
+            }
+            
+            // Check for stuck states
+            if (currentUserLock && currentSessionGroup) {
+                const lockTimestamp = sessionStorage.getItem('lockTimestamp');
+                if (lockTimestamp) {
+                    const lockAge = Date.now() - parseInt(lockTimestamp);
+                    if (lockAge > 3600000) { // 1 hour
+                        issues.push('Session lock is very old (>1 hour) - consider emergency unlock');
+                    }
+                }
+            }
+            
+            return issues;
+        }
+
+        /**
+         * Smart barcode preprocessing
+         * Best Practice: Clean and validate input before processing
+         */
+        function preprocessBarcode(rawBarcode) {
+            if (!rawBarcode) return null;
+            
+            // Clean the barcode
+            let cleaned = rawBarcode.toString().trim();
+            
+            // Remove common scanner artifacts
+            cleaned = cleaned.replace(/[\r\n\t]/g, '');
+            
+            // Validate minimum length
+            if (cleaned.length < 5) {
+                console.warn('⚠️ Barcode too short:', cleaned);
+                return null;
+            }
+            
+            // Basic QR format validation
+            if (cleaned.startsWith('QR_') && !cleaned.match(/^QR_\d+_\d+/)) {
+                console.warn('⚠️ Invalid QR format:', cleaned);
+                return null;
+            }
+            
+            return cleaned;
+        }
+
+        /**
+         * Enhanced main scan processing
+         * Best Practice: Add validation layer to existing processScan
+         */
+        function processEnhancedScan() {
+            // Pre-validation
+            const issues = validateScanEnvironment();
+            if (issues.length > 0) {
+                console.warn('🔍 Scan environment issues:', issues);
+                // Show warning for critical issues
+                if (issues.some(issue => issue.includes('emergency unlock'))) {
+                    $('#emergencyUnlockBtn').addClass('btn-warning').removeClass('btn-outline-warning');
+                    showAlert('⚠️ Your session may be stuck. Consider using Emergency Unlock if needed.', 'warning');
+                }
+            }
+            
+            // Proceed with normal processing
+            processScan();
+        }
+
+        // ==================== END SMART SCAN VALIDATION ====================
+
+        // Complete scanning session on server
+        function completeScanningSession(sessionId) {
+            if (!sessionId) {
+                console.error('No sessionId provided for completion');
+                return;
+            }
+
+            $.ajax({
+                url: '@Url.Action("CompleteScan", "Scan")',
+                type: 'POST',
+                data: { sessionId: sessionId },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        console.log('✅ Session completed on server');
+                        
+                        // Now do the UI cleanup
+                        performSessionCleanup();
+                        
+                        showAlert('🎉 Session completed successfully! Ready for new scan.', 'success');
+                        
+                        // Send SignalR notification to other users
+                        if (signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
+                            signalRConnection.invoke("NotifySessionUnlocked", sessionId, getCurrentUserName())
+                                .catch(err => console.error('Failed to notify session unlock:', err));
+                        }
+                    } else {
+                        console.error('Failed to complete session:', response.message);
+                        showAlert(`❌ Failed to complete session: ${response.message}`, 'danger');
+                        
+                        // Even if server completion fails, do UI cleanup to prevent getting stuck
+                        performSessionCleanup();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error completing session:', error);
+                    showAlert('❌ Error completing session. Please try again.', 'danger');
+                    
+                    // Even if request fails, do UI cleanup to prevent getting stuck
+                    performSessionCleanup();
+                }
+            });
+        }
+
+        // Perform UI and state cleanup after session completion
+        function performSessionCleanup() {
+            console.log('🧹 Performing session cleanup...');
+            
+            // Leave SignalR session group
+            if (currentSessionGroup) {
+                leaveSessionGroup(currentSessionGroup);
+            }
+            
+            // Clear session storage
+            clearUserLockState();
+            
+            // Clear state variables
+            currentUserLock = null;
+            currentSessionGroup = null;
+            
+            // Clear barcode cache
+            resolvedBarcodes.clear();
+            
+            // Update UI
+            updateScanStatus('ready', 'Ready to scan QR Identity', 'success');
+            $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity or Item Barcode here...')
+                .val('')
+                .focus();
+            
+            // Clear any locked state UI
+            $('.locked-session-info').hide();
+        }
+
         function checkUserLockStatus() {
+            // Try to restore from session storage first for immediate response
+            const wasRestored = restoreUserLockState();
+            
+            // Always verify with server, but don't block UI if session storage worked
             $.ajax({
                 url: '@Url.Action("CheckUserLock", "Scan")',
                 type: 'GET',
                 success: function(response) {
                     if (response.success && response.isLocked) {
-                        currentUserLock = response.lockedSession;
-                        const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
-                        if (session) {
-                            updateScanStatus('locked', `Locked to: ${session.fileName}`, 'warning');
-                            updateUIForLockedState(session);
-                        } else {
-                            updateScanStatus('locked', `Locked to: ${currentUserLock}`, 'warning');
+                        const serverLock = response.lockedSession;
+                        
+                        // If server state differs from local storage, use server state
+                        if (currentUserLock !== serverLock) {
+                            console.log('🔄 Server lock differs from local storage, syncing...');
+                            currentUserLock = serverLock;
+                            
+                            const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                            if (session) {
+                                // Update local storage with server state
+                                saveUserLockState(currentUserLock, session);
+                                updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
+                                updateUIForLockedState(session);
+                                
+                                // Join SignalR group if not already
+                                if (currentSessionGroup !== session.sessionId) {
+                                    joinSessionGroup(session.sessionId);
+                                    currentSessionGroup = session.sessionId;
+                                }
+                            } else {
+                                updateScanStatus('locked', `Locked to: ${currentUserLock}`, 'warning');
+                            }
+                        } else if (!wasRestored) {
+                            // Server confirms lock but we didn't restore from storage
+                            const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                            if (session) {
+                                saveUserLockState(currentUserLock, session);
+                                updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
+                                updateUIForLockedState(session);
+                                joinSessionGroup(session.sessionId);
+                                currentSessionGroup = session.sessionId;
+                            }
                         }
                         
-                        // Show info message
-                        showAlert(`You are currently locked to session: ${currentUserLock}. Continue scanning boxes or complete the session.`, 'info');
+                        // Don't show alert if we already restored from session storage
+                        if (!wasRestored) {
+                            showAlert(`You are currently locked to session: ${currentUserLock}. Continue scanning boxes.`, 'info');
+                        }
+                    } else if (currentUserLock && !response.isLocked) {
+                        // Server says not locked, but we have local state - clear it
+                        console.log('🧹 Server says not locked, clearing local state');
+                        clearUserLockState();
+                        currentUserLock = null;
+                        currentSessionGroup = null;
+                        updateScanStatus('ready', 'Ready to scan QR Identity', 'info');
+                    }
+                },
+                error: function() {
+                    // If server check fails but we restored from storage, that's okay
+                    if (!wasRestored) {
+                        console.warn('Failed to check server lock status');
                     }
                 }
             });
@@ -833,6 +1557,7 @@
             // Enhanced debug logging
             console.log('=== LOADED ACTIVE SESSIONS ===');
             console.log('Total sessions:', activeSessions.length);
+            console.log('Raw activeSessions array:', activeSessions);
             activeSessions.forEach((session, index) => {
                 console.log(`Session ${index + 1}:`, {
                     sessionId: session.sessionId,
@@ -840,6 +1565,8 @@
                     qrIdentity: session.qrIdentity
                 });
             });
+            console.log('QR Identities available:', activeSessions.map(s => s.qrIdentity));
+            console.log('=== END SESSION LOADING ===');
             console.log('=== END ACTIVE SESSIONS ===');
         }
 

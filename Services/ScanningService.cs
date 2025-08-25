@@ -258,6 +258,23 @@ namespace ShipmentFinishGood.Services
                 ScannedBy = scannedBy
             };
 
+            // Send SignalR notification to all clients in session group
+            await _hubContext.Clients.Group($"Session_{sessionId}")
+                .SendAsync("SessionLocked", new { 
+                    sessionId, 
+                    lockedBy = scannedBy, 
+                    qrIdentity = qrCode, 
+                    timestamp = DateTime.Now 
+                });
+
+            // Also broadcast to all sessions overview
+            await _hubContext.Clients.All.SendAsync("SessionStateChanged", new { 
+                sessionId, 
+                action = "locked", 
+                by = scannedBy, 
+                timestamp = DateTime.Now 
+            });
+
             return Result<ScanResultDto>.Success(result);
         }
 
@@ -327,6 +344,26 @@ namespace ShipmentFinishGood.Services
 
             // Send realtime update via SignalR
             await SendProgressUpdateAsync(sessionId, barcode);
+
+            // Send barcode scanned notification to all clients in session
+            await _hubContext.Clients.Group($"Session_{sessionId}")
+                .SendAsync("BarcodeScanned", new { 
+                    sessionId, 
+                    barcode, 
+                    scannedBy, 
+                    barcodeType = "BOX",
+                    timestamp = DateTime.Now 
+                });
+
+            // Broadcast barcode state change
+            await _hubContext.Clients.Group($"Session_{sessionId}")
+                .SendAsync("BarcodeStateChanged", new { 
+                    sessionId, 
+                    barcode, 
+                    action = "scanned", 
+                    by = scannedBy, 
+                    timestamp = DateTime.Now 
+                });
 
             var result = new ScanResultDto
             {
@@ -625,6 +662,14 @@ namespace ShipmentFinishGood.Services
 
             session.Status = "SCAN_COMPLETED";
             await _context.SaveChangesAsync();
+
+            // Send SignalR notification to all users in the session
+            await _hubContext.Clients.Group($"Session_{sessionId}")
+                .SendAsync("SessionUnlocked", new { 
+                    sessionId, 
+                    unlockedBy = completedBy, 
+                    timestamp = DateTime.Now 
+                });
 
             return Result<bool>.Success(true);
         }
