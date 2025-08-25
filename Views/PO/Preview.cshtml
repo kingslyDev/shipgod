@@ -1042,28 +1042,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-4">
-                    <div class="card h-100 border-0 bg-light">
-                        <div class="card-body">
-                            <h6 class="card-title text-primary">
-                                <i class="fas fa-tag me-2"></i>
-                                Prefix Settings
-                            </h6>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <label class="form-label small">Pallet Prefix</label>
-                                    <input type="text" id="palletPrefix" class="form-control" 
-                                           placeholder="AA" maxlength="5">
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label small">PCS Prefix</label>
-                                    <input type="text" id="pcsPrefix" class="form-control" 
-                                           placeholder="AB" maxlength="5">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -1593,8 +1571,6 @@
             // Get form data
             const shipmentType = document.querySelector('input[name="shipmentType"]:checked').value;
             const shipmentDate = document.getElementById('shipmentDate').value;
-            const palletPrefix = document.getElementById('palletPrefix').value;
-            const pcsPrefix = document.getElementById('pcsPrefix').value;
 
             if (!shipmentDate) {
                 alert('Please select shipment date!');
@@ -1647,8 +1623,6 @@
                     Country: country,
                     ShipmentType: shipmentType,
                     ShipmentDate: shipmentDate,
-                    PalletPrefix: palletPrefix,
-                    PcsPrefix: pcsPrefix,
                     ProcessedData: countryData
                 };
 

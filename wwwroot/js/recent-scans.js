@@ -89,9 +89,14 @@ class RecentScansManager {
                 limit: this.maxItems 
             });
 
+            console.log('🔍 GetRecentScans Response:', response);
+            console.log('📊 Scans Count:', response.data?.recentScans?.length || 0);
+            console.log('📈 Total Count:', response.data?.totalCount || 0);
+
             if (response.success && response.data) {
                 this.renderProfessionalScans(response.data);
             } else {
+                console.error('❌ API Error:', response.message);
                 this.renderEmpty();
             }
         } catch (error) {
@@ -114,128 +119,44 @@ class RecentScansManager {
     }
 
     renderProfessionalScans(data) {
-        const { recentScans, totalCount, totalScannedToday, sessionInfo, lastScanTime } = data;
+        const { recentScans, totalCount, scannedCount, pendingCount, sessionInfo } = data;
         
         if (!recentScans || recentScans.length === 0) {
             this.renderEmpty();
             return;
         }
 
-        const headerHtml = `
-            <div class="recent-scans-header professional">
-                <div class="header-left">
-                    <i class="fas fa-history me-2 text-primary"></i>
-                    <span class="header-title">Recent Scans</span>
-                    <span class="scan-badge session">${totalCount}</span>
-                </div>
-                <div class="header-right">
-                    <div class="header-stats">
-                        <span class="stat-item">
-                            <i class="fas fa-calendar-day me-1"></i>
-                            ${totalScannedToday} today
-                        </span>
-                        <span class="stat-item">
-                            <i class="fas fa-clock me-1"></i>
-                            ${lastScanTime}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        `;
+        console.log('🔍 Rendering scans:', recentScans.length, 'items');
+        console.log('📊 Status counts - Done:', scannedCount, 'Todo:', pendingCount, 'Total:', totalCount);
 
-        const sessionInfoHtml = sessionInfo ? `
-            <div class="session-info">
-                <i class="fas fa-file-alt me-2"></i>
-                <span>${sessionInfo}</span>
-            </div>
-        ` : '';
-
-        const itemsHtml = recentScans.map((scan, index) => `
-            <div class="professional-scan-item ${scan.itemType.toLowerCase()} ${scan.isCompleted ? 'completed' : 'pending'}" 
-                 data-scan-id="${index}" 
-                 onclick="toggleScanDetails(${index})">
-                <div class="scan-item-header">
-                    <div class="scan-left">
-                        <div class="scan-icon">
-                            <i class="fas fa-${this.getItemIcon(scan.itemType)}"></i>
-                        </div>
-                        <div class="scan-main-info">
-                            <div class="scan-model">
-                                <span class="model-name">${scan.displayName || scan.modelProduct}</span>
-                                <span class="item-type-badge ${scan.itemType.toLowerCase()}">${scan.itemType}</span>
-                            </div>
-                            <div class="scan-barcode-info">
-                                <div class="barcode-display" onclick="toggleBarcodeView(this)" data-full="${scan.barcodeValue}" title="Click to toggle full barcode view">
-                                    <span class="barcode-short">${this.truncateBarcode(scan.barcodeValue)}</span>
-                                    <i class="fas fa-expand toggle-icon" title="Toggle full view"></i>
-                                </div>
-                            </div>
-                        </div>
+        const scanItemsHtml = recentScans.map((scan, index) => `
+            <div class="recent-scan-item ${scan.itemType.toLowerCase()}" onclick="toggleScanDetails(${index})">
+                <div class="recent-scan-left">
+                                        <div class="recent-scan-barcode">
+                        <span class="barcode-text">${scan.barcodeValue}</span>
                     </div>
-                    <div class="scan-right">
-                        <div class="scan-time">${this.timeAgo(scan.scannedAt)}</div>
-                        <div class="scan-status ${scan.status.toLowerCase()}">
-                            <i class="fas fa-${scan.isCompleted ? 'check-circle' : 'clock'}"></i>
-                            ${scan.status}
-                        </div>
+                    <div class="recent-scan-meta">
+                        ${scan.isCompleted ? 
+                            `✅ Scanned ${this.timeAgo(scan.scannedAt)} ago` : 
+                            '⏳ Not scanned yet'
+                        }
                     </div>
                 </div>
-                
-                <div class="scan-details" id="details-${index}" style="display: none;">
-                    <div class="detail-row">
-                        <span class="detail-label">Barcode:</span>
-                        <span class="detail-value barcode-value" onclick="copyBarcode('${scan.barcodeValue}')">
-                            ${scan.shortBarcode}
-                            <i class="fas fa-copy ms-2 copy-icon" title="Click to copy full barcode"></i>
-                        </span>
-                    </div>
-                    ${scan.description ? `
-                        <div class="detail-row">
-                            <span class="detail-label">Description:</span>
-                            <span class="detail-value">${scan.description}</span>
-                        </div>
-                    ` : ''}
-                    ${scan.container ? `
-                        <div class="detail-row">
-                            <span class="detail-label">Container:</span>
-                            <span class="detail-value">${scan.container}</span>
-                        </div>
-                    ` : ''}
-                    <div class="detail-row">
-                        <span class="detail-label">Scanned by:</span>
-                        <span class="detail-value">
-                            <i class="fas fa-user me-1"></i>
-                            ${scan.scannedBy.split('@')[0]}
-                        </span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Full Time:</span>
-                        <span class="detail-value">${new Date(scan.scannedAt).toLocaleString()}</span>
-                    </div>
-                </div>
+                <div class="recent-scan-type">${scan.itemType}</div>
             </div>
         `).join('');
 
-        const html = `
-            <div class="recent-scans-container professional">
-                ${headerHtml}
-                ${sessionInfoHtml}
-                <div class="recent-scans-body">
-                    ${itemsHtml}
+        $(this.containerId).html(`
+            <div class="recent-scans-container">
+                <div class="recent-scans-header">
+                    <span>Recent Scans</span>
+                    <span class="recent-scans-badge">${recentScans.length}</span>
                 </div>
-                <div class="recent-scans-footer">
-                    <span class="footer-text">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Click items for details • Auto-refresh enabled
-                    </span>
+                <div class="recent-scans-body">
+                    ${scanItemsHtml}
                 </div>
             </div>
-        `;
-
-        $(this.containerId).html(html);
-        
-        // Store scan data for interactions
-        this.scanData = recentScans;
+        `);
     }
 
     renderEmpty() {
@@ -302,37 +223,27 @@ class RecentScansManager {
         this.hide();
         console.log('🗑️ Professional RecentScansManager destroyed');
     }
-
-    // 🔧 Utility Methods
-    truncateBarcode(barcode) {
-        if (!barcode) return 'N/A';
-        return barcode.length > 15 ? `${barcode.substring(0, 12)}...` : barcode;
-    }
 }
 
-// 🌟 GLOBAL INTERACTION FUNCTIONS
-window.toggleBarcodeView = function(element) {
-    const $element = $(element);
-    const $shortSpan = $element.find('.barcode-short');
-    const $icon = $element.find('.toggle-icon');
-    const fullBarcode = $element.data('full');
+// 🌟 GLOBAL FUNCTIONS
+window.toggleScanDetails = function(index) {
+    console.log('Toggle details for item:', index);
+};
+
+window.toggleRowBarcode = function(index) {
+    const barcodeEl = document.getElementById(`barcode-${index}`);
+    const data = window.barcodeToggleData?.[index];
     
-    if (!fullBarcode) return;
+    if (!barcodeEl || !data) return;
     
-    const isShowingFull = $element.hasClass('showing-full');
+    const isShowingFull = barcodeEl.classList.contains('showing-full');
     
     if (isShowingFull) {
-        // Show truncated version
-        $shortSpan.text(fullBarcode.length > 15 ? `${fullBarcode.substring(0, 12)}...` : fullBarcode);
-        $icon.removeClass('fa-compress').addClass('fa-expand');
-        $icon.attr('title', 'Click to expand full barcode');
-        $element.removeClass('showing-full');
+        barcodeEl.textContent = data.short;
+        barcodeEl.classList.remove('showing-full');
     } else {
-        // Show full version
-        $shortSpan.text(fullBarcode);
-        $icon.removeClass('fa-expand').addClass('fa-compress');
-        $icon.attr('title', 'Click to compress barcode');
-        $element.addClass('showing-full');
+        barcodeEl.textContent = data.full;
+        barcodeEl.classList.add('showing-full');
     }
 };
 

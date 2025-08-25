@@ -27,6 +27,8 @@ namespace ShipmentFinishGood.DTOs
     {
         public List<RecentScanDto> RecentScans { get; set; } = new();
         public int TotalCount { get; set; }
+        public int ScannedCount { get; set; }
+        public int PendingCount { get; set; }
         public int TotalScannedToday { get; set; }
         public string SessionInfo { get; set; } = string.Empty;
         public string LastScanTime { get; set; } = string.Empty;

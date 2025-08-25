@@ -62,8 +62,6 @@ namespace ShipmentFinishGood.DTOs
         
         public string? ShipmentType { get; set; }
         public DateTime? ShipmentDate { get; set; }
-        public string? PalletPrefix { get; set; }
-        public string? PcsPrefix { get; set; }
     }
 
     public class CalculationRequest
@@ -71,8 +69,6 @@ namespace ShipmentFinishGood.DTOs
         public int SessionId { get; set; }
         public string ShipmentType { get; set; } = string.Empty; // LOOSE or PALLET
         public DateTime ShipmentDate { get; set; }
-        public string? PalletPrefix { get; set; }
-        public string? PcsPrefix { get; set; }
         public List<ProcessedPOData> ProcessedData { get; set; } = new();
     }
 
@@ -82,8 +78,6 @@ namespace ShipmentFinishGood.DTOs
         public string Country { get; set; } = string.Empty;
         public string ShipmentType { get; set; } = string.Empty;
         public DateTime ShipmentDate { get; set; }
-        public string? PalletPrefix { get; set; }
-        public string? PcsPrefix { get; set; }
         public List<ProcessedPOData> ProcessedData { get; set; } = new();
     }
 
