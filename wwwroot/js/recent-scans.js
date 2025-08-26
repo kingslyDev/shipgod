@@ -20,8 +20,15 @@ class RecentScansManager {
     }
 
     createContainer() {
+        console.log('🔍 CREATE CONTAINER DEBUG: Checking if container exists...');
+        console.log('🔍 Container selector:', this.containerId);
+        console.log('🔍 Container exists:', $(this.containerId).length > 0);
+        
         if ($(this.containerId).length === 0) {
-            $('#scanStatus').parent().after(`<div id="${this.containerId.replace('#', '')}" style="display: none;"></div>`);
+            console.log('⚠️ Container not found, creating one...');
+            $('#scanStatus').parent().after(`<div id="${this.containerId.replace('#', '')}" class="recent-scans-container" style="display: none;"></div>`);
+        } else {
+            console.log('✅ Container found, using existing one');
         }
         this.renderEmpty();
     }
@@ -51,13 +58,22 @@ class RecentScansManager {
     }
 
     show(sessionId) {
-        if (!sessionId) return;
+        console.log('🔍 RECENT SCANS DEBUG: show() called with sessionId:', sessionId);
+        console.log('🔍 Container element exists:', $(this.containerId).length > 0);
+        console.log('🔍 Container current display:', $(this.containerId).css('display'));
+        
+        if (!sessionId) {
+            console.warn('❌ No sessionId provided to show()');
+            return;
+        }
         
         this.sessionId = sessionId;
         this.isVisible = true;
         this.lastScanTime = null; // Track last scan time
         
+        console.log('🔍 About to slideDown container...');
         $(this.containerId).slideDown(300, () => {
+            console.log('✅ SlideDown completed, calling loadScans()');
             this.loadScans();
         });
         
@@ -97,12 +113,20 @@ class RecentScansManager {
     }
 
     async loadScans() {
-        if (!this.sessionId || !this.isVisible) return;
+        console.log('🔍 LOADSCANS DEBUG: Starting loadScans()');
+        console.log('🔍 SessionId:', this.sessionId, 'IsVisible:', this.isVisible);
+        
+        if (!this.sessionId || !this.isVisible) {
+            console.warn('❌ LoadScans aborted - missing sessionId or not visible');
+            return;
+        }
 
         try {
             // Add loading state
+            console.log('🔍 Rendering loading state...');
             this.renderLoading();
             
+            console.log('🔍 Making AJAX call to /Scan/GetRecentScans...');
             const response = await $.get('/Scan/GetRecentScans', { 
                 sessionId: this.sessionId, 
                 limit: this.maxItems 
@@ -113,8 +137,10 @@ class RecentScansManager {
             console.log('📈 Total Count:', response.data?.totalCount || 0);
 
             if (response.success && response.data) {
+                console.log('✅ Response successful, enhancing with pallet tracking...');
                 // Enhance data with automatic pallet entries
                 const enhancedData = this.enhanceWithPalletTracking(response.data);
+                console.log('✅ Calling renderProfessionalScans...');
                 this.renderProfessionalScans(enhancedData);
             } else {
                 console.error('❌ API Error:', response.message);
@@ -318,17 +344,19 @@ class RecentScansManager {
         
         console.log(`🚛 Generated ${palletEntries.length} placeholder pallet entries (${actualPalletScans.length} real scans + ${palletEntries.length} placeholders = ${totalPallets} total)`);
         return palletEntries;
-    }    renderLoading() {
+    }
+
+    renderLoading() {
+        console.log('🔍 RENDER LOADING DEBUG: Rendering loading state');
         $(this.containerId).html(`
-            <div class="recent-scans-container professional">
-                <div class="recent-scans-header loading">
-                    <div class="header-left">
-                        <i class="fas fa-sync-alt fa-spin me-2"></i>
-                        <span>Loading Recent Scans...</span>
-                    </div>
+            <div class="recent-scans-header loading">
+                <div class="header-left">
+                    <i class="fas fa-sync-alt fa-spin me-2"></i>
+                    <span>Loading Recent Scans...</span>
                 </div>
             </div>
         `);
+        console.log('✅ Loading state rendered');
     }
 
     renderProfessionalScans(data) {
@@ -377,63 +405,62 @@ class RecentScansManager {
         const headerExtra = totalPallets ? 
             `<small class="pallet-info">🚛 ${scannedPallets}/${totalPallets} Pallets</small>` : '';
 
+        console.log('🔍 RENDER PROFESSIONAL SCANS DEBUG: Rendering', recentScans.length, 'scans');
         $(this.containerId).html(`
-            <div class="recent-scans-container">
-                <div class="recent-scans-header">
-                    <div class="header-main">
-                        <span><i class="fas fa-history me-2"></i>Recent Scans</span>
-                        ${headerExtra}
-                    </div>
-                    <div class="recent-scans-badge">
-                        <span>${recentScans.length}</span>
-                        <small>items</small>
-                    </div>
+            <div class="recent-scans-header">
+                <div class="header-main">
+                    <span><i class="fas fa-history me-2"></i>Recent Scans</span>
+                    ${headerExtra}
                 </div>
-                <div class="recent-scans-body">
-                    ${scanItemsHtml}
+                <div class="recent-scans-badge">
+                    <span>${recentScans.length}</span>
+                    <small>items</small>
                 </div>
             </div>
+            <div class="recent-scans-body">
+                ${scanItemsHtml}
+            </div>
         `);
+        console.log('✅ Professional scans rendered');
     }
 
     renderEmpty() {
+        console.log('🔍 RENDER EMPTY DEBUG: Rendering empty state');
         $(this.containerId).html(`
-            <div class="recent-scans-container professional empty">
-                <div class="recent-scans-header">
-                    <span><i class="fas fa-history me-2"></i>Recent Scans</span>
-                    <div class="recent-scans-badge">
-                        <span>0</span>
-                        <small>items</small>
-                    </div>
-                </div>
-                <div class="recent-scans-empty">
-                    <i class="fas fa-barcode empty-icon"></i>
-                    <div class="empty-text">No recent scans yet</div>
-                    <div class="empty-subtext">Start scanning to see items appear here</div>
+            <div class="recent-scans-header">
+                <span><i class="fas fa-history me-2"></i>Recent Scans</span>
+                <div class="recent-scans-badge">
+                    <span>0</span>
+                    <small>items</small>
                 </div>
             </div>
+            <div class="recent-scans-empty">
+                <i class="fas fa-barcode empty-icon"></i>
+                <div class="empty-text">No recent scans yet</div>
+                <div class="empty-subtext">Start scanning to see items appear here</div>
+            </div>
         `);
+        console.log('✅ Empty state rendered');
     }
 
     renderError() {
+        console.log('🔍 RENDER ERROR DEBUG: Rendering error state');
         $(this.containerId).html(`
-            <div class="recent-scans-container professional error">
-                <div class="recent-scans-header">
-                    <div class="header-left">
-                        <i class="fas fa-exclamation-triangle me-2 text-warning"></i>
-                        <span class="header-title">Recent Scans</span>
-                        <span class="scan-badge error">!</span>
-                    </div>
-                </div>
-                <div class="error-state">
-                    <i class="fas fa-wifi-off error-icon"></i>
-                    <span class="error-text">Failed to load</span>
-                    <button onclick="recentScansManager.loadScans()" class="btn btn-sm btn-outline-primary mt-2">
-                        <i class="fas fa-refresh me-1"></i>Retry
-                    </button>
+            <div class="recent-scans-header error">
+                <div class="header-main">
+                    <span class="header-title">Recent Scans</span>
+                    <span class="scan-badge error">!</span>
                 </div>
             </div>
+            <div class="error-state">
+                <i class="fas fa-wifi-off error-icon"></i>
+                <span class="error-text">Failed to load</span>
+                <button onclick="recentScansManager.loadScans()" class="btn btn-sm btn-outline-primary mt-2">
+                    <i class="fas fa-refresh me-1"></i>Retry
+                </button>
+            </div>
         `);
+        console.log('✅ Error state rendered');
     }
 
     getItemIcon(itemType) {

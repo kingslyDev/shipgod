@@ -5,6 +5,7 @@
 @section Styles {
 <link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/recent-scans.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/scanner-card.css" asp-append-version="true" />
 }
 
 <div class="container py-4">
@@ -50,57 +51,103 @@
     <!-- Main Scanning Input -->
     <div class="row mb-3">
     <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white py-1">
+        <div class="card shadow-lg scanner-card" id="scannerCard">
+            <div class="card-header bg-gradient-primary text-white py-2 scanner-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <small class="mb-0 fw-bold">
-                        <i class="fas fa-qrcode me-1"></i>Smart Scanner
-                    </small>
-                    <div class="d-flex gap-1">
-                        <button class="btn btn-outline-light btn-sm px-2 py-1" onclick="manualRefreshSessions()" title="Refresh QR data">
+                    <div class="header-title-section">
+                        <div class="scanner-pulse"></div>
+                        <small class="mb-0 fw-bold scanner-title">
+                            <i class="fas fa-qrcode me-2 scanner-icon"></i>Smart Scanner
+                        </small>
+                        <div class="scanner-status-line" id="scannerStatusLine">Ready to scan</div>
+                    </div>
+                    <div class="d-flex gap-1 scanner-controls">
+                        <button class="btn btn-outline-light btn-sm scanner-control-btn" onclick="manualRefreshSessions()" 
+                                title="Refresh QR data" data-bs-toggle="tooltip">
                             <i class="fas fa-sync-alt"></i>
                         </button>
-                        <button class="btn btn-outline-light btn-sm px-2 py-1" onclick="debugScanSystem()" title="Debug scan system">
+                        <button class="btn btn-outline-light btn-sm scanner-control-btn" onclick="debugScanSystem()" 
+                                title="Debug scan system" data-bs-toggle="tooltip">
                             <i class="fas fa-bug"></i>
                         </button>
-                        <button class="btn btn-outline-warning btn-sm px-2 py-1" onclick="emergencyUnlock()" title="Emergency unlock if stuck in session" 
+                        <button class="btn btn-outline-warning btn-sm scanner-control-btn" onclick="emergencyUnlock()" 
+                                title="Emergency unlock if stuck in session" data-bs-toggle="tooltip"
                                 style="display: none;" id="emergencyUnlockBtn">
                             <i class="fas fa-unlock"></i>
                         </button>
                     </div>
                 </div>
             </div>
-            <div class="card-body py-2">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text py-1">
-                                <i class="fas fa-crosshairs"></i>
-                            </span>
-                            <input type="text" 
-                                   id="mainScanInput" 
-                                   class="form-control form-control-sm py-1" 
-                                   placeholder="📱 Scan QR or barcode here..." 
-                                   autocomplete="off" 
-                                   spellcheck="false"
-                                   inputmode="text"
-                                   aria-label="Scan input"
-                                   aria-describedby="scanHelp"
-                                   autofocus>
-                            <button class="btn btn-primary btn-sm py-1 px-2" type="button" onclick="processScan()" aria-label="Scan input">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        </div>
-                        <div id="scanHelp" class="form-text" style="font-size: 0.7rem; margin-top: 0.2rem;">
-                            First scan QR Identity, then scan Box, Pallet, or PCS barcodes.
+            <div class="card-body py-3 scanner-body">
+                <div class="row align-items-center main-scanner-section">
+                    <!-- Input Section - Prioritized for tablet -->
+                    <div class="col-xl-4 col-lg-5 col-md-12 mb-3">
+                        <div class="scanner-input-group">
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text scanner-icon-bg">
+                                    <i class="fas fa-crosshairs scanner-crosshair"></i>
+                                </span>
+                                <input type="text" 
+                                       id="mainScanInput" 
+                                       class="form-control scanner-input" 
+                                       placeholder="📱 Scan QR or barcode here..." 
+                                       autocomplete="off" 
+                                       spellcheck="false"
+                                       inputmode="text"
+                                       aria-label="Scan input"
+                                       aria-describedby="scanHelp"
+                                       autofocus>
+                                <button class="btn btn-primary scan-submit-btn" type="button" onclick="processScan()" aria-label="Process scan">
+                                    <i class="fas fa-check scan-check-icon"></i>
+                                    <span class="scan-button-text d-none d-lg-inline">Scan</span>
+                                </button>
+                            </div>
+                            <div id="scanHelp" class="form-text scanner-help">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <span id="scanHelpText">First scan QR Identity, then scan Box, Pallet, or PCS barcodes.</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div id="scanStatus" class="text-center" role="status" aria-live="polite">
-                            <div style="font-size: 0.7rem; font-weight: 600; margin-bottom: 0.2rem;">Status</div>
-                            <span class="badge bg-secondary px-2 py-1" id="statusBadge" style="font-size: 0.7rem;">Ready to Scan</span>
-                            <div class="text-muted mt-1" id="statusDetail" style="font-size: 0.65rem;">
-                                Scan QR Identity to begin
+                    
+                    <!-- Session Selector - Compact for tablet -->
+                    <div class="col-xl-3 col-lg-3 col-md-5 mb-3">
+                        <div class="session-selector-group">
+                            <label class="form-label session-label d-none d-lg-flex">
+                                <i class="fas fa-list me-1"></i>Quick Session Lock
+                            </label>
+                            <div class="input-group session-input-group">
+                                <select class="form-select session-dropdown" id="sessionSelect" onchange="onQuickSessionChange()">
+                                    <option value="">-- Select Session --</option>
+                                </select>
+                                <button class="btn btn-outline-success session-lock-btn" type="button" onclick="quickLockSession()" id="quickLockBtn" disabled title="Lock to selected session">
+                                    <i class="fas fa-lock"></i>
+                                </button>
+                                <button class="btn btn-outline-warning session-lock-btn" type="button" onclick="quickUnlockSession()" id="quickUnlockBtn" style="display: none;" title="Unlock current session">
+                                    <i class="fas fa-unlock"></i>
+                                </button>
+                            </div>
+                            <div class="session-info-mini" id="sessionInfoMini" style="display: none;">
+                                <!-- Session info will be displayed here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Panel - Enhanced for tablet -->
+                    <div class="col-xl-5 col-lg-4 col-md-7 mb-3">
+                        <div id="scanStatus" class="scanner-status-panel tablet-enhanced" role="status" aria-live="polite">
+                            <div class="status-header-tablet">
+                                <div class="status-icon-section">
+                                    <i class="fas fa-info-circle status-icon-large"></i>
+                                </div>
+                                <div class="status-content-section">
+                                    <div class="status-label-large">Scanner Status</div>
+                                    <div class="status-badge-container-large">
+                                        <span class="badge status-badge-large" id="statusBadge">Ready to Scan</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="status-details-tablet" id="statusDetail">
+                                <div id="lockStatusIndicator" class="lock-status-large">Scan QR Identity to begin</div>
                             </div>
                         </div>
                     </div>
@@ -109,7 +156,6 @@
         </div>
     </div>
 </div>
-
 
     <!-- Recent Scans Container - Shows when locked to session -->
     <div id="recent-scans-container" class="recent-scans-container" style="display: none;">
@@ -159,6 +205,608 @@
         let signalRConnection = null; // SignalR connection
         let currentSessionGroup = null; // Track current session group
         let recentScansManager = null; // Recent scans manager
+
+        // Session Lock Control Functions - Simplified
+        function populateSessionDropdown() {
+            const select = document.getElementById('sessionSelect');
+            select.innerHTML = '<option value="">-- Select Session --</option>';
+            
+            activeSessions.forEach(session => {
+                const option = document.createElement('option');
+                option.value = session.qrIdentity;
+                option.textContent = `${session.materialCode || session.fileName} (${session.qrIdentity})`;
+                option.setAttribute('data-session', JSON.stringify(session));
+                select.appendChild(option);
+            });
+
+            // Update current selection if locked
+            if (currentUserLock) {
+                select.value = currentUserLock;
+                onQuickSessionChange();
+            }
+        }
+
+        function onQuickSessionChange() {
+            const select = document.getElementById('sessionSelect');
+            const quickLockBtn = document.getElementById('quickLockBtn');
+            const quickUnlockBtn = document.getElementById('quickUnlockBtn');
+            const sessionInfoMini = document.getElementById('sessionInfoMini');
+
+            if (select.value) {
+                const selectedOption = select.options[select.selectedIndex];
+                const sessionData = JSON.parse(selectedOption.getAttribute('data-session') || '{}');
+                
+                // Show session info
+                const createdDate = new Date(sessionData.uploadDate);
+                const formattedDate = createdDate.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                sessionInfoMini.innerHTML = `
+                    <strong>${sessionData.materialCode || sessionData.fileName}</strong><br>
+                    <small>Created: ${formattedDate} | Status: ${sessionData.status}</small>
+                `;
+                sessionInfoMini.style.display = 'block';
+
+                // Show appropriate button
+                if (currentUserLock === select.value) {
+                    quickLockBtn.style.display = 'none';
+                    quickUnlockBtn.style.display = 'inline-block';
+                } else {
+                    quickLockBtn.disabled = false;
+                    quickLockBtn.style.display = 'inline-block';
+                    quickUnlockBtn.style.display = 'none';
+                }
+            } else {
+                sessionInfoMini.style.display = 'none';
+                quickLockBtn.disabled = true;
+                quickLockBtn.style.display = 'inline-block';
+                quickUnlockBtn.style.display = 'none';
+            }
+
+            updateLockStatusIndicator();
+        }
+
+        function quickLockSession() {
+            const select = document.getElementById('sessionSelect');
+            const selectedSession = select.value;
+
+            if (!selectedSession) {
+                provideFeedback('warning', 'Please select a session first');
+                return;
+            }
+
+            // Use existing lock mechanism
+            lockToSession(selectedSession);
+            
+            // Update UI
+            onQuickSessionChange();
+            updateLockStatusIndicator();
+            
+            provideFeedback('success', 'Session locked successfully!');
+        }
+
+        function quickUnlockSession() {
+            // Use existing unlock mechanism
+            unlockFromSession();
+            
+            // Update dropdown
+            const select = document.getElementById('sessionSelect');
+            select.value = '';
+            onQuickSessionChange();
+            updateLockStatusIndicator();
+            
+            // Refresh dropdown
+            populateSessionDropdown();
+            
+            provideFeedback('info', 'Session unlocked');
+        }
+
+        function updateLockStatusIndicator() {
+            const indicator = document.getElementById('lockStatusIndicator');
+            
+            if (currentUserLock) {
+                const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                if (session) {
+                    indicator.innerHTML = `
+                        <i class="fas fa-lock text-success me-1"></i>
+                        Locked to: <strong>${session.materialCode}</strong>
+                    `;
+                } else {
+                    indicator.innerHTML = `
+                        <i class="fas fa-lock text-warning me-1"></i>
+                        Locked to: <strong>${currentUserLock}</strong>
+                    `;
+                }
+            } else {
+                indicator.textContent = 'Scan QR Identity to begin';
+            }
+        }
+
+        // Scanner Card Interactions
+        function initializeScannerCardInteractions() {
+            console.log('🎨 Initializing scanner card interactions...');
+            
+            const scannerCard = $('#scannerCard');
+            const scanInput = $('#mainScanInput');
+            const scanButton = $('.scan-submit-btn');
+            
+            // Detect if device is tablet
+            const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+            
+            // Initialize tooltips
+            if (typeof bootstrap !== 'undefined') {
+                $('[data-bs-toggle="tooltip"]').each(function() {
+                    new bootstrap.Tooltip(this);
+                });
+            }
+            
+            // Enhanced tablet interactions
+            if (isTablet) {
+                initializeTabletEnhancements();
+            }
+            
+            // Scanner input interactions
+            scanInput.on('input', function() {
+                const value = $(this).val().trim();
+                updateScannerCardState(value.length > 0 ? 'typing' : 'ready');
+                
+                // Auto-process if looks like a complete barcode
+                if (value.length > 8 && /^[A-Z0-9]+$/.test(value)) {
+                    setTimeout(() => {
+                        if ($(this).val().trim() === value) { // Still the same value
+                            updateScannerCardState('auto-scanning');
+                            setTimeout(() => processScan(), 300);
+                        }
+                    }, 800); // Auto-scan after 800ms of no changes
+                }
+            });
+            
+            scanInput.on('focus', function() {
+                scannerCard.addClass('focused');
+                updateScanHelpText('focused');
+            });
+            
+            scanInput.on('blur', function() {
+                scannerCard.removeClass('focused');
+                updateScanHelpText('normal');
+            });
+            
+            // Scanner button interactions
+            scanButton.on('mouseenter', function() {
+                $(this).addClass('hover-effect');
+            }).on('mouseleave', function() {
+                $(this).removeClass('hover-effect');
+            });
+            
+            // Keyboard shortcuts
+            $(document).on('keydown', function(e) {
+                // Ctrl/Cmd + Enter for quick scan
+                if ((e.ctrlKey || e.metaKey) && e.which === 13) {
+                    e.preventDefault();
+                    processScan();
+                }
+                
+                // ESC to clear and focus
+                if (e.which === 27) {
+                    e.preventDefault();
+                    scanInput.val('').focus();
+                    updateScannerCardState('ready');
+                }
+            });
+            
+            // Periodic status update
+            setInterval(updateScannerStatusLine, 5000);
+            
+            console.log('✅ Scanner card interactions initialized');
+        }
+
+        function initializeTabletEnhancements() {
+            console.log('📱 Initializing tablet-specific enhancements...');
+            
+            // Enhanced touch interactions for tablet
+            $('.scanner-status-panel').on('touchstart', function() {
+                $(this).addClass('tablet-touch-active');
+            }).on('touchend', function() {
+                $(this).removeClass('tablet-touch-active');
+            });
+            
+            // Enhance recent scans visibility on tablet
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('tablet-visible');
+                    }
+                });
+            });
+            
+            // Observe recent scans container
+            const recentScansContainer = document.getElementById('recent-scans-container');
+            if (recentScansContainer) {
+                observer.observe(recentScansContainer);
+            }
+            
+            // Add tablet-specific status updates
+            setInterval(updateTabletStatusEnhancements, 3000);
+            
+            console.log('✅ Tablet enhancements initialized');
+        }
+
+        function updateTabletStatusEnhancements() {
+            const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+            if (!isTablet) return;
+            
+            const statusPanel = $('.scanner-status-panel.tablet-enhanced');
+            if (statusPanel.length === 0) return;
+            
+            // Add subtle animation to status icon when locked
+            if (currentUserLock) {
+                statusPanel.addClass('tablet-locked-state');
+            } else {
+                statusPanel.removeClass('tablet-locked-state');
+            }
+            
+            // Ensure recent scans are visible and prominent
+            const recentScansContainer = $('#recent-scans-container');
+            if (recentScansContainer.is(':visible')) {
+                recentScansContainer.addClass('tablet-prominent');
+            }
+        }
+
+        function updateScannerCardState(state) {
+            const scannerCard = $('#scannerCard');
+            const scanInput = $('#mainScanInput');
+            const statusLine = $('#scannerStatusLine');
+            
+            // Remove previous state classes
+            scannerCard.removeClass('ready typing auto-scanning scanning locked loading error');
+            
+            switch(state) {
+                case 'ready':
+                    scannerCard.addClass('ready');
+                    scanInput.removeClass('is-valid is-invalid');
+                    break;
+                case 'typing':
+                    scannerCard.addClass('typing');
+                    statusLine.text('Typing...');
+                    break;
+                case 'auto-scanning':
+                    scannerCard.addClass('auto-scanning');
+                    statusLine.text('Auto-processing...');
+                    break;
+                case 'scanning':
+                    scannerCard.addClass('scanning');
+                    statusLine.text('Processing scan...');
+                    break;
+                case 'locked':
+                    scannerCard.addClass('locked');
+                    statusLine.text('Session locked');
+                    break;
+                case 'loading':
+                    scannerCard.addClass('loading');
+                    statusLine.text('Loading...');
+                    break;
+                case 'error':
+                    scannerCard.addClass('error');
+                    statusLine.text('Error occurred');
+                    scanInput.addClass('is-invalid');
+                    break;
+                case 'success':
+                    scanInput.addClass('is-valid');
+                    statusLine.text('Scan successful');
+                    setTimeout(() => {
+                        scanInput.removeClass('is-valid');
+                        updateScannerCardState('ready');
+                    }, 2000);
+                    break;
+            }
+        }
+
+        function updateScanHelpText(context) {
+            const helpText = $('#scanHelpText');
+            const helpContainer = $('#scanHelp');
+            
+            switch(context) {
+                case 'focused':
+                    helpText.html('💡 <strong>Tips:</strong> Use Ctrl+Enter for quick scan, ESC to clear');
+                    helpContainer.addClass('focused');
+                    break;
+                case 'locked':
+                    if (currentUserLock) {
+                        const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                        const sessionName = session ? session.fileName : currentUserLock;
+                        helpText.html(`🔒 Locked to session: <strong>${sessionName}</strong> - Scan boxes, pallets, or PCS items`);
+                    }
+                    break;
+                case 'error':
+                    helpText.html('❌ Please check your input and try again');
+                    helpContainer.addClass('error');
+                    setTimeout(() => {
+                        helpContainer.removeClass('error');
+                        updateScanHelpText('normal');
+                    }, 3000);
+                    break;
+                default:
+                    helpText.text('First scan QR Identity, then scan Box, Pallet, or PCS barcodes.');
+                    helpContainer.removeClass('focused error');
+            }
+        }
+
+        function updateScannerStatusLine() {
+            const statusLine = $('#scannerStatusLine');
+            const now = new Date();
+            
+            if (currentUserLock) {
+                const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                if (session) {
+                    statusLine.text(`Active: ${session.fileName}`);
+                } else {
+                    statusLine.text(`Active: ${currentUserLock}`);
+                }
+            } else {
+                const timeString = now.toLocaleTimeString('en-US', { 
+                    hour12: false, 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                statusLine.text(`Ready to scan • ${timeString}`);
+            }
+        }
+
+        // Interactive feedback functions
+        function playFeedbackSound(type) {
+            // Create audio context for sound feedback
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                switch(type) {
+                    case 'success':
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
+                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.2);
+                        break;
+                    case 'error':
+                        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.2);
+                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.3);
+                        break;
+                    case 'scan':
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.1);
+                        break;
+                }
+            } catch (e) {
+                // Silent fail if audio not supported
+                console.log('Audio feedback not available');
+            }
+        }
+
+        function triggerHapticFeedback(type) {
+            // Haptic feedback for mobile devices
+            if ('vibrate' in navigator) {
+                switch(type) {
+                    case 'success':
+                        navigator.vibrate([100, 50, 100]);
+                        break;
+                    case 'error':
+                        navigator.vibrate([200, 100, 200, 100, 200]);
+                        break;
+                    case 'scan':
+                        navigator.vibrate(50);
+                        break;
+                }
+            }
+        }
+
+        function showVisualFeedback(type, message) {
+            const scannerCard = $('#scannerCard');
+            const feedbackOverlay = $('<div class="scanner-feedback-overlay"></div>');
+            
+            let icon, bgClass, textClass;
+            switch(type) {
+                case 'success':
+                    icon = 'fas fa-check-circle';
+                    bgClass = 'bg-success';
+                    textClass = 'text-white';
+                    break;
+                case 'error':
+                    icon = 'fas fa-times-circle';
+                    bgClass = 'bg-danger';
+                    textClass = 'text-white';
+                    break;
+                case 'warning':
+                    icon = 'fas fa-exclamation-triangle';
+                    bgClass = 'bg-warning';
+                    textClass = 'text-dark';
+                    break;
+                case 'info':
+                    icon = 'fas fa-info-circle';
+                    bgClass = 'bg-info';
+                    textClass = 'text-white';
+                    break;
+            }
+            
+            feedbackOverlay.addClass(`${bgClass} ${textClass}`).html(`
+                <div class="feedback-content">
+                    <i class="${icon} feedback-icon"></i>
+                    <div class="feedback-message">${message}</div>
+                </div>
+            `);
+            
+            // Add CSS for overlay
+            feedbackOverlay.css({
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+                borderRadius: '16px',
+                opacity: 0,
+                transform: 'scale(0.8)'
+            });
+            
+            scannerCard.css('position', 'relative').append(feedbackOverlay);
+            
+            // Animate in
+            feedbackOverlay.animate({
+                opacity: 0.95,
+                transform: 'scale(1)'
+            }, 200, () => {
+                // Animate out after delay
+                setTimeout(() => {
+                    feedbackOverlay.animate({
+                        opacity: 0,
+                        transform: 'scale(0.8)'
+                    }, 200, () => {
+                        feedbackOverlay.remove();
+                    });
+                }, 1500);
+            });
+        }
+
+        function provideFeedback(type, message) {
+            playFeedbackSound(type);
+            triggerHapticFeedback(type);
+            showVisualFeedback(type, message);
+        }
+
+        // Manual lock to session function
+        function lockToSession(qrIdentity) {
+            const session = activeSessions.find(s => s.qrIdentity === qrIdentity);
+            if (!session) {
+                showAlert('Session not found', 'danger');
+                return;
+            }
+
+            // Call backend to lock to session
+            $.ajax({
+                url: '@Url.Action("ScanMasterQR", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: session.sessionId,
+                    qrCode: qrIdentity
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        currentUserLock = qrIdentity;
+                        currentSessionGroup = session.sessionId;
+                        
+                        // Save to session storage for persistence
+                        saveUserLockState(qrIdentity, session);
+                        
+                        // Join SignalR session group
+                        if (signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
+                            joinSessionGroup(session.sessionId);
+                        }
+                        
+                        // Clear barcode cache
+                        resolvedBarcodes.clear();
+                        
+                        // Update UI
+                        updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
+                        updateUIForLockedState(session);
+                        updateUILockState(true, session.fileName);
+                        updateLockStatusIndicator();
+                        
+                        // Clear input and focus
+                        $('#mainScanInput').val('').focus();
+                        
+                        // Show recent scans
+                        if (recentScansManager) {
+                            recentScansManager.show(session.sessionId);
+                        }
+                        
+                        showAlert(`✅ Successfully locked to session: ${session.fileName}`, 'success');
+                    } else {
+                        showAlert(`❌ Failed to lock to session: ${response.message}`, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Error locking to session. Please try again.', 'danger');
+                }
+            });
+        }
+
+        // Manual unlock from session function
+        function unlockFromSession() {
+            if (!currentUserLock) {
+                showAlert('No active session to unlock', 'warning');
+                return;
+            }
+
+            // Call backend to unlock
+            $.ajax({
+                url: '@Url.Action("UnlockFromSession", "Scan")',
+                type: 'POST',
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Clear current lock
+                        const previousLock = currentUserLock;
+                        currentUserLock = null;
+                        
+                        // Leave SignalR session group
+                        if (currentSessionGroup && signalRConnection && signalRConnection.state === signalR.HubConnectionState.Connected) {
+                            leaveSessionGroup(currentSessionGroup);
+                        }
+                        currentSessionGroup = null;
+                        
+                        // Clear session storage
+                        clearUserLockState();
+                        
+                        // Clear barcode cache
+                        resolvedBarcodes.clear();
+                        
+                        // Update UI
+                        updateScanStatus('ready', 'Ready to scan QR Identity', 'secondary');
+                        updateUILockState(false);
+                        updateLockStatusIndicator();
+                        
+                        // Hide recent scans
+                        if (recentScansManager) {
+                            recentScansManager.hide();
+                        }
+                        
+                        // Focus on input
+                        $('#mainScanInput').val('').focus();
+                        
+                        showAlert(`✅ Successfully unlocked from session`, 'success');
+                    } else {
+                        showAlert(`❌ Failed to unlock: ${response.message}`, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Error unlocking from session. Please try again.', 'danger');
+                }
+            });
+        }
 
         // Initialize SignalR connection
         function initializeSignalR() {
@@ -383,6 +1031,9 @@
             
             // Initialize SignalR connection
             initializeSignalR();
+            
+            // Initialize scanner card interactions
+            initializeScannerCardInteractions();
             
             // Focus on main scan input
             $('#mainScanInput').focus();
@@ -1081,6 +1732,7 @@
             
             // Update UI lock state
             updateUILockState(false);
+            updateLockStatusIndicator(); // Update lock status indicator
             
             // Hide recent scans
             if (recentScansManager) {
@@ -1237,6 +1889,7 @@
                     // Update UI immediately for fast response
                     updateScanStatus('locked', `Locked to: ${sessionData.fileName}`, 'success');
                     updateUIForLockedState(sessionData);
+                    updateLockStatusIndicator(); // Update lock status indicator
                     
                     // Show recent scans for restored session
                     if (recentScansManager) {
@@ -1427,6 +2080,7 @@
             
             // Update UI
             updateScanStatus('ready', 'Ready to scan QR Identity', 'success');
+            updateLockStatusIndicator(); // Update lock status indicator
             $('#mainScanInput').attr('placeholder', '📱 Scan QR Identity or Item Barcode here...')
                 .val('')
                 .focus();
@@ -1458,6 +2112,7 @@
                                 saveUserLockState(currentUserLock, session);
                                 updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
                                 updateUIForLockedState(session);
+                                updateLockStatusIndicator(); // Update lock status indicator
                                 
                                 // Show recent scans
                                 if (recentScansManager) {
@@ -1471,6 +2126,7 @@
                                 }
                             } else {
                                 updateScanStatus('locked', `Locked to: ${currentUserLock}`, 'warning');
+                                updateLockStatusIndicator(); // Update lock status indicator
                             }
                         } else if (!wasRestored) {
                             // Server confirms lock but we didn't restore from storage
@@ -1479,6 +2135,7 @@
                                 saveUserLockState(currentUserLock, session);
                                 updateScanStatus('locked', `Locked to: ${session.fileName}`, 'success');
                                 updateUIForLockedState(session);
+                                updateLockStatusIndicator(); // Update lock status indicator
                                 
                                 // Show recent scans
                                 if (recentScansManager) {
@@ -1501,6 +2158,7 @@
                         currentUserLock = null;
                         currentSessionGroup = null;
                         updateScanStatus('ready', 'Ready to scan QR Identity', 'info');
+                        updateLockStatusIndicator(); // Update lock status indicator
                     }
                 },
                 error: function() {
@@ -1523,7 +2181,14 @@
                         @:{
                         @:    sessionId: @session.SessionId,
                         @:    fileName: '@Html.Raw(session.FileName.Replace("'", "\\'"))',
-                        @:    qrIdentity: '@Html.Raw((session.QRIdentity ?? string.Empty).Replace("'", "\\'"))'
+                        @:    qrIdentity: '@Html.Raw((session.QRIdentity ?? string.Empty).Replace("'", "\\'"))',
+                        @:    materialCode: '@Html.Raw(session.FileName.Replace("'", "\\'"))', // Use filename as material code for now
+                        @:    supplierName: 'Session @session.SessionId', // Default supplier name
+                        @:    uploadDate: '@session.CreatedDate.ToString("yyyy-MM-ddTHH:mm:ss")',
+                        @:    status: '@session.Status',
+                        @:    totalBoxes: @session.TotalBoxes,
+                        @:    totalPOs: @session.TotalPOs,
+                        @:    isCompleted: @session.Status.ToLower().Contains("completed").ToString().ToLower()
                         @:},
                     }
                 }
@@ -1537,12 +2202,23 @@
                 console.log(`Session ${index + 1}:`, {
                     sessionId: session.sessionId,
                     fileName: session.fileName,
-                    qrIdentity: session.qrIdentity
+                    qrIdentity: session.qrIdentity,
+                    materialCode: session.materialCode,
+                    uploadDate: session.uploadDate,
+                    status: session.status
                 });
             });
             console.log('QR Identities available:', activeSessions.map(s => s.qrIdentity));
             console.log('=== END SESSION LOADING ===');
             console.log('=== END ACTIVE SESSIONS ===');
+
+            // Update dropdown after loading sessions
+            if (document.getElementById('sessionSelect')) {
+                populateSessionDropdown();
+            }
+
+            // Update lock status indicator
+            updateLockStatusIndicator();
         }
 
         // Update scan status display
@@ -1556,15 +2232,30 @@
             switch(status) {
                 case 'ready':
                     statusBadge.text('Ready to Scan');
-                    statusDetail.text('Scan QR Identity to begin');
+                    updateScannerCardState('ready');
+                    updateScanHelpText('normal');
                     break;
                 case 'locked':
                     statusBadge.text('Session Locked');
-                    statusDetail.text(message);
+                    updateScannerCardState('locked');
+                    updateScanHelpText('locked');
                     break;
                 case 'scanning':
                     statusBadge.text('Scanning Items');
-                    statusDetail.text(message);
+                    updateScannerCardState('scanning');
+                    break;
+                case 'loading':
+                    statusBadge.text('Loading...');
+                    updateScannerCardState('loading');
+                    break;
+                case 'error':
+                    statusBadge.text('Error');
+                    updateScannerCardState('error');
+                    updateScanHelpText('error');
+                    break;
+                case 'completed':
+                    statusBadge.text('Completed');
+                    updateScannerCardState('success');
                     break;
             }
         }
