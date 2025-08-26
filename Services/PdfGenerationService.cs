@@ -51,8 +51,7 @@ namespace ShipmentFinishGood.Services
             var accentColor = new DeviceRgb(0, 123, 255);      // Blue
             var lightGray = new DeviceRgb(248, 249, 250);      // Light background
 
-            // Header Section
-            AddHeaderSection(document, qrData, titleFont, headerFont, bodyFont, primaryColor, accentColor);
+            
 
             // QR Identity + PO Details Combined Section
             AddQRIdentityWithPODetailsSection(document, qrData, headerFont, bodyFont, monospaceFont, accentColor, lightGray);
@@ -234,31 +233,6 @@ namespace ShipmentFinishGood.Services
 
             document.Close();
             return memoryStream.ToArray();
-        }
-
-        private void AddHeaderSection(Document document, QRManagementDto qrData, 
-            PdfFont titleFont, PdfFont headerFont, PdfFont bodyFont, 
-            DeviceRgb primaryColor, DeviceRgb accentColor)
-        {
-            // Company Header
-            document.Add(new Paragraph("SHIPMENT FINISH GOOD")
-                .SetFont(titleFont)
-                .SetFontSize(18)
-                .SetFontColor(primaryColor)
-                .SetTextAlignment(TextAlignment.CENTER)
-                .SetMarginBottom(5));
-
-            document.Add(new Paragraph("BARCODE REFERENCE DOCUMENT")
-                .SetFont(headerFont)
-                .SetFontSize(14)
-                .SetFontColor(accentColor)
-                .SetTextAlignment(TextAlignment.CENTER)
-                .SetMarginBottom(20));
-
-            // Add separator line
-            document.Add(new Paragraph()
-                .SetBorder(new SolidBorder(accentColor, 2))
-                .SetMarginBottom(20));
         }
 
         private void AddQRIdentityWithPODetailsSection(Document document, QRManagementDto qrData,

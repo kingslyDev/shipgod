@@ -132,29 +132,28 @@ class RecentScansManager {
         const scanItemsHtml = recentScans.map((scan, index) => {
             // Extract shortened display text like PDF generation
             const displayText = this.extractBarcodeDisplayText(scan.barcodeValue);
+            const itemType = scan.itemType.toLowerCase();
+            const scannedClass = scan.isCompleted ? 'scanned' : '';
             
             return `
-            <div class="recent-scan-item ${scan.itemType.toLowerCase()}" onclick="toggleScanDetails(${index})">
+            <div class="recent-scan-item ${itemType} ${scannedClass}" onclick="toggleScanDetails(${index})">
                 <div class="recent-scan-left">
                     <div class="recent-scan-barcode">
                         <span class="barcode-text" title="${scan.barcodeValue}">${displayText}</span>
                     </div>
-                    <div class="recent-scan-meta">
-                        ${scan.isCompleted ? 
-                            `✅ Scanned ${this.timeAgo(scan.scannedAt)} ago` : 
-                            '⏳ Not scanned yet'
-                        }
-                    </div>
                 </div>
-                <div class="recent-scan-type">${scan.itemType}</div>
+                <div class="recent-scan-type ${itemType} ${scannedClass}">${scan.itemType}</div>
             </div>`;
         }).join('');
 
         $(this.containerId).html(`
             <div class="recent-scans-container">
                 <div class="recent-scans-header">
-                    <span>Recent Scans</span>
-                    <span class="recent-scans-badge">${recentScans.length}</span>
+                    <span><i class="fas fa-history me-2"></i>Recent Scans</span>
+                    <div class="recent-scans-badge">
+                        <span>${recentScans.length}</span>
+                        <small>items</small>
+                    </div>
                 </div>
                 <div class="recent-scans-body">
                     ${scanItemsHtml}
@@ -167,16 +166,16 @@ class RecentScansManager {
         $(this.containerId).html(`
             <div class="recent-scans-container professional empty">
                 <div class="recent-scans-header">
-                    <div class="header-left">
-                        <i class="fas fa-history me-2 text-muted"></i>
-                        <span class="header-title">Recent Scans</span>
-                        <span class="scan-badge empty">0</span>
+                    <span><i class="fas fa-history me-2"></i>Recent Scans</span>
+                    <div class="recent-scans-badge">
+                        <span>0</span>
+                        <small>items</small>
                     </div>
                 </div>
-                <div class="empty-state">
+                <div class="recent-scans-empty">
                     <i class="fas fa-barcode empty-icon"></i>
-                    <span class="empty-text">No recent scans yet</span>
-                    <small class="empty-subtext">Start scanning to see items here</small>
+                    <div class="empty-text">No recent scans yet</div>
+                    <div class="empty-subtext">Start scanning to see items appear here</div>
                 </div>
             </div>
         `);

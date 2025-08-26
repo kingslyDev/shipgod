@@ -48,59 +48,59 @@
     }
 
     <!-- Main Scanning Input -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-qrcode me-2"></i>Smart Scanner
-                        </h5>
-                        <button class="btn btn-outline-light btn-sm" onclick="manualRefreshSessions()" title="Refresh QR data">
-                            <i class="fas fa-sync-alt me-1"></i>Refresh QR Data
+    <div class="row mb-3">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white py-1">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="mb-0 fw-bold">
+                        <i class="fas fa-qrcode me-1"></i>Smart Scanner
+                    </small>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-outline-light btn-sm px-2 py-1" onclick="manualRefreshSessions()" title="Refresh QR data">
+                            <i class="fas fa-sync-alt"></i>
                         </button>
-                        <button class="btn btn-outline-light btn-sm" onclick="debugScanSystem()" title="Debug scan system">
-                            <i class="fas fa-bug me-1"></i>Debug
+                        <button class="btn btn-outline-light btn-sm px-2 py-1" onclick="debugScanSystem()" title="Debug scan system">
+                            <i class="fas fa-bug"></i>
                         </button>
-                        <button class="btn btn-outline-warning btn-sm" onclick="emergencyUnlock()" title="Emergency unlock if stuck in session" 
+                        <button class="btn btn-outline-warning btn-sm px-2 py-1" onclick="emergencyUnlock()" title="Emergency unlock if stuck in session" 
                                 style="display: none;" id="emergencyUnlockBtn">
-                            <i class="fas fa-unlock me-1"></i>Emergency Unlock
+                            <i class="fas fa-unlock"></i>
                         </button>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <div class="input-group input-group-lg">
-                                <span class="input-group-text">
-                                    <i class="fas fa-crosshairs"></i>
-                                </span>
-                                <input type="text" 
-                                       id="mainScanInput" 
-                                       class="form-control form-control-lg" 
-                                       placeholder="📱 Scan QR Identity, Box, Pallet, or PCS barcode here..." 
-                                       autocomplete="off" 
-                                       spellcheck="false"
-                                       inputmode="text"
-                                       aria-label="Scan input for QR Identity, Box, Pallet, or PCS barcode"
-                                       aria-describedby="scanHelp"
-                                       autofocus>
-                                <button class="btn btn-primary btn-lg" type="button" onclick="processScan()" aria-label="Scan input">
-                                    <i class="fas fa-check me-1"></i>Scan
-                                </button>
-                            </div>
-                            <div id="scanHelp" class="form-text">
-                                <strong>Instructions:</strong> 
-                                First scan QR Identity to lock session, then scan Box, Pallet, or PCS barcodes.
-                            </div>
+            </div>
+            <div class="card-body py-2">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text py-1">
+                                <i class="fas fa-crosshairs"></i>
+                            </span>
+                            <input type="text" 
+                                   id="mainScanInput" 
+                                   class="form-control form-control-sm py-1" 
+                                   placeholder="📱 Scan QR or barcode here..." 
+                                   autocomplete="off" 
+                                   spellcheck="false"
+                                   inputmode="text"
+                                   aria-label="Scan input"
+                                   aria-describedby="scanHelp"
+                                   autofocus>
+                            <button class="btn btn-primary btn-sm py-1 px-2" type="button" onclick="processScan()" aria-label="Scan input">
+                                <i class="fas fa-check"></i>
+                            </button>
                         </div>
-                        <div class="col-md-4">
-                            <div id="scanStatus" class="text-center" role="status" aria-live="polite">
-                                <div class="h6 mb-1">Status</div>
-                                <span class="badge bg-secondary fs-6 px-3 py-2" id="statusBadge">Ready to Scan</span>
-                                <div class="small text-muted mt-2" id="statusDetail">
-                                    Scan QR Identity to begin
-                                </div>
+                        <div id="scanHelp" class="form-text" style="font-size: 0.7rem; margin-top: 0.2rem;">
+                            First scan QR Identity, then scan Box, Pallet, or PCS barcodes.
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div id="scanStatus" class="text-center" role="status" aria-live="polite">
+                            <div style="font-size: 0.7rem; font-weight: 600; margin-bottom: 0.2rem;">Status</div>
+                            <span class="badge bg-secondary px-2 py-1" id="statusBadge" style="font-size: 0.7rem;">Ready to Scan</span>
+                            <div class="text-muted mt-1" id="statusDetail" style="font-size: 0.65rem;">
+                                Scan QR Identity to begin
                             </div>
                         </div>
                     </div>
@@ -108,6 +108,8 @@
             </div>
         </div>
     </div>
+</div>
+
 
     <!-- Recent Scans Container - Shows when locked to session -->
     <div id="recent-scans-container" class="recent-scans-container" style="display: none;">
@@ -117,31 +119,6 @@
     @if (Model?.Any() == true)
     {
 
-        <!-- Quick Guide (replaces per-session list) -->
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-body d-flex align-items-center">
-                        <i class="fas fa-qrcode text-primary fa-3x me-3" aria-hidden="true"></i>
-                        <div>
-                            <div class="h5 mb-1">Step 1 — Scan QR Identity</div>
-                            <div class="text-muted">Lock to a session by scanning the printed QR Identity.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-body d-flex align-items-center">
-                        <i class="fas fa-box-open text-success fa-3x me-3" aria-hidden="true"></i>
-                        <div>
-                            <div class="h5 mb-1">Step 2 — Scan Box Barcodes</div>
-                            <div class="text-muted">Scan each box barcode. Progress updates automatically.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     }
     else
     {
