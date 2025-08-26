@@ -54,20 +54,18 @@ namespace ShipmentFinishGood.Services
             // Header Section
             AddHeaderSection(document, qrData, titleFont, headerFont, bodyFont, primaryColor, accentColor);
 
-            // QR Identity Section
-            AddQRIdentitySection(document, qrData, headerFont, bodyFont, monospaceFont, accentColor);
+            // QR Identity + PO Details Combined Section
+            AddQRIdentityWithPODetailsSection(document, qrData, headerFont, bodyFont, monospaceFont, accentColor, lightGray);
 
-            // Summary Statistics
-            AddSummaryStatistics(document, qrData, headerFont, bodyFont, accentColor, lightGray);
+            // Add first row (2 barcode boxes) on Page 1 if any barcodes
+            AddFirstBarcodeRowIfAny(document, qrData, headerFont, bodyFont, monospaceFont);
 
-            // PO Details Breakdown
-            if (qrData.POSummaries?.Any() == true)
+            // Remaining barcodes start from Page 2 in 2x2 grid if more than 2
+            if (qrData.BarcodeList != null && qrData.BarcodeList.Count > 2)
             {
-                AddPOBreakdownSection(document, qrData, headerFont, bodyFont, accentColor, lightGray);
+                document.Add(new AreaBreak());
+                AddBarcodeListSection(document, qrData, headerFont, bodyFont, monospaceFont, accentColor, startIndex: 2);
             }
-
-            // Barcode List Section - Formatted in columns for A4
-            AddBarcodeListSection(document, qrData, headerFont, bodyFont, monospaceFont, accentColor);
 
             // Footer
             AddFooter(document, bodyFont, primaryColor);
@@ -91,9 +89,6 @@ namespace ShipmentFinishGood.Services
 
             try
             {
-                // Debug logging for QR Identity PDF
-                Console.WriteLine($"[QR Identity PDF DEBUG] QRIdentity: '{qrData.QRIdentity}'");
-                Console.WriteLine($"[QR Identity PDF DEBUG] QRImageBase64 length: {qrData.QRImageBase64?.Length ?? 0}");
 
                 byte[]? qrBytes = null;
 
@@ -103,11 +98,9 @@ namespace ShipmentFinishGood.Services
                     try
                     {
                         qrBytes = Convert.FromBase64String(qrData.QRImageBase64);
-                        Console.WriteLine($"[QR Identity PDF DEBUG] Using existing QR: {qrBytes.Length} bytes");
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        Console.WriteLine($"[QR Identity PDF DEBUG] Failed to decode existing QR: {ex.Message}");
                     }
                 }
 
@@ -118,7 +111,6 @@ namespace ShipmentFinishGood.Services
                     var qrCodeData = qrGenerator.CreateQrCode(qrData.QRIdentity, QRCodeGenerator.ECCLevel.Q);
                     var qrCode = new BitmapByteQRCode(qrCodeData);
                     qrBytes = qrCode.GetGraphic(20);
-                    Console.WriteLine($"[QR Identity PDF DEBUG] Generated new QR: {qrBytes.Length} bytes");
                 }
 
                 // Title
@@ -138,7 +130,6 @@ namespace ShipmentFinishGood.Services
                         .SetMaxHeight(300)
                         .SetHorizontalAlignment(HorizontalAlignment.CENTER)
                         .SetMarginBottom(30));
-                    Console.WriteLine($"[QR Identity PDF DEBUG] QR image added successfully");
                 }
                 else
                 {
@@ -151,12 +142,10 @@ namespace ShipmentFinishGood.Services
                         .SetBorder(new SolidBorder(1))
                         .SetPadding(20)
                         .SetMarginBottom(30));
-                    Console.WriteLine($"[QR Identity PDF DEBUG] No QR available, showing fallback");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[QR Identity PDF DEBUG] Error generating QR: {ex.Message}");
                 
                 // Add error info to PDF
                 document.Add(new Paragraph("QR IDENTITY CODE - ERROR")
@@ -272,20 +261,22 @@ namespace ShipmentFinishGood.Services
                 .SetMarginBottom(20));
         }
 
-        private void AddQRIdentitySection(Document document, QRManagementDto qrData,
-            PdfFont headerFont, PdfFont bodyFont, PdfFont monospaceFont, DeviceRgb accentColor)
+        private void AddQRIdentityWithPODetailsSection(Document document, QRManagementDto qrData,
+            PdfFont headerFont, PdfFont bodyFont, PdfFont monospaceFont, DeviceRgb accentColor, DeviceRgb lightGray)
         {
             document.Add(new Paragraph("QR IDENTITY INFORMATION")
                 .SetFont(headerFont)
                 .SetFontSize(14)
                 .SetFontColor(accentColor)
-                .SetMarginBottom(10));
+                .SetMarginBottom(15));
+
+            // Create main table with QR on left (40%) and PO Details on right (60%)
+            var mainTable = new Table(new float[] { 40, 60 });
+            mainTable.SetWidth(UnitValue.CreatePercentValue(100));
+            mainTable.SetKeepTogether(true); // Keep section intact on first page
 
             try
             {
-                // Debug logging
-                Console.WriteLine($"[PDF DEBUG] QRIdentity: '{qrData.QRIdentity}'");
-                Console.WriteLine($"[PDF DEBUG] QRImageBase64 length: {qrData.QRImageBase64?.Length ?? 0}");
 
                 byte[]? qrBytes = null;
 
@@ -295,11 +286,9 @@ namespace ShipmentFinishGood.Services
                     try
                     {
                         qrBytes = Convert.FromBase64String(qrData.QRImageBase64);
-                        Console.WriteLine($"[PDF DEBUG] Using existing QR image: {qrBytes.Length} bytes");
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        Console.WriteLine($"[PDF DEBUG] Failed to decode existing QR: {ex.Message}");
                         qrBytes = null;
                     }
                 }
@@ -312,81 +301,112 @@ namespace ShipmentFinishGood.Services
                         var qrGenerator = new QRCodeGenerator();
                         var qrCodeData = qrGenerator.CreateQrCode(qrData.QRIdentity, QRCodeGenerator.ECCLevel.Q);
                         var qrCode = new BitmapByteQRCode(qrCodeData);
-                        qrBytes = qrCode.GetGraphic(15);
-                        Console.WriteLine($"[PDF DEBUG] Generated new QR: {qrBytes.Length} bytes");
+                        qrBytes = qrCode.GetGraphic(30); // Further increased module size for high scan reliability
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        Console.WriteLine($"[PDF DEBUG] Failed to generate QR: {ex.Message}");
                         qrBytes = null;
                     }
                 }
 
-                var identityTable = new Table(2);
-                identityTable.SetWidth(UnitValue.CreatePercentValue(100));
-
-                // QR Code cell
+                // LEFT CELL - QR Code (styled like barcode boxes with black border)
                 var qrCell = new Cell();
+                qrCell.SetBorder(new SolidBorder(ColorConstants.BLACK, 1f)); // Black border like barcode boxes
+                qrCell.SetPadding(10); // Reduced padding to allocate more space for QR image
+                qrCell.SetTextAlignment(TextAlignment.CENTER);
+                qrCell.SetVerticalAlignment(VerticalAlignment.TOP); // Align to top for consistent appearance
+                qrCell.SetMinHeight(200);
+                qrCell.SetKeepTogether(true);
+
                 if (qrBytes != null)
                 {
                     try
                     {
                         var qrImage = ImageDataFactory.Create(qrBytes);
                         qrCell.Add(new Image(qrImage)
-                            .SetAutoScale(true)
-                            .SetMaxWidth(120)
-                            .SetMaxHeight(120));
-                        Console.WriteLine($"[PDF DEBUG] QR image added successfully");
+                            .SetWidth(200) // Fixed large size within 40% column (~209pt width available)
+                            .SetHeight(200)
+                            .SetHorizontalAlignment(HorizontalAlignment.CENTER)
+                            .SetMarginBottom(5));
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        Console.WriteLine($"[PDF DEBUG] Failed to create image: {ex.Message}");
                         qrCell.Add(new Paragraph("[QR IMAGE ERROR]")
                             .SetFont(bodyFont)
-                            .SetFontSize(10));
+                            .SetFontSize(12)
+                            .SetTextAlignment(TextAlignment.CENTER)
+                            .SetFontColor(ColorConstants.RED));
                     }
                 }
                 else
                 {
-                    // Fallback: show text instead of QR
                     qrCell.Add(new Paragraph("[NO QR IMAGE]")
                         .SetFont(bodyFont)
-                        .SetFontSize(10));
-                    Console.WriteLine($"[PDF DEBUG] No QR bytes available, showing fallback text");
+                        .SetFontSize(12)
+                        .SetTextAlignment(TextAlignment.CENTER)
+                        .SetFontColor(ColorConstants.RED));
                 }
 
-                qrCell.SetTextAlignment(TextAlignment.CENTER);
-                qrCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                identityTable.AddCell(qrCell);
+                mainTable.AddCell(qrCell);
 
-                // Info cell
-                var infoCell = new Cell();
-                infoCell.Add(new Paragraph("QR Identity:")
-                    .SetFont(bodyFont)
-                    .SetFontSize(10)
-                    .SetMarginBottom(5));
-                infoCell.Add(new Paragraph(qrData.QRIdentity ?? "[NO QR IDENTITY]")
-                    .SetFont(PdfFontFactory.CreateFont(StandardFonts.COURIER_BOLD))
+                // RIGHT CELL - PO Details Table
+                var poCell = new Cell();
+                poCell.SetBorder(new SolidBorder(ColorConstants.BLACK, 1f)); // Black border to match QR cell
+                poCell.SetPadding(15);
+                poCell.SetVerticalAlignment(VerticalAlignment.TOP);
+                poCell.SetKeepTogether(true);
+
+                // Add PO Details title
+                poCell.Add(new Paragraph($"PO DETAILS BREAKDOWN ({qrData.POSummaries?.Count ?? 0} POs)")
+                    .SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD))
                     .SetFontSize(12)
+                    .SetFontColor(accentColor)
                     .SetMarginBottom(10));
-                
-                infoCell.Add(new Paragraph($"Generated: {qrData.GeneratedDate:dd/MM/yyyy HH:mm:ss}")
-                    .SetFont(bodyFont)
-                    .SetFontSize(9));
-                infoCell.Add(new Paragraph($"By: {qrData.GeneratedBy}")
-                    .SetFont(bodyFont)
-                    .SetFontSize(9));
-                infoCell.Add(new Paragraph($"File: {qrData.FileName}")
-                    .SetFont(bodyFont)
-                    .SetFontSize(9));
 
-                identityTable.AddCell(infoCell);
-                document.Add(identityTable.SetMarginBottom(20));
+                // Create PO table
+                if (qrData.POSummaries?.Any() == true)
+                {
+                    // Slightly adjusted column widths to give more space to first columns
+                    var poTable = new Table(new float[] { 22, 18, 9, 9, 9, 16, 17 });
+                    poTable.SetWidth(UnitValue.CreatePercentValue(100));
+                    poTable.SetFontSize(7); // Base font size (data cells further customized)
+
+                    // Headers (compact)
+                    poTable.AddHeaderCell(CreateCompactHeaderCell("PO NUMBER", headerFont, lightGray));
+                    poTable.AddHeaderCell(CreateCompactHeaderCell("MODEL", headerFont, lightGray));
+                    poTable.AddHeaderCell(CreateCompactHeaderCell("PALLETS", headerFont, lightGray));
+                    poTable.AddHeaderCell(CreateCompactHeaderCell("BOXES", headerFont, lightGray));
+                    poTable.AddHeaderCell(CreateCompactHeaderCell("PIECES", headerFont, lightGray));
+                    poTable.AddHeaderCell(CreateCompactHeaderCell("SCANNED", headerFont, lightGray));
+                    poTable.AddHeaderCell(CreateCompactHeaderCell("PROGRESS", headerFont, lightGray));
+
+                    // Data rows (limit to fit in space)
+                    foreach (var po in qrData.POSummaries.Take(5))
+                    {
+                        poTable.AddCell(CreateCompactDataCell(po.PONumber, bodyFont));
+                        poTable.AddCell(CreateCompactDataCell(po.ModelProduct, bodyFont));
+                        poTable.AddCell(CreateCompactDataCell(po.QtyPallet.ToString(), bodyFont));
+                        poTable.AddCell(CreateCompactDataCell(po.QtyBox.ToString(), bodyFont));
+                        poTable.AddCell(CreateCompactDataCell(po.QtyPcs.ToString("N0"), bodyFont));
+                        poTable.AddCell(CreateCompactDataCell($"{po.ScannedCount}/{po.QtyBox}", bodyFont));
+                        poTable.AddCell(CreateCompactDataCell($"{po.ScannedPercentage:F1}%", bodyFont));
+                    }
+
+                    poCell.Add(poTable);
+                }
+                else
+                {
+                    poCell.Add(new Paragraph("No PO data available")
+                        .SetFont(bodyFont)
+                        .SetFontSize(10)
+                        .SetFontColor(ColorConstants.GRAY));
+                }
+
+                mainTable.AddCell(poCell);
+                document.Add(mainTable.SetMarginBottom(10));
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PDF DEBUG] Error in AddQRIdentitySection: {ex.Message}");
-                // Add error message to PDF
                 document.Add(new Paragraph($"QR GENERATION ERROR: {ex.Message}")
                     .SetFont(bodyFont)
                     .SetFontSize(10)
@@ -462,35 +482,32 @@ namespace ShipmentFinishGood.Services
         }
 
         private void AddBarcodeListSection(Document document, QRManagementDto qrData,
-            PdfFont headerFont, PdfFont bodyFont, PdfFont monospaceFont, DeviceRgb accentColor)
+            PdfFont headerFont, PdfFont bodyFont, PdfFont monospaceFont, DeviceRgb accentColor, int startIndex = 0)
         {
             if (qrData.BarcodeList?.Any() != true) return;
 
-            document.Add(new Paragraph($"BOX BARCODES ({qrData.BarcodeList.Count} items)")
-                .SetFont(headerFont)
-                .SetFontSize(14)
-                .SetFontColor(accentColor)
-                .SetMarginBottom(15));
+            // Removed BOX BARCODES title to save space (barcode pages start from page 2)
 
-            // Process barcodes in groups of 4 per page
-            for (int pageStart = 0; pageStart < qrData.BarcodeList.Count; pageStart += 4)
+            // Process barcodes in groups of 4 per page (2x2 grid)
+            for (int pageStart = startIndex; pageStart < qrData.BarcodeList.Count; pageStart += 4)
             {
-                // Add new page if not the first page
-                if (pageStart > 0)
+                // Add new page if not the first barcode page
+                if (pageStart > startIndex)
                 {
                     document.Add(new AreaBreak());
                     
-                    // Add page header for continuation pages
+                    // Add page header for continuation pages (removed title)
                     document.Add(new Paragraph($"BOX BARCODES (continued) - Page {(pageStart / 4) + 1}")
                         .SetFont(headerFont)
                         .SetFontSize(14)
                         .SetFontColor(accentColor)
-                        .SetMarginBottom(15));
+                        .SetMarginBottom(10)); // Reduced margin for continuation pages
                 }
 
-                // Create table with 2 columns and 2 rows (4 items max)
+                // Create table with 2 columns (2x2 grid)
                 var barcodeTable = new Table(2);
                 barcodeTable.SetWidth(UnitValue.CreatePercentValue(100));
+                barcodeTable.SetKeepTogether(true);
 
                 // Get items for this page (max 4)
                 var pageItems = qrData.BarcodeList.Skip(pageStart).Take(4).ToList();
@@ -498,25 +515,18 @@ namespace ShipmentFinishGood.Services
                 for (int i = 0; i < pageItems.Count; i++)
                 {
                     var barcode = pageItems[i];
-                    var itemNumber = pageStart + i + 1;
 
                     // Extract display text (everything after the last underscore before _BOX_)
                     string displayText = ExtractBarcodeDisplayText(barcode);
 
-                    // Create cell for QR + Text
+                    // Create cell for QR + Text (optimized for page 1 fitting)
                     var barcodeCell = new Cell();
-                    barcodeCell.SetBorder(new SolidBorder(ColorConstants.LIGHT_GRAY, 1f));
-                    barcodeCell.SetPadding(15);
+                    barcodeCell.SetBorder(new SolidBorder(ColorConstants.BLACK, 1f)); // Black border like design
+                    barcodeCell.SetPadding(12); // Compact padding
                     barcodeCell.SetTextAlignment(TextAlignment.CENTER);
-                    barcodeCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                    barcodeCell.SetMinHeight(200); // Fixed height for consistency
-
-                    // Add item number FIRST (at the top)
-                    barcodeCell.Add(new Paragraph($"{itemNumber}.")
-                        .SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD))
-                        .SetFontSize(14)
-                        .SetTextAlignment(TextAlignment.CENTER)
-                        .SetMarginBottom(10));
+                    barcodeCell.SetVerticalAlignment(VerticalAlignment.TOP);
+                    barcodeCell.SetMinHeight(230); // Unified height for consistent 2x2 layout
+                    barcodeCell.SetKeepTogether(true);
 
                     try
                     {
@@ -524,56 +534,46 @@ namespace ShipmentFinishGood.Services
                         var qrGenerator = new QRCodeGenerator();
                         var qrCodeData = qrGenerator.CreateQrCode(barcode, QRCodeGenerator.ECCLevel.Q);
                         var qrCode = new BitmapByteQRCode(qrCodeData);
-                        var qrBytes = qrCode.GetGraphic(10); // Optimal size for page layout
+                        var qrBytes = qrCode.GetGraphic(12); // Good size for readability
 
                         if (qrBytes != null && qrBytes.Length > 0)
                         {
                             var qrImage = ImageDataFactory.Create(qrBytes);
                             
-                            // Add QR Image with proper sizing
+                            // Add QR Image (optimized size for page fitting)
                             barcodeCell.Add(new Image(qrImage)
                                 .SetAutoScale(true)
-                                .SetWidth(120)
-                                .SetHeight(120)
+                                .SetWidth(130) // Slightly larger for clarity on dedicated pages
+                                .SetHeight(130)
                                 .SetHorizontalAlignment(HorizontalAlignment.CENTER)
-                                .SetMarginBottom(10));
+                                .SetMarginBottom(6)); // Compact spacing
                             
-                            Console.WriteLine($"[PDF DEBUG] ✅ Generated QR for barcode: {barcode} ({qrBytes.Length} bytes)");
                         }
                         else
                         {
                             throw new Exception("QR bytes is null or empty");
                         }
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        Console.WriteLine($"[PDF DEBUG] ❌ Failed to generate QR for {barcode}: {ex.Message}");
-                        Console.WriteLine($"[PDF DEBUG] Exception details: {ex}");
                         
-                        // Fallback: show placeholder rectangle
-                        var placeholder = new Table(1);
-                        placeholder.SetWidth(120);
-                        placeholder.SetHeight(120);
-                        var placeholderCell = new Cell();
-                        placeholderCell.Add(new Paragraph("[QR ERROR]")
+                        // Fallback: show error placeholder
+                        barcodeCell.Add(new Paragraph("[QR ERROR]")
                             .SetFont(bodyFont)
-                            .SetFontSize(10)
-                            .SetTextAlignment(TextAlignment.CENTER));
-                        placeholderCell.SetBackgroundColor(ColorConstants.LIGHT_GRAY);
-                        placeholderCell.SetBorder(new SolidBorder(ColorConstants.GRAY, 1f));
-                        placeholderCell.SetMinHeight(120);
-                        placeholderCell.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                        placeholder.AddCell(placeholderCell);
-                        
-                        barcodeCell.Add(placeholder.SetMarginBottom(10));
+                            .SetFontSize(12)
+                            .SetTextAlignment(TextAlignment.CENTER)
+                            .SetFontColor(ColorConstants.RED)
+                            .SetBorder(new SolidBorder(ColorConstants.RED, 1f))
+                            .SetPadding(10)
+                            .SetMarginBottom(6)); // Compact spacing
                     }
 
-                    // Add display text below QR (shortened version)
+                    // Add barcode value below QR (optimized for page fitting)
                     barcodeCell.Add(new Paragraph(displayText)
                         .SetFont(PdfFontFactory.CreateFont(StandardFonts.COURIER_BOLD))
-                        .SetFontSize(11)
+                        .SetFontSize(10) // Slightly smaller font to fit better
                         .SetTextAlignment(TextAlignment.CENTER)
-                        .SetMarginTop(5));
+                        .SetMarginTop(2)); // Minimal margin
 
                     barcodeTable.AddCell(barcodeCell);
                 }
@@ -584,12 +584,88 @@ namespace ShipmentFinishGood.Services
                 {
                     var emptyCell = new Cell();
                     emptyCell.SetBorder(Border.NO_BORDER);
-                    emptyCell.SetMinHeight(200);
+                    emptyCell.SetMinHeight(230); // Match barcode cell height
                     barcodeTable.AddCell(emptyCell);
                 }
 
-                document.Add(barcodeTable.SetMarginBottom(20));
+                document.Add(barcodeTable.SetMarginBottom(10));
             }
+        }
+
+        // Add first row (2 barcode boxes) on Page 1 below QR identity & PO details
+        private void AddFirstBarcodeRowIfAny(Document document, QRManagementDto qrData,
+            PdfFont headerFont, PdfFont bodyFont, PdfFont monospaceFont)
+        {
+            if (qrData.BarcodeList == null || qrData.BarcodeList.Count == 0) return;
+
+            var firstRowTable = new Table(2);
+            firstRowTable.SetWidth(UnitValue.CreatePercentValue(100));
+            firstRowTable.SetKeepTogether(true);
+
+            int cells = Math.Min(2, qrData.BarcodeList.Count);
+            for (int i = 0; i < 2; i++)
+            {
+                if (i < cells)
+                {
+                    string barcode = qrData.BarcodeList[i];
+                    string displayText = ExtractBarcodeDisplayText(barcode);
+
+                    var cell = new Cell();
+                    cell.SetBorder(new SolidBorder(ColorConstants.BLACK, 1f));
+                    cell.SetPadding(10);
+                    cell.SetTextAlignment(TextAlignment.CENTER);
+                    cell.SetVerticalAlignment(VerticalAlignment.TOP);
+                    cell.SetMinHeight(200); // Slightly shorter to fit on first page
+                    cell.SetKeepTogether(true);
+
+                    try
+                    {
+                        var qrGenerator = new QRCodeGenerator();
+                        var qrCodeData = qrGenerator.CreateQrCode(barcode, QRCodeGenerator.ECCLevel.Q);
+                        var qrCode = new BitmapByteQRCode(qrCodeData);
+                        var qrBytes = qrCode.GetGraphic(12);
+                        if (qrBytes != null && qrBytes.Length > 0)
+                        {
+                            var qrImage = ImageDataFactory.Create(qrBytes);
+                            cell.Add(new Image(qrImage)
+                                .SetAutoScale(true)
+                                .SetWidth(120)
+                                .SetHeight(120)
+                                .SetHorizontalAlignment(HorizontalAlignment.CENTER)
+                                .SetMarginBottom(6));
+                        }
+                        else
+                        {
+                            throw new Exception("QR bytes missing");
+                        }
+                    }
+                    catch
+                    {
+                        cell.Add(new Paragraph("[QR ERROR]")
+                            .SetFont(bodyFont)
+                            .SetFontSize(10)
+                            .SetFontColor(ColorConstants.RED)
+                            .SetMarginBottom(6));
+                    }
+
+                    cell.Add(new Paragraph(displayText)
+                        .SetFont(PdfFontFactory.CreateFont(StandardFonts.COURIER_BOLD))
+                        .SetFontSize(10)
+                        .SetTextAlignment(TextAlignment.CENTER)
+                        .SetMarginTop(2));
+
+                    firstRowTable.AddCell(cell);
+                }
+                else
+                {
+                    var empty = new Cell();
+                    empty.SetBorder(new SolidBorder(ColorConstants.BLACK, 1f));
+                    empty.SetMinHeight(200);
+                    firstRowTable.AddCell(empty);
+                }
+            }
+
+            document.Add(firstRowTable.SetMarginBottom(10));
         }
 
         // Helper method to extract display text from barcode
@@ -703,6 +779,29 @@ namespace ShipmentFinishGood.Services
                 .SetTextAlignment(TextAlignment.CENTER))
                 .SetBorder(new SolidBorder(ColorConstants.LIGHT_GRAY, 0.5f))
                 .SetPadding(4);
+        }
+
+        // Compact header cell for PO details (smaller font & padding)
+        private Cell CreateCompactHeaderCell(string content, PdfFont font, DeviceRgb backgroundColor)
+        {
+            return new Cell().Add(new Paragraph(content)
+                .SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD))
+                .SetFontSize(8)
+                .SetTextAlignment(TextAlignment.CENTER))
+                .SetBackgroundColor(backgroundColor)
+                .SetBorder(new SolidBorder(0.5f))
+                .SetPadding(3);
+        }
+
+        // Compact data cell for PO details
+        private Cell CreateCompactDataCell(string content, PdfFont font)
+        {
+            return new Cell().Add(new Paragraph(content)
+                .SetFont(font)
+                .SetFontSize(7)
+                .SetTextAlignment(TextAlignment.CENTER))
+                .SetBorder(new SolidBorder(ColorConstants.LIGHT_GRAY, 0.5f))
+                .SetPadding(2);
         }
     }
 }
