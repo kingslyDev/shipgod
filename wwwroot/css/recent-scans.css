@@ -32,6 +32,18 @@
     position: relative;
 }
 
+.recent-scans-header .header-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.recent-scans-header .pallet-info {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
 .recent-scans-header::after {
     content: '';
     position: absolute;
@@ -297,11 +309,42 @@
     border-color: rgba(25,135,84,0.3);
 }
 
-.recent-scan-type.pcs.scanned {
-    background: linear-gradient(135deg, rgba(25,135,84,0.15) 0%, rgba(25,135,84,0.08) 100%);
-    color: #146c43;
-    border-color: rgba(25,135,84,0.4);
-    font-weight: 900;
+.recent-scan-item.pallet-tracking {
+    border-left-width: 3px;
+    border-left-style: dashed;
+    background: linear-gradient(135deg, rgba(253,126,20,0.02) 0%, #ffffff 100%);
+}
+
+.recent-scan-item.pallet-tracking.scanned {
+    border-left-style: solid;
+    background: linear-gradient(135deg, rgba(25,135,84,0.03) 0%, #ffffff 100%);
+}
+
+.recent-scan-item.pallet-tracking .barcode-text {
+    font-family: 'Arial', sans-serif;
+    font-weight: 600;
+    color: #fd7e14;
+}
+
+.recent-scan-item.pallet-tracking.scanned .barcode-text {
+    color: #198754;
+}
+
+.pallet-icon {
+    color: #fd7e14;
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+    opacity: 0.7;
+}
+
+.recent-scan-item.pallet-tracking.scanned .pallet-icon {
+    color: #198754;
+}
+
+.recent-scan-type.pallet.scanned {
+    background: linear-gradient(135deg, rgba(25,135,84,0.1) 0%, rgba(25,135,84,0.05) 100%);
+    color: #198754;
+    border-color: rgba(25,135,84,0.3);
 }
 
 .recent-scans-empty {

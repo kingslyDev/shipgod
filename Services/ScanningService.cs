@@ -1076,12 +1076,26 @@ namespace ShipmentFinishGood.Services
                     Console.WriteLine($"📊 DEBUG: {kvp.Key}: {kvp.Value} items");
                 }
 
-                // Get scanning activities for status checking
+                // Get scanning activities for status checking (including pallet scans not in BarcodeRegistry)
                 var scanningActivities = await _context.ScanningActivities
-                    .Where(sa => allSessionBarcodes.Select(b => b.BarcodeValue).Contains(sa.BarcodeValue) &&
+                    .Where(sa => (allSessionBarcodes.Select(b => b.BarcodeValue).Contains(sa.BarcodeValue) ||
+                                 (sa.AssignedArea == $"Session_{sessionId}" && sa.Action == "SCAN_PALLET")) &&
                                sa.Action != "SCAN_MASTER" && 
                                sa.Result == "SUCCESS")
                     .ToListAsync();
+
+                // Get pallet scans from ScanningActivities that might not be in BarcodeRegistry
+                var palletScans = await _context.ScanningActivities
+                    .Where(sa => sa.AssignedArea == $"Session_{sessionId}" && 
+                               sa.Action == "SCAN_PALLET" && 
+                               sa.Result == "SUCCESS")
+                    .ToListAsync();
+
+                Console.WriteLine($"🚛 Found {palletScans.Count} pallet scans for session {sessionId}");
+                foreach (var palletScan in palletScans)
+                {
+                    Console.WriteLine($"  📦 Pallet: {palletScan.BarcodeValue} | User: {palletScan.UserId} | Time: {palletScan.Timestamp}");
+                }
 
                 // Build scan list with status
                 var enrichedScans = new List<RecentScanDto>();
@@ -1121,8 +1135,38 @@ namespace ShipmentFinishGood.Services
                     enrichedScans.Add(recentScan);
                 }
 
+                // Add pallet scans that are not in BarcodeRegistry but exist in ScanningActivities
+                foreach (var palletScan in palletScans)
+                {
+                    // Check if this pallet scan is already in enrichedScans
+                    if (!enrichedScans.Any(es => es.BarcodeValue.Equals(palletScan.BarcodeValue, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var palletRecentScan = new RecentScanDto
+                        {
+                            BarcodeValue = palletScan.BarcodeValue,
+                            ItemType = "PALLET",
+                            ScannedAt = palletScan.Timestamp,
+                            ScannedBy = palletScan.UserId ?? "",
+                            SequenceNumber = sequenceNumber++,
+                            
+                            // Pallet-specific information
+                            PONumber = "AUTO-GENERATED",
+                            ModelProduct = "PALLET",
+                            Description = "Pallet scan from ScanningActivities",
+                            Quantity = null,
+                            Status = "SCANNED",
+                            Container = "",
+                            ShipmentDetail = "",
+                            IsCompleted = true
+                        };
+                        
+                        enrichedScans.Add(palletRecentScan);
+                        Console.WriteLine($"  ✅ Added pallet scan: {palletScan.BarcodeValue}");
+                    }
+                }
+
                 // Get counts
-                var totalCount = allSessionBarcodes.Count;
+                var totalCount = allSessionBarcodes.Count + palletScans.Count;
                 var scannedCount = enrichedScans.Count(s => s.IsCompleted);
                 var pendingCount = totalCount - scannedCount;
 

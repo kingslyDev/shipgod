@@ -32,5 +32,8 @@ namespace ShipmentFinishGood.DTOs
         public int TotalScannedToday { get; set; }
         public string SessionInfo { get; set; } = string.Empty;
         public string LastScanTime { get; set; } = string.Empty;
+        
+        // Enhanced session metadata for better pallet calculation
+        public object? SessionMetadata { get; set; }
     }
 }
