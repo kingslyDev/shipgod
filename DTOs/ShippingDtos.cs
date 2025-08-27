@@ -49,6 +49,55 @@ namespace ShipmentFinishGood.DTOs
         public List<string> AvailableCountries { get; set; } = new List<string>();
         public List<string> AvailableModels { get; set; } = new List<string>();
     }
+
+    // Simple executive dashboard focused view model
+    public class SimpleShippingDashboardViewModel
+    {
+        // KPI
+        public int TotalItems { get; set; }
+        public int ScannedItems { get; set; }
+        public int ShippedItems { get; set; }
+        public int PendingItems => TotalItems - ScannedItems;
+        public double CompletionRate => TotalItems > 0 ? (double)ScannedItems / TotalItems * 100 : 0;
+
+        // Filters (selected values)
+        public string? SelectedCountry { get; set; }
+        public string? SelectedModel { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
+        // Options
+        public List<string> AvailableCountries { get; set; } = new();
+        public List<string> AvailableModels { get; set; } = new();
+
+        // Charts / Aggregations
+        public Dictionary<string,int> CountryVolumes { get; set; } = new(); // For bar chart (absolute)
+        public Dictionary<string,double> CountryShares { get; set; } = new(); // For pie (percentage)
+
+        // Tables
+        public List<CountrySummaryRow> TopCountries { get; set; } = new();
+        public List<OutboundItemDto> RecentActivities { get; set; } = new();
+    }
+
+    public class CountrySummaryRow
+    {
+        public string Country { get; set; } = string.Empty;
+        public int Total { get; set; }
+        public int Scanned { get; set; }
+        public double CompletionRate => Total > 0 ? (double)Scanned / Total * 100 : 0;
+        public string StatusTag => CompletionRate switch
+        {
+            >= 90 => "Excellent",
+            >= 70 => "Good",
+            _ => "Needs Attention"
+        };
+        public string StatusColor => StatusTag switch
+        {
+            "Excellent" => "#28a745",
+            "Good" => "#ffc107",
+            _ => "#dc3545"
+        };
+    }
     
     public class SessionMetric
     {

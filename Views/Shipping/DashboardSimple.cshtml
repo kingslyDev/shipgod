@@ -427,7 +427,7 @@ class ExecutiveDashboard {
 
     async loadCountryChart() {
         try {
-            const response = await fetch('/Shipping/GetChartData?chartType=country');
+            const response = await fetch('/Shipping/legacy-chart-data?chartType=country');
             const data = await response.json();
             
             const ctx = document.getElementById('countryChart').getContext('2d');
@@ -467,7 +467,7 @@ class ExecutiveDashboard {
 
     async loadHourlyChart() {
         try {
-            const response = await fetch('/Shipping/GetChartData?chartType=hourly');
+            const response = await fetch('/Shipping/legacy-chart-data?chartType=hourly');
             const data = await response.json();
             
             const ctx = document.getElementById('hourlyChart').getContext('2d');
@@ -510,7 +510,7 @@ class ExecutiveDashboard {
 
     async loadScannersChart() {
         try {
-            const response = await fetch('/Shipping/GetChartData?chartType=scanners');
+            const response = await fetch('/Shipping/legacy-chart-data?chartType=scanners');
             const data = await response.json();
             
             const ctx = document.getElementById('scannersChart').getContext('2d');
@@ -549,7 +549,7 @@ class ExecutiveDashboard {
 
     async loadBottleneckChart() {
         try {
-            const response = await fetch('/Shipping/GetChartData?chartType=bottleneck');
+            const response = await fetch('/Shipping/legacy-chart-data?chartType=bottleneck');
             const data = await response.json();
             
             const ctx = document.getElementById('bottleneckChart').getContext('2d');

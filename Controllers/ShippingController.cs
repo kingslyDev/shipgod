@@ -31,6 +31,177 @@ namespace ShipmentFinishGood.Controllers
             _logger = logger;
         }
 
+        // =============================================
+        // Simple Dashboard (requested minimal executive view)
+        // URL: /Shipping/SimpleDashboard
+        // =============================================
+        [HttpGet]
+        public async Task<IActionResult> SimpleDashboard(string? country = null, string? model = null, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            try
+            {
+                var vm = await BuildSimpleDashboardAsync(country, model, startDate, endDate);
+                return View("SimpleDashboard", vm);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading simple dashboard");
+                return View("SimpleDashboard", new SimpleShippingDashboardViewModel());
+            }
+        }
+
+    [HttpGet("/Shipping/simple-chart-data")]
+    public async Task<JsonResult> SimpleChartData(string type, string? country = null, string? model = null, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            try
+            {
+                var vm = await BuildSimpleDashboardAsync(country, model, startDate, endDate);
+                switch (type.ToLower())
+                {
+                    case "pie-country-share":
+                        return Json(new
+                        {
+                            labels = vm.CountryShares.Keys,
+                            data = vm.CountryShares.Values.Select(v => Math.Round(v,2))
+                        });
+                    case "bar-country-volume":
+                        return Json(new
+                        {
+                            labels = vm.CountryVolumes.Keys,
+                            data = vm.CountryVolumes.Values
+                        });
+                    default:
+                        return Json(new { error = "Unknown chart type" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating simple chart data: {Type}", type);
+                return Json(new { error = ex.Message });
+            }
+        }
+
+        private async Task<SimpleShippingDashboardViewModel> BuildSimpleDashboardAsync(string? country, string? model, DateTime? startDate, DateTime? endDate)
+        {
+            // Normalize date range defaults (last 30 days)
+            startDate ??= DateTime.Today.AddDays(-30);
+            endDate ??= DateTime.Today;
+
+            // Base query for barcodes (BOX assumed primary outbound unit)
+            var query = _context.BarcodeRegistries
+                .AsNoTracking()
+                .Include(b => b.POMaster)
+                .Where(b => b.BarcodeType == "BOX");
+
+            if (startDate.HasValue)
+                query = query.Where(b => b.GeneratedDate.Date >= startDate.Value.Date);
+            if (endDate.HasValue)
+                query = query.Where(b => b.GeneratedDate.Date <= endDate.Value.Date);
+            if (!string.IsNullOrEmpty(country))
+                query = query.Where(b => (b.POMaster!.Country ?? "").ToLower() == country.ToLower());
+            if (!string.IsNullOrEmpty(model))
+                query = query.Where(b => b.ModelProduct == model);
+
+            var items = await query
+                .Select(b => new {
+                    b.BarcodeValue,
+                    b.ModelProduct,
+                    Country = b.POMaster!.Country ?? (b.POMaster!.ShipmentDetail ?? "") ,
+                    b.Status,
+                    b.GeneratedDate,
+                    b.ScannedDate,
+                    b.ScannedBy
+                })
+                .ToListAsync();
+
+            int total = items.Count;
+            int scanned = items.Count(i => i.Status == "SCANNED");
+            int shipped = scanned; // assumption: scanned == shipped for now
+
+            // Aggregate by country
+            var countryGroups = items
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.Country) ? "Unknown" : NormalizeCountry(i.Country))
+                .Select(g => new { Country = g.Key, Total = g.Count(), Scanned = g.Count(x => x.Status == "SCANNED") })
+                .OrderByDescending(g => g.Total)
+                .ToList();
+
+            var countryVolumes = countryGroups.ToDictionary(g => g.Country, g => g.Total);
+            double grandTotal = countryGroups.Sum(c => (double)c.Total);
+            var countryShares = countryGroups.ToDictionary(g => g.Country, g => grandTotal > 0 ? g.Total / grandTotal * 100 : 0);
+
+            var topCountries = countryGroups.Take(5)
+                .Select(g => new CountrySummaryRow { Country = g.Country, Total = g.Total, Scanned = g.Scanned })
+                .ToList();
+
+        var recentActivities = items
+                .OrderByDescending(i => i.GeneratedDate)
+                .Take(15)
+                .Select(i => new OutboundItemDto
+                {
+                    BarcodeValue = i.BarcodeValue,
+                    ModelProduct = i.ModelProduct ?? string.Empty,
+            Country = string.IsNullOrWhiteSpace(i.Country) ? "Unknown" : NormalizeCountry(i.Country),
+                    Status = i.Status == "SCANNED" ? "Scanned" : "Generated",
+                    GeneratedDate = i.GeneratedDate,
+                    ScannedDate = i.ScannedDate,
+                    ScannedBy = i.ScannedBy
+                })
+                .ToList();
+
+            // Load available filters (without current filters for broad options)
+            var availableCountries = await _context.BarcodeRegistries
+                .Include(b => b.POMaster)
+                .Where(b => b.POMaster != null && b.POMaster.Country != null && b.POMaster.Country != "")
+                .Select(b => b.POMaster!.Country!)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToListAsync();
+
+            var availableModels = await _context.BarcodeRegistries
+                .Where(b => b.ModelProduct != null && b.ModelProduct != "")
+                .Select(b => b.ModelProduct!)
+                .Distinct()
+                .OrderBy(m => m)
+                .ToListAsync();
+
+            return new SimpleShippingDashboardViewModel
+            {
+                TotalItems = total,
+                ScannedItems = scanned,
+                ShippedItems = shipped,
+                SelectedCountry = country,
+                SelectedModel = model,
+                StartDate = startDate,
+                EndDate = endDate,
+                CountryVolumes = countryVolumes,
+                CountryShares = countryShares,
+                TopCountries = topCountries,
+                RecentActivities = recentActivities,
+                AvailableCountries = availableCountries,
+                AvailableModels = availableModels
+            };
+        }
+
+        private static string NormalizeCountry(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "Unknown";
+            var lower = raw.Trim().ToLower();
+            // Basic normalization map
+            return lower switch
+            {
+                "sg" or "singapore" => "Singapore",
+                "my" or "malaysia" => "Malaysia",
+                "id" or "indonesia" => "Indonesia",
+                "vn" or "vietnam" => "Vietnam",
+                "ph" or "philippines" => "Philippines",
+                "th" or "thailand" => "Thailand",
+                "jp" or "japan" => "Japan",
+                "kr" or "korea" or "south korea" => "South Korea",
+                "cn" or "china" => "China",
+                _ => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(lower)
+            };
+        }
+
         /// <summary>
         /// Executive Dashboard - Focus on barang keluar with real metrics
         /// </summary>
@@ -405,8 +576,9 @@ namespace ShipmentFinishGood.Controllers
             return true;
         }
         
-        [HttpGet]
-        public async Task<IActionResult> GetChartData(string chartType)
+    // Legacy dashboard chart data
+    [HttpGet("/Shipping/legacy-chart-data")]
+    public async Task<IActionResult> GetChartData(string chartType)
         {
             try
             {

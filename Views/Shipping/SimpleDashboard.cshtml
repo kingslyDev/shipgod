@@ -1,0 +1,192 @@
+@model ShipmentFinishGood.DTOs.SimpleShippingDashboardViewModel
+@{
+    ViewBag.Title = "Simple Shipping Dashboard";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<style>
+    .dash-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:1.5rem;}
+    .dash-header h1{font-size:1.9rem;font-weight:600;margin:0;color:#2c3e50;}
+    .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1rem;}
+    .filters .form-control,.filters select{border-radius:6px;padding:.45rem .65rem;font-size:.9rem;}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem;margin-bottom:1.25rem;}
+    .kpi{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1rem 1.1rem;position:relative;box-shadow:0 2px 4px rgba(0,0,0,.04);}
+    .kpi h3{font-size:.75rem;letter-spacing:.05em;font-weight:600;color:#6b7280;margin:0 0 .35rem;text-transform:uppercase;}
+    .kpi .val{font-size:2rem;font-weight:700;line-height:1;color:#111827;}
+    .kpi .sub{font-size:.7rem;color:#6b7280;margin-top:.35rem;}
+    .kpi .rate{font-size:.75rem;font-weight:600;}
+    .rate.good{color:#28a745;} .rate.warn{color:#ffc107;} .rate.bad{color:#dc3545;}
+    .panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem;margin-bottom:1.25rem;box-shadow:0 2px 4px rgba(0,0,0,.04);} 
+    .panel h2{font-size:1rem;font-weight:600;margin:0 0 .75rem;color:#374151;display:flex;align-items:center;gap:.4rem;}
+    .flex-row{display:flex;flex-wrap:wrap;gap:1rem;}
+    .chart-box{flex:1 1 380px;min-height:340px;position:relative;}
+    .chart-holder{position:relative;height:290px;}
+    table{width:100%;border-collapse:collapse;font-size:.8rem;}
+    th,td{padding:.55rem .6rem;border-bottom:1px solid #f1f2f4;text-align:left;}
+    th{background:#f9fafb;font-weight:600;font-size:.65rem;letter-spacing:.05em;color:#6b7280;text-transform:uppercase;}
+    tbody tr:hover{background:#f5f7fa;} 
+    .status-chip{display:inline-block;padding:.25rem .55rem;border-radius:12px;font-size:.6rem;font-weight:600;letter-spacing:.05em;color:#fff;}
+    .status-excellent{background:#28a745;} .status-good{background:#ffc107;color:#111;} .status-needs{background:#dc3545;}
+    .recent-status{font-weight:600;}
+    .tag-scanned{color:#28a745;} .tag-generated{color:#6b7280;} 
+    .btn-sm{font-size:.7rem;border-radius:6px;padding:.45rem .8rem;font-weight:600;letter-spacing:.03em;}
+    .btn-primary{background:#2563eb;border:1px solid #1d4ed8;color:#fff;} .btn-outline{background:#fff;border:1px solid #d1d5db;color:#374151;}
+    .btn-primary:hover{background:#1d4ed8;} .btn-outline:hover{background:#f3f4f6;}
+    .export-note{font-size:.65rem;color:#6b7280;margin-left:.5rem;}
+    /* Responsive */
+    @@media (max-width:760px){.flex-row{flex-direction:column;} .chart-box{min-height:300px;} .kpi .val{font-size:1.7rem;} .dash-header h1{font-size:1.4rem;}}
+</style>
+<div class="container-fluid">
+    <div class="dash-header">
+        <h1>📦 Simple Shipping Dashboard</h1>
+        <div>
+            <button class="btn-sm btn-outline" onclick="refreshSimple()">Refresh</button>
+        </div>
+    </div>
+    <form method="get" class="panel" id="simpleFilterForm">
+        <div class="filters">
+            <div>
+                <label class="small mb-1">Country</label>
+                <select name="country" class="form-control">
+                    <option value="">All</option>
+                    @foreach(var c in Model.AvailableCountries){<option value="@c" selected="@(Model.SelectedCountry==c)">@c</option>}
+                </select>
+            </div>
+            <div>
+                <label class="small mb-1">Model</label>
+                <select name="model" class="form-control">
+                    <option value="">All</option>
+                    @foreach(var m in Model.AvailableModels){<option value="@m" selected="@(Model.SelectedModel==m)">@m</option>}
+                </select>
+            </div>
+            <div>
+                <label class="small mb-1">From</label>
+                <input type="date" name="startDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" class="form-control"/>
+            </div>
+            <div>
+                <label class="small mb-1">To</label>
+                <input type="date" name="endDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" class="form-control"/>
+            </div>
+            <div style="display:flex;gap:.4rem;align-items:flex-end;">
+                <button class="btn-sm btn-primary" type="submit">Apply</button>
+                <button class="btn-sm btn-outline" type="button" onclick="clearSimpleFilters()">Clear</button>
+            </div>
+        </div>
+    </form>
+    <div class="kpis">
+        <div class="kpi">
+            <h3>Total Items</h3>
+            <div class="val" id="kpiTotal">@Model.TotalItems</div>
+            <div class="sub">Ready for shipment</div>
+        </div>
+        <div class="kpi">
+            <h3>Scanned</h3>
+            <div class="val" id="kpiScanned">@Model.ScannedItems</div>
+            <div class="rate @(Model.CompletionRate>=90?"good":Model.CompletionRate>=70?"warn":"bad")">@Model.CompletionRate.ToString("F1")%</div>
+            <div class="sub">Completion</div>
+        </div>
+        <div class="kpi">
+            <h3>Shipped</h3>
+            <div class="val" id="kpiShipped">@Model.ShippedItems</div>
+            <div class="sub">Equals scanned</div>
+        </div>
+        <div class="kpi">
+            <h3>Pending</h3>
+            <div class="val" id="kpiPending">@Model.PendingItems</div>
+            <div class="sub">Awaiting scan</div>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="flex-row">
+            <div class="chart-box">
+                <h2>🧩 Country Share</h2>
+                <div class="chart-holder">
+                    <div id="pieLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#6b7280;">Loading...</div>
+                    <canvas id="pieCountry"></canvas>
+                </div>
+            </div>
+            <div class="chart-box">
+                <h2>📊 Country Volume</h2>
+                <div class="chart-holder">
+                    <div id="barLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#6b7280;">Loading...</div>
+                    <canvas id="barCountry"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="flex-row">
+        <div class="panel" style="flex:1 1 380px;">
+            <h2>🏅 Top 5 Countries</h2>
+            <table>
+                <thead><tr><th>Country</th><th>Total</th><th>Scanned</th><th>Completion</th><th>Status</th></tr></thead>
+                <tbody>
+                @if(Model.TopCountries.Any()){
+                    foreach(var row in Model.TopCountries){
+                        var tagClass = row.StatusTag=="Excellent"?"status-excellent":row.StatusTag=="Good"?"status-good":"status-needs";
+                        <tr>
+                            <td>@row.Country</td>
+                            <td>@row.Total</td>
+                            <td>@row.Scanned</td>
+                            <td>@row.CompletionRate.ToString("F1")%</td>
+                            <td><span class="status-chip @tagClass">@row.StatusTag</span></td>
+                        </tr>
+                    }
+                } else {<tr><td colspan="5" class="text-muted">No data</td></tr>}
+                </tbody>
+            </table>
+        </div>
+        <div class="panel" style="flex:1 1 380px;">
+            <h2>🕒 Recent Activity</h2>
+            <table>
+                <thead><tr><th>Time</th><th>Barcode</th><th>Model</th><th>Country</th><th>Status</th></tr></thead>
+                <tbody>
+                @if(Model.RecentActivities.Any()){
+                    foreach(var a in Model.RecentActivities){
+                        var stClass = a.Status=="Scanned"?"tag-scanned":"tag-generated";
+                        <tr>
+                            <td>@a.GeneratedDate.ToString("MM-dd HH:mm")</td>
+                            <td style="font-family:monospace;">@a.BarcodeValue</td>
+                            <td>@a.ModelProduct</td>
+                            <td>@a.Country</td>
+                            <td class="recent-status @stClass">@a.Status</td>
+                        </tr>
+                    }
+                } else {<tr><td colspan="5" class="text-muted">No recent activity</td></tr>}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="export-note">Export feature (CSV / PDF) dapat ditambahkan selanjutnya.</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let pieChart, barChart;
+async function loadCharts(){
+    const params = new URLSearchParams({country:'@Model.SelectedCountry',model:'@Model.SelectedModel',startDate:'@Model.StartDate?.ToString("yyyy-MM-dd")',endDate:'@Model.EndDate?.ToString("yyyy-MM-dd")'});
+    document.getElementById('pieLoading').style.display='flex';
+    document.getElementById('barLoading').style.display='flex';
+    let pieData = {labels:[],data:[]};
+    let barData = {labels:[],data:[]};
+    try{
+        const pieRes = await fetch('/Shipping/simple-chart-data?type=pie-country-share&'+params.toString());
+        pieData = await pieRes.json();
+    }catch(e){console.error('Pie load error',e);document.getElementById('pieLoading').textContent='Error loading';}
+    try{
+        const barRes = await fetch('/Shipping/simple-chart-data?type=bar-country-volume&'+params.toString());
+        barData = await barRes.json();
+    }catch(e){console.error('Bar load error',e);document.getElementById('barLoading').textContent='Error loading';}
+    const pieCtx = document.getElementById('pieCountry').getContext('2d');
+    const barCtx = document.getElementById('barCountry').getContext('2d');
+    const palette = ['#2563eb','#10b981','#f59e0b','#ef4444','#6366f1','#0ea5e9','#9333ea','#f97316'];
+    if(pieChart) pieChart.destroy();
+    pieChart = new Chart(pieCtx,{type:'pie',data:{labels:pieData.labels,datasets:[{data:pieData.data,backgroundColor:pieData.labels.map((_,i)=>palette[i%palette.length])}]},options:{plugins:{legend:{position:'bottom'}}}});
+    document.getElementById('pieLoading').style.display='none';
+    if(barChart) barChart.destroy();
+    barChart = new Chart(barCtx,{type:'bar',data:{labels:barData.labels,datasets:[{data:barData.data,backgroundColor:barData.labels.map((_,i)=>palette[i%palette.length])}]},options:{scales:{y:{beginAtZero:true}}}});
+    document.getElementById('barLoading').style.display='none';
+}
+function clearSimpleFilters(){document.getElementById('simpleFilterForm').reset();window.location.href='/Shipping/SimpleDashboard';}
+function refreshSimple(){loadCharts();}
+// Auto-refresh every 5 minutes
+setInterval(loadCharts,300000);
+document.addEventListener('DOMContentLoaded',loadCharts);
+</script>
