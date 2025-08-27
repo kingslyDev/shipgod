@@ -21,136 +21,440 @@ namespace ShipmentFinishGood.Services
             _barcodeService = barcodeService;
         }
 
-    // Use centralized normalizer for country strings
-
-    public async Task<UploadPreviewDto> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
-    {
-        // Generate file hash for duplicate detection
-        var fileHash = await GenerateFileHashAsync(file);
-        
-        // Check for duplicate uploads (same file content + same user + within last 24 hours)
-        var duplicateCheck = await _context.UploadSessions
-            .Where(s => s.FileHash == fileHash && 
-                       s.UploadedBy == uploadedBy && 
-                       s.UploadDate >= DateTime.Now.AddDays(-1) &&
-                       s.Status != "DELETED")
-            .FirstOrDefaultAsync();
-
-        if (duplicateCheck != null)
+        public async Task<UploadPreviewDto> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
         {
-            throw new InvalidOperationException($"File '{file.FileName}' dengan konten yang sama sudah diupload pada {duplicateCheck.UploadDate:dd/MM/yyyy HH:mm}. Session ID: {duplicateCheck.SessionId}");
-        }
+            var fileHash = await GenerateFileHashAsync(file);
+            
+            var duplicateCheck = await _context.UploadSessions
+                .Where(s => s.FileHash == fileHash && 
+                           s.UploadedBy == uploadedBy && 
+                           s.UploadDate >= DateTime.Now.AddDays(-1) &&
+                           s.Status != "DELETED")
+                .FirstOrDefaultAsync();
 
-        // 🎯 ENHANCED PARSING WITH FORMAT DETECTION
-        var (rawData, formatInfo) = ParseExcelFileWithFormatDetection(file);
-        
-        // Group by country first
-        var dataByCountry = rawData
-            .GroupBy(r => CountryNormalizer.NormalizeOrUnknown(r.Country))
-            .ToDictionary(g => g.Key, g => g.ToList());
+            if (duplicateCheck != null)
+            {
+                throw new InvalidOperationException($"File '{file.FileName}' dengan konten yang sama sudah diupload pada {duplicateCheck.UploadDate:dd/MM/yyyy HH:mm}. Session ID: {duplicateCheck.SessionId}");
+            }
 
-        // Calculate processed data for each country
-        var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
-        foreach (var countryGroup in dataByCountry)
-        {
-            var processedData = await CalculateProcessedDataAsync(countryGroup.Value, "LOOSE");
-            processedDataByCountry[countryGroup.Key] = processedData;
-        }
+            var (rawData, formatInfo) = ParseExcelFileWithFormatDetection(file);
+            
+            var dataByCountry = rawData
+                .GroupBy(r => CountryNormalizer.NormalizeOrUnknown(r.Country))
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-        var session = new UploadSession
-        {
-            FileName = file.FileName,
-            SheetName = "Sheet1",
-            Status = "PREVIEW",
-            UploadDate = DateTime.Now,
-            UploadedBy = uploadedBy,
-            SheetIdentifier = GenerateSheetIdentifier(),
-            FileHash = fileHash,
-            Countries = string.Join(",", dataByCountry.Keys)  // Store all countries
-        };            _context.UploadSessions.Add(session);
-        await _context.SaveChangesAsync();
+            var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
+            foreach (var countryGroup in dataByCountry)
+            {
+                var processedData = await CalculateProcessedDataAsync(countryGroup.Value, "LOOSE");
+                processedDataByCountry[countryGroup.Key] = processedData;
+            }
 
-        // Store raw data with country info
-        foreach (var row in rawData)
-        {
-            var detail = new UploadSessionDetail
+            var session = new UploadSession
+            {
+                FileName = file.FileName,
+                SheetName = "Sheet1",
+                Status = "PREVIEW",
+                UploadDate = DateTime.Now,
+                UploadedBy = uploadedBy,
+                SheetIdentifier = GenerateSheetIdentifier(),
+                FileHash = fileHash,
+                Countries = string.Join(",", dataByCountry.Keys)
+            };
+            
+            _context.UploadSessions.Add(session);
+            await _context.SaveChangesAsync();
+
+            foreach (var row in rawData)
+            {
+                var detail = new UploadSessionDetail
+                {
+                    SessionId = session.SessionId,
+                    OriginalPO = row.NoPO,
+                    Model = row.Model,
+                    OriginalQty = row.Qty,
+                    RowIndex = row.RowIndex,
+                    Country = row.Country
+                };
+                _context.UploadSessionDetails.Add(detail);
+            }
+            await _context.SaveChangesAsync();
+
+            var allProcessedData = processedDataByCountry.Values.SelectMany(x => x).ToList();
+
+            return new UploadPreviewDto
             {
                 SessionId = session.SessionId,
-                OriginalPO = row.NoPO,
-                Model = row.Model,
-                OriginalQty = row.Qty,
-                RowIndex = row.RowIndex,
-                Country = row.Country  // NEW: Store country
+                FileName = session.FileName,
+                SheetName = session.SheetName,
+                RawData = rawData,
+                ProcessedData = allProcessedData,
+                ProcessedDataByCountry = processedDataByCountry,
+                PendingCountries = dataByCountry.Keys.ToList(),
+                SubmittedCountries = new List<string>(),
+                FormatInfo = formatInfo
             };
-            _context.UploadSessionDetails.Add(detail);
-        }
-        await _context.SaveChangesAsync();
-
-        // Flatten for backward compatibility
-        var allProcessedData = processedDataByCountry.Values.SelectMany(x => x).ToList();
-
-        return new UploadPreviewDto
-        {
-            SessionId = session.SessionId,
-            FileName = session.FileName,
-            SheetName = session.SheetName,
-            RawData = rawData,
-            ProcessedData = allProcessedData,
-            ProcessedDataByCountry = processedDataByCountry,
-            PendingCountries = dataByCountry.Keys.ToList(),
-            SubmittedCountries = new List<string>(),
-            FormatInfo = formatInfo  // 🆕 ADD FORMAT INFO
-        };
         }
 
-    private List<ExcelRowData> ParseExcelFileAsync(IFormFile file)
-    {
-        return ParseMultiSheetFormat(file);
-    }
-
-    // 🎯 ENHANCED PARSING WITH FORMAT DETECTION
-    private (List<ExcelRowData> rawData, ExcelFormatInfo formatInfo) ParseExcelFileWithFormatDetection(IFormFile file)
-    {
-        using var stream = file.OpenReadStream();
-        using var workbook = new XLWorkbook(stream);
-
-        var formatInfo = new ExcelFormatInfo
+        private (List<ExcelRowData> rawData, ExcelFormatInfo formatInfo) ParseExcelFileWithFormatDetection(IFormFile file)
         {
-            FormatType = "MULTI_SHEET",
-            TotalSheets = workbook.Worksheets.Count,
-            SheetNames = workbook.Worksheets.Select(w => w.Name).ToList(),
-            Description = $"Multi-sheet format: {workbook.Worksheets.Count} sheets with 3 columns per sheet (PO | Model | Qty)"
-        };
+            using var stream = file.OpenReadStream();
+            using var workbook = new XLWorkbook(stream);
 
-        var rawData = ParseMultiSheetFormat(workbook);
+            var formatType = DetectFormatType(workbook);
 
-        // Enhanced format info
-        formatInfo.DetectedCountries = rawData.Select(r => r.Country).Distinct().Where(c => !string.IsNullOrEmpty(c)).ToList()!;
-        formatInfo.TotalRows = rawData.Count;
-
-        return (rawData, formatInfo);
-    }
-
-    private List<ExcelRowData> ParseMultiSheetFormat(IFormFile file)
-    {
-        using var stream = file.OpenReadStream();
-        using var workbook = new XLWorkbook(stream);
-        return ParseMultiSheetFormat(workbook);
-    }
-
-    private bool IsOldFormat(IXLWorkbook workbook)
-    {
-        try
-        {
-            // Check if single sheet and has "COUNTRY" header in first column
-            if (workbook.Worksheets.Count == 1)
+            // Parse data FIRST so we can build an accurate sheet/country summary (avoid phantom names like "USA" / "Bucharest")
+            List<ExcelRowData> rawData = formatType switch
             {
-                var worksheet = workbook.Worksheet(1);
+                "STUFFING_PLAN" => ParseStuffingPlanFormat(workbook),
+                "OLD_SINGLE_SHEET" => ParseSingleSheetFormat(workbook),
+                _ => ParseMultiSheetFormat(workbook)
+            };
+
+            var detectedCountries = rawData
+                .Select(r => r.Country)
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Cast<string>()
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+
+            // Only count sheets that actually produced data rows. This removes empty/hidden/template sheets.
+            // UI previously showed workbook.Worksheets.Count causing inflated counts (e.g. 10) and unrelated names.
+            var effectiveSheetCount = detectedCountries.Count;
+
+            var formatInfo = new ExcelFormatInfo
+            {
+                FormatType = formatType,
+                TotalSheets = effectiveSheetCount,
+                SheetNames = detectedCountries, // Use validated country list instead of raw workbook sheet names
+                Description = GetFormatDescription(formatType, effectiveSheetCount),
+                DetectedCountries = detectedCountries,
+                TotalRows = rawData.Count
+            };
+
+            return (rawData, formatInfo);
+        }
+
+        private string DetectFormatType(IXLWorkbook workbook)
+        {
+            try
+            {
+                Console.WriteLine("=== FORMAT DETECTION START ===");
+                Console.WriteLine($"Total worksheets: {workbook.Worksheets.Count}");
                 
-                // Check header row first (row 1)
+                foreach (var ws in workbook.Worksheets)
+                {
+                    Console.WriteLine($"Sheet: '{ws.Name}'");
+                }
+                
+                if (IsStuffingPlanFormat(workbook))
+                {
+                    Console.WriteLine("DETECTED: STUFFING_PLAN");
+                    return "STUFFING_PLAN";
+                }
+                
+                if (IsOldFormat(workbook))
+                {
+                    Console.WriteLine("DETECTED: OLD_SINGLE_SHEET");
+                    return "OLD_SINGLE_SHEET";
+                }
+                
+                Console.WriteLine("DETECTED: MULTI_SHEET (default)");
+                return "MULTI_SHEET";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"FORMAT DETECTION ERROR: {ex.Message}");
+                return "MULTI_SHEET";
+            }
+        }
+
+        private bool IsStuffingPlanFormat(IXLWorkbook workbook)
+        {
+            try
+            {
+                // Enhanced detection for stuffing plan format
+                var stuffingPlanIndicators = new[]
+                {
+                    "STUFFING PLAN", "STUFFING_PLAN", "Export Department", "EXPORT DEPARTMENT",
+                    "Shipment to", "SHIPMENT TO", "N.W (Kg)", "G.W (Kg)", "Volume (M3)", "Ready :"
+                };
+
+                var dataHeaders = new[] { "NO PO", "NO MODEL", "QTY" };
+
+                foreach (var worksheet in workbook.Worksheets)
+                {
+                    var lastRow = Math.Min(20, worksheet.LastRowUsed()?.RowNumber() ?? 0);
+                    
+                    // Check for stuffing plan indicators
+                    bool hasStuffingPlanIndicator = false;
+                    int headerMatchCount = 0;
+                    
+                    for (int row = 1; row <= lastRow; row++)
+                    {
+                        for (int col = 1; col <= 15; col++)
+                        {
+                            var cellValue = worksheet.Cell(row, col).GetString().Trim();
+                            
+                            // Check for stuffing plan indicators
+                            if (stuffingPlanIndicators.Any(indicator => 
+                                cellValue.Contains(indicator, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                hasStuffingPlanIndicator = true;
+                            }
+                            
+                            // Check for required data headers
+                            if (dataHeaders.Any(header => 
+                                cellValue.Equals(header, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                headerMatchCount++;
+                            }
+                        }
+                    }
+                    
+                    // If we have stuffing plan indicators OR at least 2 of the 3 required headers
+                    if (hasStuffingPlanIndicator || headerMatchCount >= 2)
+                    {
+                        Console.WriteLine($"Detected Stuffing Plan format in sheet: {worksheet.Name}");
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private List<ExcelRowData> ParseStuffingPlanFormat(IXLWorkbook workbook)
+        {
+            var rawData = new List<ExcelRowData>();
+            int globalRowIndex = 1;
+
+            foreach (var worksheet in workbook.Worksheets)
+            {
+                // COUNTRY: Extract from sheet name (requirement #4)
+                var countryFromSheetName = CountryNormalizer.Normalize(worksheet.Name);
+                var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+                
+                if (lastRowUsed <= 1) continue;
+
+                var dataStartRow = FindDataStartRow(worksheet);
+                if (dataStartRow == -1) continue;
+
+                var (poCol, modelCol, qtyCol) = FindColumnIndexes(worksheet, dataStartRow);
+                if (poCol == -1 || modelCol == -1 || qtyCol == -1) continue;
+
+                // Inheritance variables for NO PO and NO MODEL (requirements #1 & #2)
+                var currentPO = string.Empty;
+                var currentModel = string.Empty;
+
+                for (int row = dataStartRow + 1; row <= lastRowUsed; row++)
+                {
+                    globalRowIndex++;
+                    
+                    var noPOCell = worksheet.Cell(row, poCol).GetString().Trim();
+                    var modelCell = worksheet.Cell(row, modelCol).GetString().Trim();
+                    var qtyCell = worksheet.Cell(row, qtyCol).GetString().Trim();
+
+                    // Skip completely empty rows
+                    if (string.IsNullOrEmpty(noPOCell) && 
+                        string.IsNullOrEmpty(modelCell) && 
+                        string.IsNullOrEmpty(qtyCell))
+                        continue;
+
+                    // NO PO: Inheritance rule - if empty, inherit from row above (requirement #1)
+                    if (!string.IsNullOrEmpty(noPOCell))
+                        currentPO = noPOCell;
+
+                    // NO MODEL: Inheritance rule - if empty, inherit from row above (requirement #2)
+                    if (!string.IsNullOrEmpty(modelCell))
+                        currentModel = modelCell;
+
+                    // QTY: Always has unique value per row (requirement #3)
+                    if (!ParseQuantity(qtyCell, out int qty))
+                        continue;
+
+                    // Only add valid rows with all required data
+                    if (!string.IsNullOrEmpty(currentPO) && 
+                        !string.IsNullOrEmpty(currentModel) && 
+                        qty > 0)
+                    {
+                        rawData.Add(new ExcelRowData
+                        {
+                            NoPO = currentPO,
+                            Country = countryFromSheetName,
+                            Model = currentModel,
+                            Qty = qty,
+                            RowIndex = globalRowIndex
+                        });
+                    }
+                }
+            }
+
+            return rawData;
+        }
+
+        private int FindDataStartRow(IXLWorksheet worksheet)
+        {
+            // Look for exact header indicators, NOT "LCL" which is shipment type
+            var headerIndicators = new[] { "NO PO", "NO MODEL", "QTY" };
+            
+            var lastRow = Math.Min(20, worksheet.LastRowUsed()?.RowNumber() ?? 0);
+            for (int row = 1; row <= lastRow; row++)
+            {
+                int matchCount = 0;
+                
+                // Check if this row contains all 3 required headers
+                for (int col = 1; col <= 15; col++)
+                {
+                    var cellValue = worksheet.Cell(row, col).GetString().Trim().ToUpper();
+                    
+                    if (headerIndicators.Any(indicator => 
+                        cellValue.Equals(indicator, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        matchCount++;
+                    }
+                }
+                
+                // If we found at least 2 of the 3 headers in this row, it's likely the header row
+                if (matchCount >= 2)
+                {
+                    return row;
+                }
+            }
+            
+            return -1;
+        }
+
+        private (int poCol, int modelCol, int qtyCol) FindColumnIndexes(IXLWorksheet worksheet, int headerRow)
+        {
+            int poCol = -1, modelCol = -1, qtyCol = -1;
+            
+            // Search for exact column headers in stuffing plan format
+            for (int col = 1; col <= 15; col++)
+            {
+                var headerValue = worksheet.Cell(headerRow, col).GetString().Trim().ToUpper();
+                
+                // Debug: Print what we find in each column
+                Console.WriteLine($"Column {col}: '{headerValue}'");
+                
+                // NO PO column detection - be more specific (requirement #1)
+                if (headerValue.Equals("NO PO", StringComparison.OrdinalIgnoreCase))
+                    poCol = col;
+                    
+                // NO MODEL column detection - be more specific (requirement #2) 
+                else if (headerValue.Equals("NO MODEL", StringComparison.OrdinalIgnoreCase))
+                    modelCol = col;
+                    
+                // QTY column detection - be more specific (requirement #3)
+                else if (headerValue.Equals("QTY", StringComparison.OrdinalIgnoreCase))
+                    qtyCol = col;
+            }
+            
+            // If exact matches not found, try partial matches
+            if (poCol == -1 || modelCol == -1 || qtyCol == -1)
+            {
+                for (int col = 1; col <= 15; col++)
+                {
+                    var headerValue = worksheet.Cell(headerRow, col).GetString().Trim().ToUpper();
+                    
+                    if (poCol == -1 && headerValue.Contains("PO") && !headerValue.Contains("MODEL"))
+                        poCol = col;
+                    else if (modelCol == -1 && headerValue.Contains("MODEL"))
+                        modelCol = col;
+                    else if (qtyCol == -1 && headerValue.Contains("QTY"))
+                        qtyCol = col;
+                }
+            }
+            
+            // Final fallback - but warn about it
+            if (poCol == -1)
+            {
+                Console.WriteLine("Warning: NO PO column not found, using column 1");
+                poCol = 1;
+            }
+            if (modelCol == -1)
+            {
+                Console.WriteLine("Warning: NO MODEL column not found, using column 2");
+                modelCol = 2;
+            }
+            if (qtyCol == -1)
+            {
+                Console.WriteLine("Warning: QTY column not found, using column 3");
+                qtyCol = 3;
+            }
+            
+            Console.WriteLine($"Final column mapping: PO={poCol}, MODEL={modelCol}, QTY={qtyCol}");
+            
+            return (poCol, modelCol, qtyCol);
+        }
+
+        private bool ParseQuantity(string qtyCell, out int qty)
+        {
+            qty = 0;
+            
+            if (string.IsNullOrEmpty(qtyCell)) return false;
+            
+            // Handle specific formats from Stuffing Plan:
+            // Examples: "1.149 Sets", "383 SP", "2.700", "63", "129"
+            var cleanQty = qtyCell
+                .Replace(" Sets", "", StringComparison.OrdinalIgnoreCase)
+                .Replace(" SP", "", StringComparison.OrdinalIgnoreCase)  
+                .Replace("Sets", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("SP", "", StringComparison.OrdinalIgnoreCase)
+                .Replace(" ", "")
+                .Trim();
+            
+            // Handle decimal notation with dots (e.g., "1.149" -> 1149)
+            if (cleanQty.Contains("."))
+            {
+                cleanQty = cleanQty.Replace(".", "");
+            }
+            
+            // Handle comma notation if any (e.g., "1,149" -> 1149) 
+            if (cleanQty.Contains(","))
+            {
+                cleanQty = cleanQty.Replace(",", "");
+            }
+            
+            // Try to parse as integer
+            if (int.TryParse(cleanQty, out qty))
+                return qty > 0;
+            
+            // Fallback: try decimal parsing for edge cases
+            if (decimal.TryParse(cleanQty, out decimal decimalQty))
+            {
+                qty = (int)Math.Round(decimalQty);
+                return qty > 0;
+            }
+            
+            return false;
+        }
+
+        private string GetFormatDescription(string formatType, int sheetCount)
+        {
+            return formatType switch
+            {
+                "STUFFING_PLAN" => $"Stuffing Plan format: {sheetCount} sheets with structured data (PO | Model | Qty)",
+                "OLD_SINGLE_SHEET" => "Legacy single-sheet format: 1 sheet with 4 columns (Country | PO | Model | Qty)",
+                "MULTI_SHEET" => $"Multi-sheet format: {sheetCount} sheets with 3 columns per sheet (PO | Model | Qty)",
+                _ => $"Unknown format: {sheetCount} sheets"
+            };
+        }
+
+        private bool IsOldFormat(IXLWorkbook workbook)
+        {
+            try
+            {
+                if (workbook.Worksheets.Count != 1) return false;
+                
+                var worksheet = workbook.Worksheet(1);
                 var headerCell = worksheet.Cell(1, 1).GetString().Trim().ToUpper();
                 
-                // Check if first column header contains "COUNTRY" or similar
                 if (headerCell.Contains("COUNTRY") || headerCell.Contains("NEGARA") || 
                     headerCell.Contains("NATION") || headerCell.Contains("PAIS") ||
                     headerCell.Contains("PAÍSES") || headerCell.Contains("LAND"))
@@ -158,7 +462,6 @@ namespace ShipmentFinishGood.Services
                     return true;
                 }
 
-                // Additional check: if first data row (row 2) has 4 columns with data
                 try
                 {
                     var col1 = worksheet.Cell(2, 1).GetString().Trim();
@@ -166,154 +469,117 @@ namespace ShipmentFinishGood.Services
                     var col3 = worksheet.Cell(2, 3).GetString().Trim();
                     var col4 = worksheet.Cell(2, 4).GetString().Trim();
                     
-                    // If all 4 columns have data and looks like old format
                     if (!string.IsNullOrEmpty(col1) && !string.IsNullOrEmpty(col2) && 
                         !string.IsNullOrEmpty(col3) && !string.IsNullOrEmpty(col4))
                     {
-                        // Additional validation: check if col1 looks like a country name
                         var potentialCountry = col1.ToUpper();
                         var commonCountries = new[] { "AUSTRALIA", "CANADA", "GERMANY", "USA", "UK", "FRANCE", 
                                                     "JAPAN", "SINGAPORE", "MALAYSIA", "INDONESIA", "THAILAND",
                                                     "PHILIPPINES", "VIETNAM", "INDIA", "CHINA", "KOREA", "BRAZIL" };
                         
-                        if (commonCountries.Any(country => potentialCountry.Contains(country)))
-                        {
-                            return true;
-                        }
+                        return commonCountries.Any(country => potentialCountry.Contains(country));
                     }
                 }
                 catch
                 {
-                    // If error reading data rows, continue with other checks
+                    // Continue with other checks
                 }
+                
+                return false;
             }
-            
-            return false;
-        }
-        catch (Exception)
-        {
-            // Log error if needed, but don't throw - assume new format
-            // TODO: Add logging here if needed
-            return false;
-        }
-    }
-
-    private List<ExcelRowData> ParseSingleSheetFormat(IXLWorkbook workbook)
-    {
-        var rawData = new List<ExcelRowData>();
-        var worksheet = workbook.Worksheet(1);
-        var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
-        var currentPO = string.Empty;
-        var currentCountry = string.Empty;
-
-        for (int row = 2; row <= lastRowUsed; row++)
-        {
-            var countryCell = worksheet.Cell(row, 1).GetString().Trim();  // Column 1: Country
-            var noPOCell = worksheet.Cell(row, 2).GetString().Trim();     // Column 2: No PO
-            var modelCell = worksheet.Cell(row, 3).GetString().Trim();    // Column 3: Model
-            var qtyCell = worksheet.Cell(row, 4).GetString().Trim();      // Column 4: Qty
-
-            if (string.IsNullOrEmpty(modelCell) && string.IsNullOrEmpty(qtyCell))
-                continue;
-
-            // Inherit Country if empty
-            if (!string.IsNullOrEmpty(countryCell))
+            catch
             {
-                currentCountry = CountryNormalizer.Normalize(countryCell);
+                return false;
             }
-
-            // Inherit PO if empty
-            if (!string.IsNullOrEmpty(noPOCell))
-            {
-                currentPO = noPOCell;
-            }
-
-            if (!int.TryParse(qtyCell.Replace(".", "").Replace(",", ""), out int qty))
-            {
-                if (decimal.TryParse(qtyCell, out decimal decimalQty))
-                {
-                    qty = (int)Math.Round(decimalQty);
-                }
-                else
-                {
-                    continue;
-                }
-            }
-
-            rawData.Add(new ExcelRowData
-            {
-                NoPO = currentPO,
-                Country = currentCountry,
-                Model = modelCell,
-                Qty = qty,
-                RowIndex = row
-            });
         }
 
-        return rawData;
-    }
-
-    private List<ExcelRowData> ParseMultiSheetFormat(IXLWorkbook workbook)
-    {
-        var rawData = new List<ExcelRowData>();
-        int globalRowIndex = 1; // Global row counter across all sheets
-
-        foreach (var worksheet in workbook.Worksheets)
+        private List<ExcelRowData> ParseSingleSheetFormat(IXLWorkbook workbook)
         {
-            var countryFromSheetName = CountryNormalizer.Normalize(worksheet.Name);
+            var rawData = new List<ExcelRowData>();
+            var worksheet = workbook.Worksheet(1);
             var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
             var currentPO = string.Empty;
-
-            // Skip empty sheets
-            if (lastRowUsed <= 1) continue;
+            var currentCountry = string.Empty;
 
             for (int row = 2; row <= lastRowUsed; row++)
             {
-                globalRowIndex++;
-                
-                var noPOCell = worksheet.Cell(row, 1).GetString().Trim();     // Column 1: No PO
-                var modelCell = worksheet.Cell(row, 2).GetString().Trim();    // Column 2: Model
-                var qtyCell = worksheet.Cell(row, 3).GetString().Trim();      // Column 3: Qty
+                var countryCell = worksheet.Cell(row, 1).GetString().Trim();
+                var noPOCell = worksheet.Cell(row, 2).GetString().Trim();
+                var modelCell = worksheet.Cell(row, 3).GetString().Trim();
+                var qtyCell = worksheet.Cell(row, 4).GetString().Trim();
 
-                // Skip empty rows
                 if (string.IsNullOrEmpty(modelCell) && string.IsNullOrEmpty(qtyCell))
                     continue;
 
-                // Inherit PO if empty (same logic as before)
-                if (!string.IsNullOrEmpty(noPOCell))
-                {
-                    currentPO = noPOCell;
-                }
+                if (!string.IsNullOrEmpty(countryCell))
+                    currentCountry = CountryNormalizer.Normalize(countryCell);
 
-                // Parse quantity with same logic
-                if (!int.TryParse(qtyCell.Replace(".", "").Replace(",", ""), out int qty))
-                {
-                    if (decimal.TryParse(qtyCell, out decimal decimalQty))
-                    {
-                        qty = (int)Math.Round(decimalQty);
-                    }
-                    else
-                    {
-                        continue;
-                    }
-                }
+                if (!string.IsNullOrEmpty(noPOCell))
+                    currentPO = noPOCell;
+
+                if (!ParseQuantity(qtyCell, out int qty))
+                    continue;
 
                 rawData.Add(new ExcelRowData
                 {
                     NoPO = currentPO,
-                    Country = countryFromSheetName, // Country dari nama sheet
+                    Country = currentCountry,
                     Model = modelCell,
                     Qty = qty,
-                    RowIndex = globalRowIndex
+                    RowIndex = row
                 });
             }
+
+            return rawData;
         }
 
-        return rawData;
-    }        public async Task<List<ProcessedPOData>> CalculateProcessedDataAsync(List<ExcelRowData> rawData, string shipmentType)
+        private List<ExcelRowData> ParseMultiSheetFormat(IXLWorkbook workbook)
+        {
+            var rawData = new List<ExcelRowData>();
+            int globalRowIndex = 1;
+
+            foreach (var worksheet in workbook.Worksheets)
+            {
+                var countryFromSheetName = CountryNormalizer.Normalize(worksheet.Name);
+                var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+                var currentPO = string.Empty;
+
+                if (lastRowUsed <= 1) continue;
+
+                for (int row = 2; row <= lastRowUsed; row++)
+                {
+                    globalRowIndex++;
+                    
+                    var noPOCell = worksheet.Cell(row, 1).GetString().Trim();
+                    var modelCell = worksheet.Cell(row, 2).GetString().Trim();
+                    var qtyCell = worksheet.Cell(row, 3).GetString().Trim();
+
+                    if (string.IsNullOrEmpty(modelCell) && string.IsNullOrEmpty(qtyCell))
+                        continue;
+
+                    if (!string.IsNullOrEmpty(noPOCell))
+                        currentPO = noPOCell;
+
+                    if (!ParseQuantity(qtyCell, out int qty))
+                        continue;
+
+                    rawData.Add(new ExcelRowData
+                    {
+                        NoPO = currentPO,
+                        Country = countryFromSheetName,
+                        Model = modelCell,
+                        Qty = qty,
+                        RowIndex = globalRowIndex
+                    });
+                }
+            }
+
+            return rawData;
+        }
+
+        public async Task<List<ProcessedPOData>> CalculateProcessedDataAsync(List<ExcelRowData> rawData, string shipmentType)
         {
             var modelConfigs = await _modelConfigService.GetAllAsync();
-            // Group by model name because we can have both LOOSE and PALLET configs with the same model name
             var configDict = modelConfigs
                 .GroupBy(m => m.ModelName)
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -327,7 +593,7 @@ namespace ShipmentFinishGood.Services
                     .Select(g => new ProcessedPOData
                     {
                         NoPO = string.Join(", ", g.Select(x => x.NoPO).Distinct()),
-                        Country = g.Select(x => x.Country).FirstOrDefault() ?? "",  // NEW: Include country
+                        Country = g.Select(x => x.Country).FirstOrDefault() ?? "",
                         Model = g.Key ?? "",
                         TotalQty = g.Sum(x => x.Qty)
                     })
@@ -340,7 +606,7 @@ namespace ShipmentFinishGood.Services
                     .Select(g => new ProcessedPOData
                     {
                         NoPO = g.Key.NoPO ?? "",
-                        Country = g.Select(x => x.Country).FirstOrDefault() ?? "",  // NEW: Include country
+                        Country = g.Select(x => x.Country).FirstOrDefault() ?? "",
                         Model = g.Key.Model ?? "",
                         TotalQty = g.Sum(x => x.Qty)
                     })
@@ -369,7 +635,6 @@ namespace ShipmentFinishGood.Services
             };
 
             CalculateBreakdown(processedData, configDict, shipmentType);
-
             return processedData;
         }
 
@@ -377,16 +642,13 @@ namespace ShipmentFinishGood.Services
         {
             if (!configDict.TryGetValue(item.Model, out var configs) || configs.Count == 0)
             {
-                // No config found for this model: keep everything as loose pieces
                 item.QtyPcs = item.TotalQty;
                 return;
             }
 
-            // Prefer config matching the shipment type; fall back to any available
             var configForType = configs.FirstOrDefault(c => string.Equals(c.Type, shipmentType, StringComparison.OrdinalIgnoreCase))
                                ?? configs.First();
 
-            // For pallet calculation, try to use PALLET config when available
             var palletConfig = configs.FirstOrDefault(c => string.Equals(c.Type, "PALLET", StringComparison.OrdinalIgnoreCase));
             var pcsPerPallet = string.Equals(shipmentType, "PALLET", StringComparison.OrdinalIgnoreCase)
                 ? (palletConfig?.PcsPerPallet ?? configForType.PcsPerPallet)
@@ -419,7 +681,7 @@ namespace ShipmentFinishGood.Services
             session.ShipmentDate = request.ShipmentDate;
             session.Status = "PROCESSED";
 
-        foreach (var item in request.ProcessedData)
+            foreach (var item in request.ProcessedData)
             {
                 var poMaster = new POMaster
                 {
@@ -435,7 +697,7 @@ namespace ShipmentFinishGood.Services
                     SourceSessionId = request.SessionId,
                     ShipmentMethod = request.ShipmentType,
                     CreatedBy = createdBy,
-                    Country = CountryNormalizer.Normalize(item.Country)  // NEW: Store normalized country in POMaster
+                    Country = CountryNormalizer.Normalize(item.Country)
                 };
 
                 _context.POMasters.Add(poMaster);
@@ -443,22 +705,16 @@ namespace ShipmentFinishGood.Services
 
             await _context.SaveChangesAsync();
 
-            // Generate QR Identity for the session
             session.IdentityQRCode = $"QR_{session.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
             _context.UploadSessions.Update(session);
             await _context.SaveChangesAsync();
 
-            // Generate barcodes for the session
             await _barcodeService.GenerateBarcodesForSessionAsync(session.SessionId, createdBy);
-            
             return true;
         }
 
-        // NEW: Method to submit specific country
         public async Task<bool> SubmitCountryDataAsync(CountrySubmissionRequest request, string createdBy)
         {
-            // Validate no duplicate country submission
-            // Normalize request country for consistent comparisons and storage
             var normalizedRequestCountry = CountryNormalizer.Normalize(request.Country);
 
             var existingCountrySubmission = await _context.UploadSessions
@@ -472,7 +728,6 @@ namespace ShipmentFinishGood.Services
                 throw new InvalidOperationException($"Country {request.Country} sudah di-submit sebelumnya!");
             }
 
-            // Create new session for this country
             var parentSession = await _context.UploadSessions.FindAsync(request.SessionId);
             if (parentSession == null) return false;
 
@@ -492,8 +747,7 @@ namespace ShipmentFinishGood.Services
             _context.UploadSessions.Add(newSession);
             await _context.SaveChangesAsync();
 
-            // Create POMasters for this country
-        foreach (var item in request.ProcessedData)
+            foreach (var item in request.ProcessedData)
             {
                 var poMaster = new POMaster
                 {
@@ -509,7 +763,7 @@ namespace ShipmentFinishGood.Services
                     SourceSessionId = newSession.SessionId,
                     ShipmentMethod = request.ShipmentType,
                     CreatedBy = createdBy,
-                    Country = CountryNormalizer.Normalize(request.Country)  // NEW: Store normalized country in POMaster
+                    Country = CountryNormalizer.Normalize(request.Country)
                 };
 
                 _context.POMasters.Add(poMaster);
@@ -517,70 +771,67 @@ namespace ShipmentFinishGood.Services
 
             await _context.SaveChangesAsync();
 
-            // Generate QR Identity for the new session
             newSession.IdentityQRCode = $"QR_{newSession.SessionId}_{DateTime.Now:yyyyMMddHHmmss}";
             _context.UploadSessions.Update(newSession);
             await _context.SaveChangesAsync();
 
-            // Generate barcodes for the new session
             await _barcodeService.GenerateBarcodesForSessionAsync(newSession.SessionId, createdBy);
-            
             return true;
         }
 
-    public async Task<UploadPreviewDto?> GetPreviewAsync(int sessionId)
-    {
-        var session = await _context.UploadSessions
-            .Include(s => s.Details)
-            .Include(s => s.ChildSessions)
-            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
-
-        if (session == null) return null;
-
-        // Get submitted countries from child sessions (normalized for comparison)
-        var submittedCountries = session.ChildSessions
-            .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
-            .Select(c => CountryNormalizer.Normalize(c.Country!))
-            .ToList();
-
-        var rawData = session.Details.Select(d => new ExcelRowData
+        public async Task<UploadPreviewDto?> GetPreviewAsync(int sessionId)
         {
-            NoPO = d.OriginalPO,
-            Country = d.Country,  // NEW: Include country
-            Model = d.Model,
-            Qty = d.OriginalQty,
-            RowIndex = d.RowIndex
-        }).ToList();
+            var session = await _context.UploadSessions
+                .Include(s => s.Details)
+                .Include(s => s.ChildSessions)
+                .FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-        // Group by country (normalized for consistent comparison)
-        var dataByCountry = rawData
-            .GroupBy(r => CountryNormalizer.NormalizeOrUnknown(r.Country))
-            .ToDictionary(g => g.Key, g => g.ToList());
+            if (session == null) return null;
 
-        var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
-        foreach (var countryGroup in dataByCountry.Where(c => !submittedCountries.Contains(c.Key)))
-        {
-            var processedData = await CalculateProcessedDataAsync(countryGroup.Value, session.ShipmentType ?? "LOOSE");
-            processedDataByCountry[countryGroup.Key] = processedData;
+            var submittedCountries = session.ChildSessions
+                .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
+                .Select(c => CountryNormalizer.Normalize(c.Country!))
+                .ToList();
+
+            var rawData = session.Details.Select(d => new ExcelRowData
+            {
+                NoPO = d.OriginalPO,
+                Country = d.Country,
+                Model = d.Model,
+                Qty = d.OriginalQty,
+                RowIndex = d.RowIndex
+            }).ToList();
+
+            var dataByCountry = rawData
+                .GroupBy(r => CountryNormalizer.NormalizeOrUnknown(r.Country))
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
+            foreach (var countryGroup in dataByCountry.Where(c => !submittedCountries.Contains(c.Key)))
+            {
+                var processedData = await CalculateProcessedDataAsync(countryGroup.Value, session.ShipmentType ?? "LOOSE");
+                processedDataByCountry[countryGroup.Key] = processedData;
+            }
+
+            var allProcessedData = processedDataByCountry.Values.SelectMany(x => x).ToList();
+            var pendingCountries = dataByCountry.Keys.Where(c => !submittedCountries.Contains(c)).ToList();
+
+            return new UploadPreviewDto
+            {
+                SessionId = session.SessionId,
+                FileName = session.FileName,
+                SheetName = session.SheetName,
+                RawData = rawData,
+                ProcessedData = allProcessedData,
+                ProcessedDataByCountry = processedDataByCountry,
+                PendingCountries = pendingCountries,
+                SubmittedCountries = submittedCountries,
+                ShipmentType = session.ShipmentType,
+                ShipmentDate = session.ShipmentDate
+            };
         }
 
-        var allProcessedData = processedDataByCountry.Values.SelectMany(x => x).ToList();
-        var pendingCountries = dataByCountry.Keys.Where(c => !submittedCountries.Contains(c)).ToList();
-
-        return new UploadPreviewDto
-        {
-            SessionId = session.SessionId,
-            FileName = session.FileName,
-            SheetName = session.SheetName,
-            RawData = rawData,
-            ProcessedData = allProcessedData,
-            ProcessedDataByCountry = processedDataByCountry,
-            PendingCountries = pendingCountries,
-            SubmittedCountries = submittedCountries,
-            ShipmentType = session.ShipmentType,
-            ShipmentDate = session.ShipmentDate
-        };
-    }        public async Task<bool> UpdatePODataAsync(int poId, ProcessedPOData updatedData)
+        public async Task<bool> UpdatePODataAsync(int poId, ProcessedPOData updatedData)
         {
             var poMaster = await _context.POMasters.FindAsync(poId);
             if (poMaster == null) return false;
@@ -627,7 +878,7 @@ namespace ShipmentFinishGood.Services
             var sessions = await _context.UploadSessions
                 .Include(s => s.POMasters)
                 .ThenInclude(p => p.Details)
-                .Where(s => s.POMasters.Any()) // Only sessions with processed POs
+                .Where(s => s.POMasters.Any())
                 .OrderByDescending(s => s.UploadDate)
                 .ToListAsync();
 
@@ -647,19 +898,16 @@ namespace ShipmentFinishGood.Services
                     QRIdentity = session.IdentityQRCode,
                     CreatedDate = session.UploadDate,
                     CreatedBy = session.UploadedBy,
-                    Country = session.POMasters.FirstOrDefault(p => !string.IsNullOrEmpty(p.Country))?.Country, // Add country
+                    Country = session.POMasters.FirstOrDefault(p => !string.IsNullOrEmpty(p.Country))?.Country,
                     
-                    // Summary data
                     TotalPOs = session.POMasters.Count,
                     TotalQty = session.POMasters.Sum(p => p.QtyTotal),
                     TotalBoxes = session.POMasters.Sum(p => p.QtyBox),
                     TotalPallets = session.POMasters.Sum(p => p.QtyPallet),
                     
-                    // Progress tracking
                     TotalItemsToScan = totalItemsToScan,
                     ScannedItems = scannedItems,
                     
-                    // Individual POs
                     POs = session.POMasters.Select(p => new POMasterDto
                     {
                         POId = p.POId,
@@ -676,7 +924,7 @@ namespace ShipmentFinishGood.Services
                         ShipmentMethod = p.ShipmentMethod,
                         CreatedDate = p.CreatedDate,
                         CreatedBy = p.CreatedBy,
-                        Country = p.Country, // NEW: Include Country
+                        Country = p.Country,
                         SourceSessionId = p.SourceSessionId,
                         FileName = session.FileName,
                         QRIdentity = session.IdentityQRCode
@@ -685,20 +933,6 @@ namespace ShipmentFinishGood.Services
             }).ToList();
         }
 
-        private string GenerateSheetIdentifier()
-        {
-            return $"SH{DateTime.Now:yyyyMMddHHmmss}";
-        }
-
-        private async Task<string> GenerateFileHashAsync(IFormFile file)
-        {
-            using var stream = file.OpenReadStream();
-            using var sha256 = SHA256.Create();
-            var hashBytes = await Task.Run(() => sha256.ComputeHash(stream));
-            return Convert.ToBase64String(hashBytes);
-        }
-
-        // NEW: File hash and resume functionality
         public async Task<UploadSession?> GetExistingSessionByHashAsync(string fileHash)
         {
             try
@@ -708,13 +942,12 @@ namespace ShipmentFinishGood.Services
                     .Include(s => s.Details)
                     .Where(s => s.FileHash == fileHash && 
                                s.Status != "DELETED" && 
-                               s.ParentSessionId == null) // Only parent sessions
+                               s.ParentSessionId == null)
                     .OrderByDescending(s => s.UploadDate)
                     .FirstOrDefaultAsync();
             }
-            catch (Exception)
+            catch
             {
-                // Log error if needed, return null for graceful degradation
                 return null;
             }
         }
@@ -730,25 +963,21 @@ namespace ShipmentFinishGood.Services
 
                 if (session == null) return new List<string>();
 
-                // Get all countries from original data (normalized for comparison)
                 var allCountries = session.Details
                     .Where(d => !string.IsNullOrEmpty(d.Country))
                     .Select(d => CountryNormalizer.Normalize(d.Country!))
                     .Distinct()
                     .ToList();
 
-                // Get submitted countries (normalized for comparison)
                 var submittedCountries = session.ChildSessions
                     .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
                     .Select(c => CountryNormalizer.Normalize(c.Country!))
                     .ToList();
 
-                // Return remaining countries
                 return allCountries.Except(submittedCountries).ToList();
             }
-            catch (Exception)
+            catch
             {
-                // Log error if needed, return empty list for graceful degradation
                 return new List<string>();
             }
         }
@@ -762,9 +991,8 @@ namespace ShipmentFinishGood.Services
                                   s.Status == "PROCESSED" && 
                                   !string.IsNullOrEmpty(s.Country));
             }
-            catch (Exception)
+            catch
             {
-                // Log error if needed, return false for graceful degradation
                 return false;
             }
         }
@@ -773,19 +1001,14 @@ namespace ShipmentFinishGood.Services
         {
             try
             {
-                // Generate file hash
                 var fileHash = await GenerateFileHashAsync(file);
-                
-                // Check if file already exists
                 var existingSession = await GetExistingSessionByHashAsync(fileHash);
                 
                 if (existingSession != null)
                 {
-                    // File already uploaded - check remaining countries
                     var remainingCountries = await GetRemainingCountriesAsync(existingSession.SessionId);
                     var hasSubmitted = await HasAnySubmittedCountriesAsync(existingSession.SessionId);
                     
-                    // Get submitted countries for information
                     var submittedCountries = existingSession.ChildSessions
                         .Where(c => c.Status == "PROCESSED" && !string.IsNullOrEmpty(c.Country))
                         .Select(c => c.Country!)
@@ -793,7 +1016,6 @@ namespace ShipmentFinishGood.Services
 
                     if (remainingCountries.Any())
                     {
-                        // Has remaining countries - get preview data
                         var previewData = await GetPreviewAsync(existingSession.SessionId);
                         
                         return new FileUploadResult
@@ -813,7 +1035,6 @@ namespace ShipmentFinishGood.Services
                     }
                     else
                     {
-                        // All countries completed
                         return new FileUploadResult
                         {
                             IsExistingFile = true,
@@ -829,7 +1050,6 @@ namespace ShipmentFinishGood.Services
                 }
                 else
                 {
-                    // New file - normal processing
                     var previewData = await ProcessExcelFileAsync(file, uploadedBy);
                     
                     return new FileUploadResult
@@ -848,7 +1068,6 @@ namespace ShipmentFinishGood.Services
             }
             catch (Exception ex)
             {
-                // Log error and return failure result
                 return new FileUploadResult
                 {
                     IsExistingFile = false,
@@ -861,7 +1080,6 @@ namespace ShipmentFinishGood.Services
             }
         }
 
-        // Dashboard methods implementation
         public async Task<List<UploadSession>> GetAllUploadSessionsAsync()
         {
             return await _context.UploadSessions
@@ -877,6 +1095,19 @@ namespace ShipmentFinishGood.Services
                 .Where(s => s.Status == "IN_PROGRESS" || s.Status == "VALIDATED" || s.Status == "QR_GENERATED")
                 .OrderByDescending(s => s.UploadDate)
                 .ToListAsync();
+        }
+
+        private string GenerateSheetIdentifier()
+        {
+            return $"SH{DateTime.Now:yyyyMMddHHmmss}";
+        }
+
+        private async Task<string> GenerateFileHashAsync(IFormFile file)
+        {
+            using var stream = file.OpenReadStream();
+            using var sha256 = SHA256.Create();
+            var hashBytes = await Task.Run(() => sha256.ComputeHash(stream));
+            return Convert.ToBase64String(hashBytes);
         }
     }
 }

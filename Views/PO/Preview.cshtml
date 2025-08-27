@@ -1136,7 +1136,7 @@
                                             </td>
                                             <td>
                                                 <input type="text" class="form-control form-control-sm editable-field" 
-                                                       name="po_@(countryData.Key)_@i" 
+                                                       name="po_@(countryData.Key.Replace(" ", "_"))_@i" 
                                                        value="@item.NoPO" 
                                                        readonly />
                                             </td>
@@ -1148,7 +1148,7 @@
                                             </td>
                                             <td>
                                                 <input type="number" class="form-control form-control-sm editable-field" 
-                                                       name="qty_@(countryData.Key)_@i" 
+                                                       name="qty_@(countryData.Key.Replace(" ", "_"))_@i" 
                                                        value="@item.TotalQty" 
                                                        readonly />
                                             </td>
@@ -1423,7 +1423,7 @@
 
         // Helper function to update table display
         function updateTableDisplay(country) {
-            const tableBody = document.querySelector(`#table_${country} tbody`);
+            const tableBody = document.querySelector(`#table_${country.replace(/ /g, '_')} tbody`);
             if (!tableBody) return;
             
             const data = currentData[country];
@@ -1448,7 +1448,7 @@
                     </td>
                     <td>
                         <input type="text" class="form-control form-control-sm editable-field" 
-                               name="po_${country}_${index}" 
+                               name="po_${country.replace(/ /g, '_')}_${index}" 
                                value="${item.NoPO}" 
                                data-original-value="${item.NoPO}"
                                readonly />
@@ -1461,7 +1461,7 @@
                     </td>
                     <td>
                         <input type="number" class="form-control form-control-sm editable-field" 
-                               name="qty_${country}_${index}" 
+                               name="qty_${country.replace(/ /g, '_')}_${index}" 
                                value="${item.TotalQty}" 
                                data-original-value="${item.TotalQty}"
                                readonly />
@@ -1596,8 +1596,8 @@
                     const currentRowData = currentData[country][index];
                     
                     // Get current values from UI (in case they were updated but not yet saved)
-                    const currentPO = row.querySelector(`input[name="po_${country}_${index}"]`).value;
-                    const currentQty = parseInt(row.querySelector(`input[name="qty_${country}_${index}"]`).value);
+                    const currentPO = row.querySelector(`input[name="po_${country.replace(/ /g, '_')}_${index}"]`).value;
+                    const currentQty = parseInt(row.querySelector(`input[name="qty_${country.replace(/ /g, '_')}_${index}"]`).value);
                     
                     // Get current calculated quantities from UI display
                     const currentPallet = parseInt(row.querySelector('.qty-display[data-type="pallet"]').textContent) || 0;
@@ -1889,8 +1889,8 @@
             const coreData = {
                 rowIndex: parseInt(rowIndex),
                 country: country,
-                noPO: row.querySelector(`input[name="po_${country}_${rowIndex}"]`).value,
-                totalQty: parseInt(row.querySelector(`input[name="qty_${country}_${rowIndex}"]`).value) || 0
+                noPO: row.querySelector(`input[name="po_${country.replace(/ /g, '_')}_${rowIndex}"]`).value,
+                totalQty: parseInt(row.querySelector(`input[name="qty_${country.replace(/ /g, '_')}_${rowIndex}"]`).value) || 0
             };
 
             // Get metadata (invoice, container, detail) for local storage
