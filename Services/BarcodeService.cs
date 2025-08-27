@@ -41,6 +41,9 @@ namespace ShipmentFinishGood.Services
                         .ExecuteUpdateAsync(b => b
                             .SetProperty(x => x.Status, "CANCELLED")
                             .SetProperty(x => x.IsActive, false));
+                    
+                    // Force completion of the deactivation before proceeding
+                    await _context.SaveChangesAsync();
                 }
 
                 var barcodesToInsert = new List<BarcodeRegistry>();
@@ -63,25 +66,65 @@ namespace ShipmentFinishGood.Services
                     for (int i = 1; i <= poMaster.QtyBox; i++)
                     {
                         var barcode = $"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}";
-                        barcodesToInsert.Add(new BarcodeRegistry
+                        
+                        // Additional safety check - ensure no duplicate barcode values in memory
+                        if (!barcodesToInsert.Any(b => b.BarcodeValue == barcode))
                         {
-                            BarcodeValue = barcode,
-                            BarcodeType = "BOX",
-                            SessionId = sessionId,
-                            POId = poMaster.POId,
-                            ModelProduct = poMaster.ModelProduk,
-                            BoxNumber = i,
-                            Status = "GENERATED",
-                            GeneratedBy = generatedBy,
-                            GeneratedDate = DateTime.Now,
-                            IsActive = true
-                        });
+                            barcodesToInsert.Add(new BarcodeRegistry
+                            {
+                                BarcodeValue = barcode,
+                                BarcodeType = "BOX",
+                                SessionId = sessionId,
+                                POId = poMaster.POId,
+                                ModelProduct = poMaster.ModelProduk,
+                                BoxNumber = i,
+                                Status = "GENERATED",
+                                GeneratedBy = generatedBy,
+                                GeneratedDate = DateTime.Now,
+                                IsActive = true
+                            });
+                        }
                     }
                 }
 
-                // Bulk insert
-                await _context.BarcodeRegistries.AddRangeAsync(barcodesToInsert);
-                await _context.SaveChangesAsync();
+                // Bulk insert with additional error handling
+                try
+                {
+                    await _context.BarcodeRegistries.AddRangeAsync(barcodesToInsert);
+                    await _context.SaveChangesAsync();
+                }
+                catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx) 
+                when (dbEx.InnerException?.Message?.Contains("duplicate key") == true)
+                {
+                    // If duplicate key error occurs, try to recover by checking existing records
+                    var duplicateBarcodeValue = ExtractDuplicateBarcodeValue(dbEx.InnerException.Message);
+                    if (!string.IsNullOrEmpty(duplicateBarcodeValue))
+                    {
+                        // Remove duplicates from our insertion list and try again
+                        var existingBarcode = await _context.BarcodeRegistries
+                            .FirstOrDefaultAsync(b => b.BarcodeValue == duplicateBarcodeValue && b.IsActive);
+                        
+                        if (existingBarcode != null)
+                        {
+                            // Remove the duplicate from our list and try to insert the rest
+                            barcodesToInsert.RemoveAll(b => b.BarcodeValue == duplicateBarcodeValue);
+                            
+                            if (barcodesToInsert.Any())
+                            {
+                                await _context.BarcodeRegistries.AddRangeAsync(barcodesToInsert);
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                        else
+                        {
+                            throw; // Re-throw if we can't handle it
+                        }
+                    }
+                    else
+                    {
+                        throw; // Re-throw if we can't extract the duplicate value
+                    }
+                }
 
                 return Result.Success();
             }
@@ -193,7 +236,33 @@ namespace ShipmentFinishGood.Services
                     }
 
                     await _context.BarcodeRegistries.AddRangeAsync(barcodesToAdd);
-                    await _context.SaveChangesAsync();
+                    
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                    catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx) 
+                    when (dbEx.InnerException?.Message?.Contains("duplicate key") == true)
+                    {
+                        // Handle potential duplicate key errors gracefully
+                        var duplicateBarcodeValue = ExtractDuplicateBarcodeValue(dbEx.InnerException.Message);
+                        if (!string.IsNullOrEmpty(duplicateBarcodeValue))
+                        {
+                            // Remove the duplicate and try again
+                            barcodesToAdd.RemoveAll(b => b.BarcodeValue == duplicateBarcodeValue);
+                            if (barcodesToAdd.Any())
+                            {
+                                // Clear the context and try again
+                                _context.ChangeTracker.Clear();
+                                await _context.BarcodeRegistries.AddRangeAsync(barcodesToAdd);
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                        else
+                        {
+                            throw;
+                        }
+                    }
 
                     return Result.Success();
                 }
@@ -456,6 +525,26 @@ namespace ShipmentFinishGood.Services
             catch (Exception)
             {
                 return null;
+            }
+        }
+
+        private static string ExtractDuplicateBarcodeValue(string errorMessage)
+        {
+            try
+            {
+                // Extract barcode value from error message like:
+                // "The duplicate key value is (QR_2_20250827082413_BOX_RF-2400DEB-K_001)."
+                var startIndex = errorMessage.IndexOf("(");
+                var endIndex = errorMessage.IndexOf(")");
+                if (startIndex != -1 && endIndex != -1 && endIndex > startIndex)
+                {
+                    return errorMessage.Substring(startIndex + 1, endIndex - startIndex - 1);
+                }
+                return string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
     }
