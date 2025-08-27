@@ -1680,6 +1680,12 @@
                     
                     // Show success message
                     showToast(`✅ ${country} submitted successfully!`, 'success');
+
+                    // Auto-download Barcode PDF for the newly created session (country-specific)
+                    // Uses the NewSessionId returned from backend (camelCased to newSessionId in JSON)
+                    if (result.newSessionId) {
+                        autoDownloadCountryPdf(result.newSessionId);
+                    }
                     
                 } else {
                     throw new Error(result.message || 'Submission failed');
@@ -2014,6 +2020,25 @@
 
                 bsModal.show();
             });
+        }
+
+        // Auto download PDF helper (Barcode List PDF)
+        function autoDownloadCountryPdf(sessionId) {
+            try {
+                // Small delay to ensure backend transaction fully committed
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = `/QR/DownloadPDF?sessionId=${sessionId}`;
+                    // Rely on server-provided filename; optional explicit download attribute:
+                    link.setAttribute('download', `Barcodes_Session_${sessionId}.pdf`);
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }, 400); // 400ms delay – adjust if needed
+            } catch (e) {
+                console.warn('Auto download PDF failed:', e);
+            }
         }
     </script>
 }

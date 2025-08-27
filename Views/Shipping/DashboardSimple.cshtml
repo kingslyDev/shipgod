@@ -275,14 +275,7 @@
             <div class="kpi-trend trend-up">+12% vs yesterday</div>
         </div>
 
-        <div class="kpi-card">
-            <div class="kpi-icon">
-                <i class="fas fa-users"></i>
-            </div>
-            <div class="kpi-value">@Model.ActiveScanners/@Model.TotalScanners</div>
-            <div class="kpi-label">Active Scanners</div>
-            <div class="kpi-trend trend-up">80% utilization</div>
-        </div>
+    <!-- Active Scanners KPI removed as requested -->
 
         <div class="kpi-card">
             <div class="kpi-icon">
@@ -312,21 +305,7 @@
             </div>
         </div>
 
-        <!-- Top Scanners -->
-        <div class="chart-card">
-            <div class="chart-title">🏆 Top Performing Scanners</div>
-            <div class="chart-wrapper">
-                <canvas id="scannersChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Bottleneck Heatmap -->
-        <div class="chart-card">
-            <div class="chart-title">🔥 Process Bottlenecks</div>
-            <div class="chart-wrapper">
-                <canvas id="bottleneckChart"></canvas>
-            </div>
-        </div>
+    <!-- Top Performing Scanners and Process Bottlenecks removed as requested -->
     </div>
 
     <!-- Country Statistics per Model -->
@@ -338,6 +317,7 @@
                     <tr>
                         <th>Country</th>
                         <th>Model</th>
+                        <th>Shipment Date</th>
                         <th>Total Shipped</th>
                         <th>Completion %</th>
                         <th>Avg Lead Time</th>
@@ -355,6 +335,7 @@
                                     @stat.Country
                                 </td>
                                 <td>@stat.Model</td>
+                                <td>@(stat.ShipmentDate.HasValue ? stat.ShipmentDate.Value.ToString("dd/MM/yyyy") : "-")</td>
                                 <td>@stat.TotalShipped.ToString("N0")</td>
                                 <td>@stat.CompletionRate.ToString("F1")%</td>
                                 <td>@stat.AvgLeadTime.ToString("F1")h</td>
@@ -617,4 +598,55 @@ function clearFilters() {
 document.addEventListener('DOMContentLoaded', () => {
     new ExecutiveDashboard();
 });
+</script>
+
+<script>
+// Client-side pagination for shipping statistics table
+(() => {
+    const pageSize = 7;
+    const table = document.querySelector('.stats-card table');
+    if (!table) return;
+
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    if (rows.length <= pageSize) return; // no pagination needed
+
+    // Create pagination controls
+    const pager = document.createElement('div');
+    pager.className = 'd-flex justify-content-center mt-3';
+    const ul = document.createElement('ul');
+    ul.className = 'pagination';
+    pager.appendChild(ul);
+
+    const container = document.querySelector('.stats-card');
+    container.appendChild(pager);
+
+    const pageCount = Math.ceil(rows.length / pageSize);
+    let currentPage = 1;
+
+    function renderPage(page) {
+        currentPage = page;
+        const start = (page - 1) * pageSize;
+        const end = start + pageSize;
+        rows.forEach((r, idx) => r.style.display = (idx >= start && idx < end) ? '' : 'none');
+        // update active class
+        Array.from(ul.children).forEach((li, i) => {
+            li.classList.toggle('active', i + 1 === page);
+        });
+    }
+
+    for (let i = 1; i <= pageCount; i++) {
+        const li = document.createElement('li');
+        li.className = 'page-item' + (i === 1 ? ' active' : '');
+        const a = document.createElement('a');
+        a.className = 'page-link';
+        a.href = '#';
+        a.textContent = i;
+        a.addEventListener('click', (e) => { e.preventDefault(); renderPage(i); });
+        li.appendChild(a);
+        ul.appendChild(li);
+    }
+
+    renderPage(1);
+})();
 </script>

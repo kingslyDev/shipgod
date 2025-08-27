@@ -186,6 +186,10 @@ namespace ShipmentFinishGood.DTOs
         public int SessionId { get; set; }
         public string FileName { get; set; } = string.Empty;
         public string SheetName { get; set; } = string.Empty;
+    // Added: Target country for this session (child session after split) if available
+    public string? Country { get; set; }
+    // Added: Shipment date for this session (if provided)
+    public DateTime? ShipmentDate { get; set; }
         public string QRIdentity { get; set; } = string.Empty;
         public string QRImageBase64 { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;

@@ -135,6 +135,8 @@ namespace ShipmentFinishGood.DTOs
         public int TotalShipped { get; set; }
         public double CompletionRate { get; set; }
         public double AvgLeadTime { get; set; }
+    // New: representative shipment date for this country+model group
+    public DateTime? ShipmentDate { get; set; }
     }
 
     public class ShipmentSummaryDto

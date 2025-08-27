@@ -149,6 +149,8 @@ namespace ShipmentFinishGood.Services
                 SessionId = session.SessionId,
                 FileName = session.FileName ?? "",
                 SheetName = session.SheetName ?? "",
+                    Country = session.Country, // populate country (child session holds single country)
+                    ShipmentDate = session.ShipmentDate,
                 QRIdentity = masterBarcode.BarcodeValue ?? "",
                 QRImageBase64 = qrImageBase64 ?? "",
                 Status = "Ready for Scanning",

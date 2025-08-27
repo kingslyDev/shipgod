@@ -463,6 +463,15 @@ namespace ShipmentFinishGood.Controllers
                                       .Select(x => (x.ScannedDate!.Value - x.GeneratedDate).TotalHours)
                                       .DefaultIfEmpty(0)
                                       .Average()
+                        ,
+                    // Choose latest scanned date if available, otherwise latest generated date
+                    ShipmentDate = g.Where(x => x.ScannedDate.HasValue)
+                                .Select(x => x.ScannedDate)
+                                .OrderByDescending(d => d)
+                                .FirstOrDefault()
+                                ?? g.Select(x => (DateTime?)x.GeneratedDate)
+                                    .OrderByDescending(d => d)
+                                    .FirstOrDefault()
                     })
                     .OrderBy(s => s.Country)
                     .ThenBy(s => s.Model)

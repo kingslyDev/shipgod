@@ -171,6 +171,27 @@ namespace ShipmentFinishGood.Services
                 .SetPadding(10)
                 .SetMarginBottom(30));
 
+            // Improved: show Destination Country and Source File as separate centered paragraphs
+            if (!string.IsNullOrEmpty(qrData.Country))
+            {
+                document.Add(new Paragraph()
+                    .Add(new Text("Destination Country: ").SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD)))
+                    .Add(new Text(qrData.Country).SetFont(bodyFont))
+                    .SetTextAlignment(TextAlignment.CENTER)
+                    .SetFontSize(12)
+                    .SetMarginBottom(6));
+            }
+
+            if (!string.IsNullOrEmpty(qrData.FileName))
+            {
+                document.Add(new Paragraph()
+                    .Add(new Text("Source File: ").SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD)))
+                    .Add(new Text(qrData.FileName).SetFont(bodyFont))
+                    .SetTextAlignment(TextAlignment.CENTER)
+                    .SetFontSize(11)
+                    .SetMarginBottom(14));
+            }
+
             // Session Information
             var infoTable = new Table(2);
             infoTable.SetWidth(UnitValue.CreatePercentValue(100));
@@ -303,6 +324,26 @@ namespace ShipmentFinishGood.Services
                             .SetHeight(200)
                             .SetHorizontalAlignment(HorizontalAlignment.CENTER)
                             .SetMarginBottom(5));
+                        // Add country and source file under QR image for clarity
+                        if (!string.IsNullOrEmpty(qrData.Country))
+                        {
+                            qrCell.Add(new Paragraph()
+                                .Add(new Text("Destination Country: ").SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD)))
+                                .Add(new Text(qrData.Country).SetFont(bodyFont))
+                                .SetTextAlignment(TextAlignment.CENTER)
+                                .SetFontSize(11)
+                                .SetMarginBottom(4));
+                        }
+
+                        if (!string.IsNullOrEmpty(qrData.FileName))
+                        {
+                            qrCell.Add(new Paragraph()
+                                .Add(new Text("Source File: ").SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD)))
+                                .Add(new Text(qrData.FileName).SetFont(bodyFont))
+                                .SetTextAlignment(TextAlignment.CENTER)
+                                .SetFontSize(10)
+                                .SetMarginBottom(4));
+                        }
                     }
                     catch
                     {
@@ -337,6 +378,16 @@ namespace ShipmentFinishGood.Services
                     .SetFontSize(12)
                     .SetFontColor(accentColor)
                     .SetMarginBottom(10));
+
+                // Shipment Date display (if present)
+                if (qrData.ShipmentDate.HasValue)
+                {
+                    poCell.Add(new Paragraph($"Shipment Date: {qrData.ShipmentDate.Value:dd/MM/yyyy}")
+                        .SetFont(bodyFont)
+                        .SetFontSize(10)
+                        .SetFontColor(ColorConstants.DARK_GRAY)
+                        .SetMarginBottom(8));
+                }
 
                 // Create PO table
                 if (qrData.POSummaries?.Any() == true)
@@ -541,10 +592,21 @@ namespace ShipmentFinishGood.Services
                         }
 
                         // Add text below QR
-                        barcodeCell.Add(new Paragraph(displayText)
+                        var barcodeTextPara = new Paragraph(displayText)
                             .SetFont(PdfFontFactory.CreateFont(StandardFonts.COURIER_BOLD))
                             .SetFontSize(11)
-                            .SetTextAlignment(TextAlignment.CENTER));
+                            .SetTextAlignment(TextAlignment.CENTER)
+                            .SetMarginBottom(2);
+                        barcodeCell.Add(barcodeTextPara);
+                        // Country label under each barcode
+                        if (!string.IsNullOrEmpty(qrData.Country))
+                        {
+                            barcodeCell.Add(new Paragraph(qrData.Country)
+                                .SetFont(bodyFont)
+                                .SetFontSize(9)
+                                .SetFontColor(ColorConstants.GRAY)
+                                .SetTextAlignment(TextAlignment.CENTER));
+                        }
                     }
                     // Empty cell still takes up exact quadrant space
                     
@@ -617,6 +679,14 @@ namespace ShipmentFinishGood.Services
                         .SetFontSize(11)
                         .SetTextAlignment(TextAlignment.CENTER)
                         .SetMarginTop(4));
+                    if (!string.IsNullOrEmpty(qrData.Country))
+                    {
+                        cell.Add(new Paragraph(qrData.Country)
+                            .SetFont(bodyFont)
+                            .SetFontSize(9)
+                            .SetFontColor(ColorConstants.GRAY)
+                            .SetTextAlignment(TextAlignment.CENTER));
+                    }
 
                     firstRowTable.AddCell(cell);
                 }
