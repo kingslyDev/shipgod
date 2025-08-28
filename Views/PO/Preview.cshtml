@@ -1018,6 +1018,17 @@
                                     <small class="d-block text-muted">Group by Model</small>
                                 </label>
                             </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="autoLooseMode" checked onchange="toggleAutoMode()">
+                                <label class="form-check-label" for="autoLooseMode">
+                                    <i class="fas fa-magic me-2 text-success"></i>
+                                    <strong>Auto LOOSE Mode</strong>
+                                    <small class="d-block text-muted">Automatically set LOOSE & calculate for next country</small>
+                                </label>
+                                <div class="mt-1">
+                                    <span id="autoModeStatus" class="badge bg-success">Auto LOOSE Mode: ENABLED</span>
+                                </div>
+                            </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="shipmentType" id="typePallet" value="PALLET" onchange="updateMode()">
                                 <label class="form-check-label" for="typePallet">
@@ -1314,12 +1325,47 @@
                 document.getElementById('settingsPanel').style.display = 'block';
                 document.getElementById('statsRow').style.display = 'block';
                 
+                // Auto LOOSE Mode logic
+                const autoLooseMode = document.getElementById('autoLooseMode')?.checked;
+                if (autoLooseMode) {
+                    // Auto-set to LOOSE
+                    const looseRadio = document.getElementById('typeLoose');
+                    if (looseRadio && !looseRadio.checked) {
+                        looseRadio.checked = true;
+                        // Auto-trigger calculation
+                        setTimeout(() => updateMode(), 100);
+                    }
+                }
+                
                 // Update stats
                 updateStats(selectedCountry);
             } else {
                 // Hide panels
                 document.getElementById('settingsPanel').style.display = 'none';
                 document.getElementById('statsRow').style.display = 'none';
+            }
+        }
+
+        // Toggle auto mode functionality
+        function toggleAutoMode() {
+            const autoLooseMode = document.getElementById('autoLooseMode').checked;
+            const autoModeStatus = document.getElementById('autoModeStatus');
+            
+            if (autoLooseMode) {
+                if (autoModeStatus) {
+                    autoModeStatus.textContent = 'Auto LOOSE Mode: ENABLED';
+                    autoModeStatus.className = 'badge bg-success';
+                }
+                
+                // Show toast notification
+                showToast('✨ Auto LOOSE Mode enabled! Next countries will auto-set to LOOSE and calculate automatically.', 'success');
+            } else {
+                if (autoModeStatus) {
+                    autoModeStatus.textContent = 'Auto LOOSE Mode: DISABLED';
+                    autoModeStatus.className = 'badge bg-secondary';
+                }
+                
+                showToast('Auto LOOSE Mode disabled. You will need to manually select shipment type for next countries.', 'info');
             }
         }
 
@@ -1675,6 +1721,14 @@
                         if (dropdown.options.length > 1) {
                             dropdown.selectedIndex = 1;
                             switchCountry();
+                            
+                            // Show auto-mode notification if enabled
+                            const autoLooseMode = document.getElementById('autoLooseMode')?.checked;
+                            if (autoLooseMode) {
+                                setTimeout(() => {
+                                    showToast(`🚀 Auto LOOSE Mode: Next country automatically set to LOOSE and calculated!`, 'success');
+                                }, 500);
+                            }
                         }
                     }
                     

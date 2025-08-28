@@ -1,0 +1,151 @@
+is_global = true
+build_property.TargetFramework = net8.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = ShipmentFinishGood
+build_property.RootNamespace = ShipmentFinishGood
+build_property.ProjectDir = /Users/ghalyabr/Documents/Projek/shipgod/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 8.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = /Users/ghalyabr/Documents/Projek/shipgod
+build_property._RazorSourceGeneratorDebug = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Auth/Denied.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQXV0aC9EZW5pZWQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Auth/Login.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQXV0aC9Mb2dpbi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Final/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvRmluYWwvSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Home/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvSG9tZS9JbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Home/Privacy.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvSG9tZS9Qcml2YWN5LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/ModelConfigurations/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvTW9kZWxDb25maWd1cmF0aW9ucy9DcmVhdGUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/ModelConfigurations/Delete.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvTW9kZWxDb25maWd1cmF0aW9ucy9EZWxldGUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/ModelConfigurations/Details.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvTW9kZWxDb25maWd1cmF0aW9ucy9EZXRhaWxzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/ModelConfigurations/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvTW9kZWxDb25maWd1cmF0aW9ucy9FZGl0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/ModelConfigurations/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvTW9kZWxDb25maWd1cmF0aW9ucy9JbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/PO/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUE8vQ3JlYXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/PO/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUE8vSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/PO/Preview.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUE8vUHJldmlldy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/QR/Manage.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUVIvTWFuYWdlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/QR/PrintQR.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvUVIvUHJpbnRRUi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Scan/History.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2Nhbi9IaXN0b3J5LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Scan/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2Nhbi9JbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Scan/SessionDetail.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2Nhbi9TZXNzaW9uRGV0YWlsLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Scan/StartScan.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2Nhbi9TdGFydFNjYW4uY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shared/Error.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hhcmVkL0Vycm9yLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shared/_Alerts.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hhcmVkL19BbGVydHMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shared/_ValidationScriptsPartial.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hhcmVkL19WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shipping/Dashboard.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hpcHBpbmcvRGFzaGJvYXJkLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shipping/DashboardSimple.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hpcHBpbmcvRGFzaGJvYXJkU2ltcGxlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shipping/Reports.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hpcHBpbmcvUmVwb3J0cy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shipping/SimpleDashboard.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hpcHBpbmcvU2ltcGxlRGFzaGJvYXJkLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Users/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvVXNlcnMvQ3JlYXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Users/Delete.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvVXNlcnMvRGVsZXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Users/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvVXNlcnMvRWRpdC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Users/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvVXNlcnMvSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/_ViewImports.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvX1ZpZXdJbXBvcnRzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/_ViewStart.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvX1ZpZXdTdGFydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ghalyabr/Documents/Projek/shipgod/Views/Shared/_Layout.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvU2hhcmVkL19MYXlvdXQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = b-bydw0y8yen
