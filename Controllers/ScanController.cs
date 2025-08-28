@@ -169,7 +169,7 @@ namespace ShipmentFinishGood.Controllers
                 Console.WriteLine($"User: {userName}");
                 Console.WriteLine($"Barcode Length: {barcode.Length}");
                 Console.WriteLine($"Contains PALLET: {barcode.ToUpperInvariant().Contains("PALLET")}");
-                Console.WriteLine($"Contains PCS: {barcode.ToUpperInvariant().Contains("PCS")}");
+                Console.WriteLine($"Starts with %Q (PCS): {barcode.ToUpperInvariant().StartsWith("%Q")}");
                 Console.WriteLine($"Contains BOX: {barcode.ToUpperInvariant().Contains("BOX")}");
                 
                 var result = await _scanService.ScanItemBarcodeAsync(sessionId, barcode, userName);
@@ -255,7 +255,7 @@ namespace ShipmentFinishGood.Controllers
             if (upperBarcode.Contains("PALLET"))
                 return "PALLET";
             
-            if (upperBarcode.Contains("PCS"))
+            if (upperBarcode.StartsWith("%Q"))
                 return "PCS";
             
             if (upperBarcode.Contains("BOX"))

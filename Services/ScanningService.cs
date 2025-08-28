@@ -400,7 +400,7 @@ namespace ShipmentFinishGood.Services
                         return await ScanPcsItemAsync(sessionId, barcode, scannedBy);
                     
                     default:
-                        return Result<ScanResultDto>.Failure("Invalid barcode format. Barcode must contain 'BOX', 'PALLET', or 'PCS'");
+                        return Result<ScanResultDto>.Failure("Invalid barcode format. Barcode must contain 'BOX', 'PALLET', or start with '%Q' for PCS");
                 }
             }
             catch (Exception ex)
@@ -456,7 +456,7 @@ namespace ShipmentFinishGood.Services
         }
 
         /// <summary>
-        /// Scan a PCS item - simplified for any barcode containing "PCS"
+        /// Scan a PCS item - simplified for any barcode starting with "%Q"
         /// </summary>
         private async Task<Result<ScanResultDto>> ScanPcsItemAsync(int sessionId, string barcode, string scannedBy)
         {
@@ -894,7 +894,7 @@ namespace ShipmentFinishGood.Services
             if (upperBarcode.Contains("PALLET"))
                 return ScanItemType.Pallet;
             
-            if (upperBarcode.Contains("PCS"))
+            if (upperBarcode.StartsWith("%Q"))
                 return ScanItemType.Pcs;
             
             if (upperBarcode.Contains("BOX"))
@@ -1076,10 +1076,10 @@ namespace ShipmentFinishGood.Services
                     Console.WriteLine($"📊 DEBUG: {kvp.Key}: {kvp.Value} items");
                 }
 
-                // Get scanning activities for status checking (including pallet scans not in BarcodeRegistry)
+                // Get scanning activities for status checking (including pallet and PCS scans not in BarcodeRegistry)
                 var scanningActivities = await _context.ScanningActivities
                     .Where(sa => (allSessionBarcodes.Select(b => b.BarcodeValue).Contains(sa.BarcodeValue) ||
-                                 (sa.AssignedArea == $"Session_{sessionId}" && sa.Action == "SCAN_PALLET")) &&
+                                 (sa.AssignedArea == $"Session_{sessionId}" && (sa.Action == "SCAN_PALLET" || sa.Action == "SCAN_PCS"))) &&
                                sa.Action != "SCAN_MASTER" && 
                                sa.Result == "SUCCESS")
                     .ToListAsync();
@@ -1091,10 +1091,23 @@ namespace ShipmentFinishGood.Services
                                sa.Result == "SUCCESS")
                     .ToListAsync();
 
+                // Get PCS scans from ScanningActivities that might not be in BarcodeRegistry
+                var pcsScans = await _context.ScanningActivities
+                    .Where(sa => sa.AssignedArea == $"Session_{sessionId}" && 
+                               sa.Action == "SCAN_PCS" && 
+                               sa.Result == "SUCCESS")
+                    .ToListAsync();
+
                 Console.WriteLine($"🚛 Found {palletScans.Count} pallet scans for session {sessionId}");
                 foreach (var palletScan in palletScans)
                 {
                     Console.WriteLine($"  📦 Pallet: {palletScan.BarcodeValue} | User: {palletScan.UserId} | Time: {palletScan.Timestamp}");
+                }
+
+                Console.WriteLine($"📦 Found {pcsScans.Count} PCS scans for session {sessionId}");
+                foreach (var pcsScan in pcsScans)
+                {
+                    Console.WriteLine($"  🔢 PCS: {pcsScan.BarcodeValue} | User: {pcsScan.UserId} | Time: {pcsScan.Timestamp}");
                 }
 
                 // Build scan list with status
@@ -1165,8 +1178,38 @@ namespace ShipmentFinishGood.Services
                     }
                 }
 
+                // Add PCS scans that are not in BarcodeRegistry but exist in ScanningActivities
+                foreach (var pcsScan in pcsScans)
+                {
+                    // Check if this PCS scan is already in enrichedScans
+                    if (!enrichedScans.Any(es => es.BarcodeValue.Equals(pcsScan.BarcodeValue, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var pcsRecentScan = new RecentScanDto
+                        {
+                            BarcodeValue = pcsScan.BarcodeValue,
+                            ItemType = "PCS",
+                            ScannedAt = pcsScan.Timestamp,
+                            ScannedBy = pcsScan.UserId ?? "",
+                            SequenceNumber = sequenceNumber++,
+                            
+                            // PCS-specific information
+                            PONumber = "AUTO-GENERATED",
+                            ModelProduct = "PCS",
+                            Description = "PCS scan from ScanningActivities",
+                            Quantity = null,
+                            Status = "SCANNED",
+                            Container = "",
+                            ShipmentDetail = "",
+                            IsCompleted = true
+                        };
+                        
+                        enrichedScans.Add(pcsRecentScan);
+                        Console.WriteLine($"  ✅ Added PCS scan: {pcsScan.BarcodeValue}");
+                    }
+                }
+
                 // Get counts
-                var totalCount = allSessionBarcodes.Count + palletScans.Count;
+                var totalCount = allSessionBarcodes.Count + palletScans.Count + pcsScans.Count;
                 var scannedCount = enrichedScans.Count(s => s.IsCompleted);
                 var pendingCount = totalCount - scannedCount;
 

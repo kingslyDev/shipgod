@@ -862,3 +862,102 @@
         font-weight: 500;
     }
 }
+
+/* Progress Bars Mini untuk Header Recent Scans */
+.scan-progress-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 8px 0;
+}
+
+.progress-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.progress-label {
+    min-width: 60px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.progress-bar-mini {
+    flex: 1;
+    height: 4px;
+    background-color: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.progress-fill.box {
+    background: linear-gradient(90deg, #0d6efd, #4dabf7);
+}
+
+.progress-fill.pallet {
+    background: linear-gradient(90deg, #198754, #51cf66);
+}
+
+.progress-fill.pcs {
+    background: linear-gradient(90deg, #fd7e14, #ffa726);
+}
+
+.progress-count {
+    min-width: 30px;
+    text-align: right;
+    font-weight: 700;
+    color: #495057;
+}
+
+/* Responsive untuk tablet */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .scan-progress-mini {
+        gap: 6px;
+        margin-top: 12px;
+        padding: 10px 0;
+    }
+    
+    .progress-item {
+        gap: 12px;
+        font-size: 12px;
+    }
+    
+    .progress-label {
+        min-width: 70px;
+        font-weight: 700;
+    }
+    
+    .progress-bar-mini {
+        height: 5px;
+    }
+    
+    .progress-count {
+        min-width: 35px;
+        font-weight: 800;
+    }
+}
+
+/* Simple Progress Text Styling */
+.progress-text {
+    color: #6c757d;
+    font-weight: 600;
+    margin-left: 1rem;
+    display: inline-block;
+    font-size: 0.85rem;
+}
+
+@media (min-width: 768px) {
+    .progress-text {
+        font-size: 0.9rem;
+        margin-left: 1.5rem;
+    }
+}

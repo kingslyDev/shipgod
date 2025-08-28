@@ -9,6 +9,7 @@ class RecentScansManager {
         this.isVisible = false;
         this.maxItems = options.maxItems || 8;
         this.refreshInterval = null;
+    this.currentScans = []; // cache of last rendered scans for quick prepend
         
         this.init();
     }
@@ -367,6 +368,9 @@ class RecentScansManager {
             return;
         }
 
+    // Cache a shallow copy (exclude pallet tracking placeholders when storing)
+    this.currentScans = recentScans.filter(s => !s.isPalletTracking).slice(0, this.maxItems);
+
         console.log('🔍 Rendering scans:', recentScans.length, 'items');
         console.log('📊 Status counts - Done:', scannedCount, 'Todo:', pendingCount, 'Total:', totalCount);
         if (totalPallets) {
@@ -401,16 +405,36 @@ class RecentScansManager {
             </div>`;
         }).join('');
 
-        // Enhanced header with pallet info
-        const headerExtra = totalPallets ? 
-            `<small class="pallet-info">🚛 ${scannedPallets}/${totalPallets} Pallets</small>` : '';
+        // Calculate progress statistics
+        const boxScans = recentScans.filter(s => s.itemType === 'BOX' && s.isCompleted);
+        const palletScans = recentScans.filter(s => s.itemType === 'PALLET' && s.isCompleted);
+        const pcsScans = recentScans.filter(s => s.itemType === 'PCS' && s.isCompleted);
+        
+        const totalBoxItems = recentScans.filter(s => s.itemType === 'BOX').length;
+        const totalPalletItems = recentScans.filter(s => s.itemType === 'PALLET').length;
+        const totalPcsItems = recentScans.filter(s => s.itemType === 'PCS').length;
+
+        // Create simple progress counters
+        const progressCounters = [];
+        if (totalPalletItems > 0) {
+            progressCounters.push(`pallet ${palletScans.length}/${totalPalletItems}`);
+        }
+        if (totalBoxItems > 0) {
+            progressCounters.push(`box ${boxScans.length}/${totalBoxItems}`);
+        }
+        if (totalPcsItems > 0) {
+            progressCounters.push(`pcs ${pcsScans.length}/${totalPcsItems}`);
+        }
+        
+        const progressText = progressCounters.length > 0 ? 
+            `<small class="progress-text">${progressCounters.join(', ')}</small>` : '';
 
         console.log('🔍 RENDER PROFESSIONAL SCANS DEBUG: Rendering', recentScans.length, 'scans');
         $(this.containerId).html(`
             <div class="recent-scans-header">
                 <div class="header-main">
                     <span><i class="fas fa-history me-2"></i>Recent Scans</span>
-                    ${headerExtra}
+                    ${progressText}
                 </div>
                 <div class="recent-scans-badge">
                     <span>${recentScans.length}</span>
@@ -421,7 +445,7 @@ class RecentScansManager {
                 ${scanItemsHtml}
             </div>
         `);
-        console.log('✅ Professional scans rendered');
+        console.log('✅ Professional scans rendered with progress counters');
     }
 
     renderEmpty() {
@@ -531,6 +555,69 @@ class RecentScansManager {
 
         // Final fallback: return as is
         return fullBarcode;
+    }
+
+    /**
+     * 🚀 Add a freshly scanned item instantly without waiting for server refresh
+     * Keeps UX responsive especially for PCS scans (%Q*)
+     */
+    addImmediateScan(barcodeValue, scanType) {
+        try {
+            if (!this.isVisible || !this.sessionId) return;
+
+            // Normalize type
+            const upperType = (scanType || '').toUpperCase();
+            const detectedType = upperType || (barcodeValue.startsWith('%Q') ? 'PCS' : 'ITEM');
+
+            // Avoid duplicates (already present at top)
+            if (this.currentScans.length > 0 && this.currentScans[0].barcodeValue === barcodeValue) {
+                return;
+            }
+
+            const newScan = {
+                barcodeValue: barcodeValue,
+                itemType: detectedType,
+                isCompleted: true,
+                scannedAt: new Date().toISOString(),
+                isPalletTracking: false
+            };
+
+            // Prepend in cache
+            this.currentScans.unshift(newScan);
+            // Trim to maxItems
+            if (this.currentScans.length > this.maxItems) this.currentScans.pop();
+
+            // Re-render lightweight list (without full reload) preserving existing DOM header
+            const bodyEl = $(this.containerId).find('.recent-scans-body');
+            if (bodyEl.length === 0) {
+                // Fallback full reload
+                this.loadScans();
+                return;
+            }
+
+            const displayText = this.extractBarcodeDisplayText(barcodeValue);
+            const itemTypeClass = detectedType.toLowerCase();
+            const newItemHtml = `
+            <div class="recent-scan-item ${itemTypeClass} scanned" style="display:none;">
+                <div class="recent-scan-left">
+                    <div class="recent-scan-barcode">
+                        <span class="barcode-text" title="${barcodeValue}">${displayText}</span>
+                    </div>
+                </div>
+                <div class="recent-scan-type ${itemTypeClass} scanned">${detectedType}</div>
+            </div>`;
+
+            bodyEl.prepend(newItemHtml);
+            const inserted = bodyEl.children().first();
+            inserted.slideDown(120).addClass('flash-highlight');
+            setTimeout(() => inserted.removeClass('flash-highlight'), 1500);
+
+            // Update badge count (items count excludes pallet placeholders)
+            $(this.containerId).find('.recent-scans-badge span:first').text(this.currentScans.length);
+        } catch (e) {
+            console.warn('addImmediateScan failed, falling back to loadScans()', e);
+            this.loadScans();
+        }
     }
 }
 

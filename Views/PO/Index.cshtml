@@ -127,7 +127,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <div class="h4 mb-0" id="totalPOs">0</div>
-                            <div class="small opacity-75">Total POs</div>
+                            <div class="small opacity-75">Total PCS</div>
                         </div>
                         <i class="fas fa-file-alt fa-2x opacity-75"></i>
                     </div>
@@ -427,8 +427,8 @@
                             
                             <div class="row text-center mb-3">
                                 <div class="col-4">
-                                    <div class="fw-bold text-primary">${session.totalPOs}</div>
-                                    <small class="text-muted">POs</small>
+                                    <div class="fw-bold text-primary">${session.totalPcs.toLocaleString()}</div>
+                                    <small class="text-muted">PCS</small>
                                 </div>
                                 <div class="col-4">
                                     <div class="fw-bold text-success">${session.totalBoxes.toLocaleString()}</div>
@@ -555,7 +555,7 @@
         function updateSummaryCards(summary) {
             if (summary) {
                 $('#totalSessions').text(summary.totalSessions || 0);
-                $('#totalPOs').text((summary.totalPOs || 0).toLocaleString());
+                $('#totalPOs').text((summary.totalPcs || 0).toLocaleString());
                 $('#totalBoxes').text((summary.totalBoxes || 0).toLocaleString());
                 $('#completedSessions').text(summary.completedSessions || 0);
             }

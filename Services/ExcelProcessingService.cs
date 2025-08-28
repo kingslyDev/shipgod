@@ -904,6 +904,7 @@ namespace ShipmentFinishGood.Services
                     TotalQty = session.POMasters.Sum(p => p.QtyTotal),
                     TotalBoxes = session.POMasters.Sum(p => p.QtyBox),
                     TotalPallets = session.POMasters.Sum(p => p.QtyPallet),
+                    TotalPcs = session.POMasters.Sum(p => p.QtyPcs),
                     
                     TotalItemsToScan = totalItemsToScan,
                     ScannedItems = scannedItems,

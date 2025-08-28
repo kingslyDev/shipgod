@@ -1131,7 +1131,7 @@
         function isMasterQR(value) {
             // Basic format check: starts with QR_ and doesn't contain item indicators
             if (!value.startsWith('QR_')) return false;
-            if (value.includes('_BOX_') || value.includes('PALLET') || value.includes('PCS')) return false;
+            if (value.includes('_BOX_') || value.includes('PALLET') || value.startsWith('%Q')) return false;
             
             // If we have activeSessions loaded, try exact match
             if (activeSessions.length > 0) {
@@ -1191,7 +1191,7 @@
             // Basic format checks
             const hasItemType = upperValue.includes('BOX') || 
                                upperValue.includes('PALLET') || 
-                               upperValue.includes('PCS');
+                               upperValue.startsWith('%Q');
             
             if (!hasItemType) return false;
             
@@ -1208,7 +1208,7 @@
             }
             
             // For PALLET and PCS, allow if user is locked to a session
-            if ((upperValue.includes('PALLET') || upperValue.includes('PCS')) && currentUserLock) {
+            if ((upperValue.includes('PALLET') || upperValue.startsWith('%Q')) && currentUserLock) {
                 console.log('✅ PALLET/PCS barcode and user has active session');
                 return true;
             }
@@ -1363,7 +1363,7 @@
 
             const upperBarcode = barcode.toUpperCase();
             const itemType = upperBarcode.includes('PALLET') ? 'PALLET' : 
-                           upperBarcode.includes('PCS') ? 'PCS' : 
+                           upperBarcode.startsWith('%Q') ? 'PCS' : 
                            upperBarcode.includes('BOX') ? 'BOX' : 'ITEM';
 
             // Find which session this barcode belongs to
@@ -1489,7 +1489,7 @@
                 console.log('🔓 Processing as Master QR');
                 processMasterQRDirect(resolved.sessionId, resolved.qrIdentity, resolved.fileName);
             } else if (scannedValue.includes('_BOX_') || scannedValue.includes('BOX') || 
-                       scannedValue.includes('PALLET') || scannedValue.includes('PCS')) {
+                       scannedValue.includes('PALLET') || scannedValue.toUpperCase().startsWith('%Q')) {
                 // This is an item barcode
                 console.log('📦 Processing as item barcode');
                 processItemBarcodeDirect(resolved.sessionId, scannedValue);
@@ -1582,6 +1582,14 @@
                         // Update enhanced progress display
                         if (response.data) {
                             updateEnhancedProgress(response.data);
+
+                            // Instant add to recent scans (BOX, PALLET, PCS incl. %Q)
+                            if (window.recentScansManager && typeof window.recentScansManager.addImmediateScan === 'function') {
+                                window.recentScansManager.addImmediateScan(
+                                    response.data.BarcodeValue || barcode,
+                                    response.data.ScanType || response.data.ScanTypeString || 'ITEM'
+                                );
+                            }
                             
                             // Check if all items are complete
                             if (response.data.isAllComplete) {

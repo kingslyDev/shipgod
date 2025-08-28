@@ -131,6 +131,7 @@ namespace ShipmentFinishGood.Controllers
                         TotalQty = session.POMasters.Sum(p => p.QtyTotal),
                         TotalBoxes = session.POMasters.Sum(p => p.QtyBox),
                         TotalPallets = session.POMasters.Sum(p => p.QtyPallet),
+                        TotalPcs = session.POMasters.Sum(p => p.QtyPcs),
                         TotalItemsToScan = scanCounts.TotalItems,
                         ScannedItems = scanCounts.ScannedItems,
                         // Add country field to DTO
@@ -142,7 +143,7 @@ namespace ShipmentFinishGood.Controllers
                 var summary = new
                 {
                     TotalSessions = totalItems,
-                    TotalPOs = sessionDtos.Sum(s => s.TotalPOs),
+                    TotalPcs = sessionDtos.Sum(s => s.TotalPcs),
                     TotalBoxes = sessionDtos.Sum(s => s.TotalBoxes),
                     CompletedSessions = sessionDtos.Count(s => s.ScanProgress >= 100)
                 };

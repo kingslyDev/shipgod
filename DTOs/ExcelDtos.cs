@@ -433,6 +433,7 @@ namespace ShipmentFinishGood.DTOs
         public int TotalQty { get; set; }
         public int TotalBoxes { get; set; }
         public int TotalPallets { get; set; }
+        public int TotalPcs { get; set; }
         
         // Progress tracking
         public int TotalItemsToScan { get; set; }
