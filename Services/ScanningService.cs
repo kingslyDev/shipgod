@@ -424,12 +424,18 @@ namespace ShipmentFinishGood.Services
             if (!poData.Any())
                 return Result<ScanResultDto>.Failure("No PO data found for this session");
 
-            // Calculate total pallets and scanned pallets
+            // Calculate total pallets and validate session has pallets
             var totalPallets = poData.Sum(po => po.QtyPallet);
+            if (totalPallets == 0)
+            {
+                Console.WriteLine($"🚫 PALLET SCAN REJECTED: Session {sessionId} has no pallets in PO data (QtyPallet=0)");
+                return Result<ScanResultDto>.Failure("This session does not contain any pallets. Pallet scanning is not allowed for this shipment.");
+            }
+
             var scannedPallets = await GetScannedItemCountAsync(sessionId, ScanItemType.Pallet);
 
             // Relaxed validation - allow scanning if we haven't reached max pallets
-            if (totalPallets > 0 && scannedPallets >= totalPallets)
+            if (scannedPallets >= totalPallets)
                 return Result<ScanResultDto>.Failure($"All pallets already scanned ({scannedPallets}/{totalPallets})");
 
             // Check if this specific barcode was already scanned (to prevent duplicates)
@@ -444,6 +450,8 @@ namespace ShipmentFinishGood.Services
 
             // Send real-time update
             await SendProgressUpdateAsync(sessionId, barcode);
+
+            Console.WriteLine($"✅ PALLET SCAN SUCCESS: Session {sessionId}, Barcode {barcode}, Progress {scannedPallets + 1}/{totalPallets}");
 
             return Result<ScanResultDto>.Success(new ScanResultDto
             {
@@ -470,12 +478,18 @@ namespace ShipmentFinishGood.Services
             if (!poData.Any())
                 return Result<ScanResultDto>.Failure("No PO data found for this session");
 
-            // Calculate total pcs and scanned pcs
+            // Calculate total pcs and validate session has PCS
             var totalPcs = poData.Sum(po => po.QtyPcs);
+            if (totalPcs == 0)
+            {
+                Console.WriteLine($"🚫 PCS SCAN REJECTED: Session {sessionId} has no PCS in PO data (QtyPcs=0)");
+                return Result<ScanResultDto>.Failure("This session does not contain any PCS items. PCS scanning is not allowed for this shipment.");
+            }
+
             var scannedPcs = await GetScannedItemCountAsync(sessionId, ScanItemType.Pcs);
 
             // Relaxed validation - allow scanning if we haven't reached max PCS
-            if (totalPcs > 0 && scannedPcs >= totalPcs)
+            if (scannedPcs >= totalPcs)
                 return Result<ScanResultDto>.Failure($"All PCS items already scanned ({scannedPcs}/{totalPcs})");
 
             // Check if this specific barcode was already scanned (to prevent duplicates)
@@ -490,6 +504,8 @@ namespace ShipmentFinishGood.Services
 
             // Send real-time update
             await SendProgressUpdateAsync(sessionId, barcode);
+
+            Console.WriteLine($"✅ PCS SCAN SUCCESS: Session {sessionId}, Barcode {barcode}, Progress {scannedPcs + 1}/{totalPcs}");
 
             return Result<ScanResultDto>.Success(new ScanResultDto
             {
@@ -652,16 +668,26 @@ namespace ShipmentFinishGood.Services
 
         public async Task<Result<bool>> CompleteScanAsync(int sessionId, string completedBy)
         {
-            var canComplete = await CanCompleteScanAsync(sessionId);
-            if (!canComplete)
-                return Result<bool>.Failure("Cannot complete scan. Not all boxes are scanned or master QR not scanned.");
-
             var session = await _context.UploadSessions.FindAsync(sessionId);
             if (session == null)
                 return Result<bool>.Failure("Session not found");
 
+            // Check if already completed (idempotency)
+            if (session.Status == "SCAN_COMPLETED")
+            {
+                Console.WriteLine($"🔄 Session {sessionId} already completed, skipping duplicate completion");
+                return Result<bool>.Success(true);
+            }
+
+            var canComplete = await CanCompleteScanAsync(sessionId);
+            if (!canComplete)
+                return Result<bool>.Failure("Cannot complete scan. Not all items are scanned or master QR not scanned.");
+
+            // Mark as completed
             session.Status = "SCAN_COMPLETED";
             await _context.SaveChangesAsync();
+
+            Console.WriteLine($"✅ AUTO-COMPLETE: Session {sessionId} completed by {completedBy}");
 
             // Send SignalR notification to all users in the session
             await _hubContext.Clients.Group($"Session_{sessionId}")
@@ -829,7 +855,17 @@ namespace ShipmentFinishGood.Services
         private async Task<bool> CanCompleteScanAsync(int sessionId)
         {
             var progress = await GetScanProgressAsync(sessionId);
-            return progress.IsMasterScanned && progress.ScannedCount == progress.TotalBarcodes;
+            
+            // Enhanced completion logic: check all types are complete AND master is scanned
+            var canComplete = progress.IsMasterScanned && progress.IsAllComplete;
+            
+            Console.WriteLine($"🔍 COMPLETION CHECK Session {sessionId}: Master={progress.IsMasterScanned}, " +
+                            $"Box={progress.IsBoxComplete}({progress.ScannedBoxes}/{progress.TotalBoxes}), " +
+                            $"Pallet={progress.IsPalletComplete}({progress.ScannedPallets}/{progress.TotalPallets}), " +
+                            $"PCS={progress.IsPcsComplete}({progress.ScannedPcs}/{progress.TotalPcs}), " +
+                            $"CanComplete={canComplete}");
+            
+            return canComplete;
         }
 
         // Helper method to force QR generation for testing
@@ -1293,11 +1329,71 @@ namespace ShipmentFinishGood.Services
                         allProgress = overallProgress,
                         lastScannedBarcode = scannedBarcode
                     });
+
+                // 🚀 AUTO-UNLOCK: Check if session is now complete after this scan
+                await CheckAndAutoCompleteSessionAsync(sessionId, scannedBarcode);
             }
             catch (Exception ex)
             {
                 // Log error but don't fail the scan operation
                 Console.WriteLine($"Error sending progress update: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Checks if session should be auto-completed and triggers completion if ready
+        /// </summary>
+        private async Task CheckAndAutoCompleteSessionAsync(int sessionId, string lastScannedBarcode)
+        {
+            try
+            {
+                // Get current session status to avoid unnecessary work
+                var session = await _context.UploadSessions
+                    .Select(s => new { s.SessionId, s.Status })
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+                if (session == null || session.Status == "SCAN_COMPLETED")
+                {
+                    return; // Session not found or already completed
+                }
+
+                // Check if all scanning is complete
+                var canComplete = await CanCompleteScanAsync(sessionId);
+                if (canComplete)
+                {
+                    Console.WriteLine($"🎯 AUTO-COMPLETE TRIGGERED: Session {sessionId} is 100% complete after scanning {lastScannedBarcode}");
+                    
+                    // Auto-complete the session
+                    var completionResult = await CompleteScanAsync(sessionId, "System Auto-Complete");
+                    
+                    if (completionResult.IsSuccess)
+                    {
+                        Console.WriteLine($"✅ AUTO-COMPLETE SUCCESS: Session {sessionId} automatically completed");
+                        
+                        // Send enhanced completion notification to all clients
+                        await _hubContext.Clients.Group($"Session_{sessionId}")
+                            .SendAsync("SessionAutoCompleted", new
+                            {
+                                sessionId = sessionId,
+                                completedBy = "System Auto-Complete",
+                                lastScannedBarcode = lastScannedBarcode,
+                                timestamp = DateTime.Now,
+                                message = "All items scanned successfully! Session completed automatically."
+                            });
+                    }
+                    else
+                    {
+                        Console.WriteLine($"❌ AUTO-COMPLETE FAILED: Session {sessionId} - {completionResult.Error}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"⏳ Session {sessionId} not yet complete after scanning {lastScannedBarcode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in auto-completion check for session {sessionId}: {ex.Message}");
             }
         }
     }

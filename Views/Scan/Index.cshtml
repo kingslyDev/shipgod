@@ -939,6 +939,42 @@
                 showAlert(`Session unlocked by ${data.unlockedBy}`, 'success');
             });
 
+            // New: Session auto-completed event (server-side completion)
+            signalRConnection.on("SessionAutoCompleted", function (data) {
+                console.log('🎯 Session auto-completed:', data);
+                
+                // Clear user lock if it's current session
+                if (data.sessionId === currentSessionGroup) {
+                    // Leave the SignalR session group
+                    if (currentSessionGroup) {
+                        leaveSessionGroup(currentSessionGroup);
+                    }
+                    
+                    // Clear session storage
+                    clearUserLockState();
+                    
+                    currentUserLock = null;
+                    currentSessionGroup = null;
+                    
+                    // Update UI with completion message
+                    updateScanStatus('completed', 'All items scanned - Session completed automatically!', 'success');
+                    
+                    // Hide recent scans
+                    if (recentScansManager) {
+                        recentScansManager.hide();
+                    }
+                    
+                    // Show success message
+                    showAlert(`🎉 ${data.message}`, 'success');
+                    
+                    // Focus on input for next session
+                    setTimeout(() => {
+                        $('#mainScanInput').val('').focus();
+                        updateScanStatus('ready', '🚀 Ready for next session', 'info');
+                    }, 3000);
+                }
+            });
+
             // User joined/left session events
             signalRConnection.on("UserJoinedSession", function (userName) {
                 if (userName !== getCurrentUserName()) {
@@ -1411,14 +1447,8 @@
                         if (response.data) {
                             updateEnhancedProgress(response.data);
                             
-                            // Check if all items are complete and session can be unlocked
-                            if (response.data.isAllComplete) {
-                                const session = activeSessions.find(s => s.sessionId === currentSessionGroup);
-                                const sessionName = session ? session.fileName : `Session ${currentSessionGroup}`;
-                                
-                                console.log('🎯 All items complete, triggering professional completion');
-                                completeSessionAutomatically(currentSessionGroup, sessionName);
-                            }
+                            // Server will now handle auto-completion, so we remove client-side logic
+                            // The server checks after each scan and auto-completes when 100% done
                         }
                         
                         // No need to refresh - direct resolution handles sync
@@ -1594,14 +1624,8 @@
                                 );
                             }
                             
-                            // Check if all items are complete
-                            if (response.data.isAllComplete) {
-                                const session = activeSessions.find(s => s.sessionId === currentSessionGroup);
-                                const sessionName = session ? session.fileName : `Session ${currentSessionGroup}`;
-                                
-                                console.log('🎯 All items complete, triggering professional completion');
-                                completeSessionAutomatically(currentSessionGroup, sessionName);
-                            }
+                            // Server will now handle auto-completion, so we remove client-side logic
+                            // The server checks after each scan and auto-completes when 100% done
                         }
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
