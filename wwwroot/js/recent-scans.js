@@ -138,11 +138,8 @@ class RecentScansManager {
             console.log('📈 Total Count:', response.data?.totalCount || 0);
 
             if (response.success && response.data) {
-                console.log('✅ Response successful, enhancing with pallet tracking...');
-                // Enhance data with automatic pallet entries
-                const enhancedData = this.enhanceWithPalletTracking(response.data);
-                console.log('✅ Calling renderProfessionalScans...');
-                this.renderProfessionalScans(enhancedData);
+                // Render as-is using credible stats from backend
+                this.renderProfessionalScans(response.data);
             } else {
                 console.error('❌ API Error:', response.message);
                 this.renderEmpty();
@@ -153,202 +150,8 @@ class RecentScansManager {
         }
     }
 
-    /**
-     * Enhance scan data with automatic pallet tracking based on session PO data
-     */
-    enhanceWithPalletTracking(data) {
-        const { recentScans, totalCount, scannedCount, pendingCount, sessionInfo, sessionMetadata } = data;
-        
-        if (!recentScans || recentScans.length === 0) {
-            return data;
-        }
-
-        console.log('🚛 Enhancing with pallet tracking for session:', this.sessionId);
-        console.log('📊 Session metadata:', sessionMetadata);
-        
-        // Use actual database values if available from sessionMetadata
-        let totalPallets;
-        if (sessionMetadata) {
-            // Prioritize actual database pallet count, then estimated count
-            totalPallets = sessionMetadata.totalPallets > 0 ? 
-                sessionMetadata.totalPallets : 
-                sessionMetadata.estimatedPallets || this.estimatePalletCount(recentScans, sessionMetadata);
-            
-            console.log(`📊 Using session data: ${totalPallets} pallets (DB: ${sessionMetadata.totalPallets}, Est: ${sessionMetadata.estimatedPallets}, Boxes: ${sessionMetadata.totalBoxes})`);
-        } else {
-            // Fallback to basic estimation
-            totalPallets = this.estimatePalletCount(recentScans, null);
-            console.log(`📊 Using fallback estimation: ${totalPallets} pallets`);
-        }
-        
-        const scannedPallets = this.countScannedPallets(recentScans);
-        
-        console.log(`🚛 Pallet tracking: ${scannedPallets}/${totalPallets} pallets`);
-        
-        // Get actual pallet scans from backend data to mark correct ones as scanned
-        const actualPalletScans = recentScans.filter(scan => 
-            scan.itemType && scan.itemType.toLowerCase() === 'pallet' && scan.isCompleted
-        );
-        
-        // Generate pallet entries
-        const palletEntries = this.generatePalletEntries(totalPallets, scannedPallets, actualPalletScans);
-        
-        // Combine original scans with pallet entries
-        const enhancedScans = [...recentScans, ...palletEntries];
-        
-        return {
-            ...data,
-            recentScans: enhancedScans,
-            totalCount: totalCount + totalPallets,
-            totalPallets: totalPallets,
-            scannedPallets: scannedPallets,
-            sessionMetadata: sessionMetadata // Pass through for debugging
-        };
-    }
-
-    /**
-     * Estimate pallet count based on available data and actual database values
-     */
-    estimatePalletCount(scans, sessionInfo) {
-        // Look for existing pallet scans to get pattern
-        const existingPalletScans = scans.filter(scan => 
-            scan.itemType && scan.itemType.toLowerCase().includes('pallet')
-        );
-        
-        if (existingPalletScans.length > 0) {
-            // Use highest pallet number found + some buffer
-            const maxPalletNum = Math.max(...existingPalletScans.map(scan => {
-                const match = scan.barcodeValue.match(/pallet.*?(\d+)/i);
-                return match ? parseInt(match[1]) : 1;
-            }));
-            return Math.max(maxPalletNum, 3); // At least 3 pallets
-        }
-        
-        // Calculate based on total quantity and model configurations
-        const boxCount = scans.filter(scan => 
-            scan.itemType && scan.itemType.toLowerCase() === 'box'
-        ).length;
-        
-        if (boxCount > 0) {
-            // Real calculation based on actual model configurations:
-            // From database, we can see:
-            // - RF-2400DGN-S: 14 boxes total, PcsPerPallet typically 240 
-            // - RF-D10GN-K: 2 boxes total, PcsPerPallet typically 192
-            // - RF-P50DGC-S: 1 box total, PcsPerPallet typically 1000
-            
-            // More realistic pallet calculation based on typical patterns:
-            // Large quantities (>50 boxes): 1 pallet per 20-25 boxes
-            // Medium quantities (10-50 boxes): 1 pallet per 12-18 boxes  
-            // Small quantities (<10 boxes): still need at least 1 pallet for proper stacking
-            
-            let estimatedPallets;
-            if (boxCount >= 50) {
-                estimatedPallets = Math.ceil(boxCount / 22); // 1 pallet per ~22 boxes
-            } else if (boxCount >= 10) {
-                estimatedPallets = Math.ceil(boxCount / 15); // 1 pallet per ~15 boxes
-            } else if (boxCount >= 5) {
-                estimatedPallets = Math.max(2, Math.ceil(boxCount / 8)); // At least 2 pallets for medium loads
-            } else {
-                estimatedPallets = Math.max(1, Math.ceil(boxCount / 3)); // At least 1 pallet for small loads
-            }
-            
-            // For the specific case in database:
-            // Entry 1: RF-2400DGN-S with 14 boxes -> should be ~1-2 pallets
-            // Entry 4: RF-2400DEG-K with 12 boxes -> should be ~1-2 pallets  
-            // This gives us realistic 2-4 pallets total for this session
-            
-            console.log(`🚛 Estimated ${estimatedPallets} pallets for ${boxCount} boxes`);
-            return Math.max(estimatedPallets, 2); // Minimum 2 pallets for proper logistics
-        }
-        
-        // If no boxes found, estimate based on session complexity
-        // More diverse sessions = more pallets needed
-        const uniqueModels = [...new Set(scans.map(s => s.barcodeValue?.split('_')[1] || ''))].length;
-        const sessionBasedEstimate = Math.max(2, Math.min(uniqueModels + 1, 8)); // 2-8 pallets based on complexity
-        console.log(`🚛 Using model diversity estimate: ${sessionBasedEstimate} pallets for ${uniqueModels} unique models`);
-        return sessionBasedEstimate;
-    }
-
-    /**
-     * Count how many pallets have been scanned based on ScanningActivities database
-     */
-    countScannedPallets(scans) {
-        // Count real pallet scans from database (ScanningActivities)
-        // This includes both auto-generated entries and actual pallet scans from database
-        const realPalletScans = scans.filter(scan => 
-            scan.itemType && 
-            scan.itemType.toLowerCase() === 'pallet' && 
-            scan.isCompleted === true && // This comes from ScanningActivities lookup
-            scan.scannedAt && scan.scannedAt !== '0001-01-01T00:00:00' // Valid scan timestamp
-        );
-        
-        console.log('🚛 Pallet scan analysis:');
-        console.log('  - Total scans found:', scans.length);
-        
-        // Count all pallet items (including tracking and real scans)
-        const allPalletItems = scans.filter(s => s.itemType && s.itemType.toLowerCase() === 'pallet');
-        console.log('  - Pallet type scans:', allPalletItems.length);
-        console.log('  - Completed pallet scans:', realPalletScans.length);
-        
-        // Debug individual pallet scans
-        allPalletItems.forEach(scan => {
-            console.log(`    📦 ${scan.barcodeValue}: ${scan.isCompleted ? '✅ SCANNED' : '⏳ PENDING'} (${scan.scannedAt})`);
-            if (scan.scannedBy) {
-                console.log(`        👤 Scanned by: ${scan.scannedBy}`);
-            }
-        });
-        
-        return realPalletScans.length;
-    }
-    
-    /**
-     * Generate pallet entries for tracking, but skip ones that already exist from database
-     */
-    generatePalletEntries(totalPallets, scannedPalletCount, actualPalletScans = []) {
-        const palletEntries = [];
-        
-        // Get list of existing pallet barcodes from backend data
-        const existingPalletBarcodes = actualPalletScans.map(scan => 
-            scan.barcodeValue.toLowerCase().replace(/[^a-z0-9]/g, '') // normalize: pallet01, Pallet01 → pallet01
-        );
-        
-        console.log('🚛 Existing pallets from database:', existingPalletBarcodes);
-        
-        for (let i = 1; i <= totalPallets; i++) {
-            const palletNumber = i.toString().padStart(2, '0');
-            const palletName = `Pallet${palletNumber}`;
-            const normalizedPalletName = `pallet${palletNumber}`; // pallet01, pallet02, etc
-            
-            // Skip if this pallet already exists in real database scans
-            if (existingPalletBarcodes.includes(normalizedPalletName)) {
-                console.log(`    🔄 Skipping ${palletName} - already exists as real scan`);
-                continue;
-            }
-            
-            // Generate placeholder for pallets that haven't been scanned yet
-            const isScanned = false; // Only real scans from database should be marked as scanned
-            
-            palletEntries.push({
-                barcodeValue: palletName,
-                itemType: 'PALLET',
-                isCompleted: isScanned,
-                scannedAt: null,
-                scannedBy: '',
-                isPalletTracking: true, // Flag to identify auto-generated entries
-                sequenceNumber: i + 1000, // Higher sequence to put after real scans
-                poNumber: 'AUTO-GENERATED',
-                modelProduct: 'PALLET',
-                description: `Pallet tracking ${palletNumber}`,
-                status: 'PENDING'
-            });
-        }
-        
-        console.log(`🚛 Generated ${palletEntries.length} placeholder pallet entries (${actualPalletScans.length} real scans + ${palletEntries.length} placeholders = ${totalPallets} total)`);
-        return palletEntries;
-    }
-
     renderLoading() {
-        console.log('🔍 RENDER LOADING DEBUG: Rendering loading state');
+        console.log('� RENDER LOADING DEBUG: Rendering loading state');
         $(this.containerId).html(`
             <div class="recent-scans-header loading">
                 <div class="header-left">
@@ -361,44 +164,33 @@ class RecentScansManager {
     }
 
     renderProfessionalScans(data) {
-        const { recentScans, totalCount, scannedCount, pendingCount, sessionInfo, totalPallets, scannedPallets } = data;
+        const { recentScans, totalCount, scannedCount, pendingCount, sessionInfo, stats } = data;
         
         if (!recentScans || recentScans.length === 0) {
             this.renderEmpty();
             return;
         }
 
-    // Cache a shallow copy (exclude pallet tracking placeholders when storing)
-    this.currentScans = recentScans.filter(s => !s.isPalletTracking).slice(0, this.maxItems);
+        // Cache a shallow copy of what we render
+        this.currentScans = recentScans.slice(0, this.maxItems);
 
         console.log('🔍 Rendering scans:', recentScans.length, 'items');
         console.log('📊 Status counts - Done:', scannedCount, 'Todo:', pendingCount, 'Total:', totalCount);
-        if (totalPallets) {
-            console.log('🚛 Pallet tracking - Scanned:', scannedPallets, 'Total:', totalPallets);
-        }
 
-        // Sort scans: regular scans first, then pallet tracking
-        const sortedScans = recentScans.sort((a, b) => {
-            if (a.isPalletTracking && !b.isPalletTracking) return 1;
-            if (!a.isPalletTracking && b.isPalletTracking) return -1;
-            return 0;
-        });
+        // Keep order as returned
+        const sortedScans = recentScans;
 
         const scanItemsHtml = sortedScans.map((scan, index) => {
-            const displayText = scan.isPalletTracking ? 
-                scan.barcodeValue : // Show Pallet01, Pallet02, etc as-is
-                this.extractBarcodeDisplayText(scan.barcodeValue);
+            const displayText = this.extractBarcodeDisplayText(scan.barcodeValue);
                 
             const itemType = scan.itemType.toLowerCase();
             const scannedClass = scan.isCompleted ? 'scanned' : '';
-            const trackingClass = scan.isPalletTracking ? 'pallet-tracking' : '';
             
             return `
-            <div class="recent-scan-item ${itemType} ${scannedClass} ${trackingClass}" onclick="toggleScanDetails(${index})">
+            <div class="recent-scan-item ${itemType} ${scannedClass}" onclick="toggleScanDetails(${index})">
                 <div class="recent-scan-left">
                     <div class="recent-scan-barcode">
                         <span class="barcode-text" title="${scan.barcodeValue}">${displayText}</span>
-                        ${scan.isPalletTracking ? '<i class="fas fa-truck pallet-icon"></i>' : ''}
                     </div>
                 </div>
                 <div class="recent-scan-type ${itemType} ${scannedClass}">${scan.itemType}</div>
@@ -410,20 +202,24 @@ class RecentScansManager {
         const palletScans = recentScans.filter(s => s.itemType === 'PALLET' && s.isCompleted);
         const pcsScans = recentScans.filter(s => s.itemType === 'PCS' && s.isCompleted);
         
-        const totalBoxItems = recentScans.filter(s => s.itemType === 'BOX').length;
-        const totalPalletItems = recentScans.filter(s => s.itemType === 'PALLET').length;
-        const totalPcsItems = recentScans.filter(s => s.itemType === 'PCS').length;
+        // Use credible totals from stats; fall back to visible recent list counts
+        const totalBoxItems = (stats && typeof stats.boxTotal === 'number') ? stats.boxTotal : recentScans.filter(s => s.itemType === 'BOX').length;
+        const totalPalletItems = (stats && typeof stats.palletTotal === 'number') ? stats.palletTotal : recentScans.filter(s => s.itemType === 'PALLET').length;
+        const totalPcsItems = (stats && typeof stats.pcsTotal === 'number') ? stats.pcsTotal : recentScans.filter(s => s.itemType === 'PCS').length;
 
         // Create simple progress counters
         const progressCounters = [];
         if (totalPalletItems > 0) {
-            progressCounters.push(`pallet ${palletScans.length}/${totalPalletItems}`);
+            const palletDone = (stats && typeof stats.palletScanned === 'number') ? stats.palletScanned : palletScans.length;
+            progressCounters.push(`pallet ${palletDone}/${totalPalletItems}`);
         }
         if (totalBoxItems > 0) {
-            progressCounters.push(`box ${boxScans.length}/${totalBoxItems}`);
+            const boxDone = (stats && typeof stats.boxScanned === 'number') ? stats.boxScanned : boxScans.length;
+            progressCounters.push(`box ${boxDone}/${totalBoxItems}`);
         }
         if (totalPcsItems > 0) {
-            progressCounters.push(`pcs ${pcsScans.length}/${totalPcsItems}`);
+            const pcsDone = (stats && typeof stats.pcsScanned === 'number') ? stats.pcsScanned : pcsScans.length;
+            progressCounters.push(`pcs ${pcsDone}/${totalPcsItems}`);
         }
         
         const progressText = progressCounters.length > 0 ? 
@@ -436,9 +232,9 @@ class RecentScansManager {
                     <span><i class="fas fa-history me-2"></i>Recent Scans</span>
                     ${progressText}
                 </div>
-                <div class="recent-scans-badge">
-                    <span>${recentScans.length}</span>
-                    <small>items</small>
+                <div class="recent-scans-badge" title="Scanned/Total (Items shown are latest only)">
+                    <span>${scannedCount}/${totalCount}</span>
+                    <small>scanned</small>
                 </div>
             </div>
             <div class="recent-scans-body">

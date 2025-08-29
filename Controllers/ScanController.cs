@@ -528,46 +528,6 @@ namespace ShipmentFinishGood.Controllers
             try
             {
                 var recentScans = await _scanService.GetRecentScansAsync(sessionId, limit);
-                
-                // Get additional session information for better pallet calculation
-                var sessionInfo = await _context.UploadSessions
-                    .Include(s => s.POMasters)
-                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
-                
-                if (sessionInfo != null)
-                {
-                    // Calculate actual pallet information from PO data
-                    var totalBoxes = sessionInfo.POMasters.Sum(po => po.QtyBox);
-                    var totalPallets = sessionInfo.POMasters.Sum(po => po.QtyPallet);
-                    var totalQty = sessionInfo.POMasters.Sum(po => po.QtyTotal);
-                    var totalPOCount = sessionInfo.POMasters.Count;
-                    
-                    // If no pallets in database, estimate based on box count and quantities
-                    var estimatedPallets = totalPallets > 0 ? totalPallets : Math.Max(2, Math.Ceiling((double)totalBoxes / 15));
-                    
-                    recentScans.SessionInfo = $"{sessionInfo.FileName} ({sessionInfo.SheetName}) - {totalPOCount} POs";
-                    
-                    // Add session metadata for frontend calculation
-                    recentScans.SessionMetadata = new
-                    {
-                        totalBoxes = totalBoxes,
-                        totalPallets = totalPallets,
-                        estimatedPallets = estimatedPallets,
-                        totalQty = totalQty,
-                        totalPOCount = totalPOCount,
-                        shipmentType = sessionInfo.ShipmentType
-                    };
-                    
-                    Console.WriteLine($"🔧 Session metadata: Boxes={totalBoxes}, Pallets={totalPallets}, Estimated={estimatedPallets}");
-                    Console.WriteLine($"🔧 RecentScans count: {recentScans.RecentScans.Count}");
-                    var palletItems = recentScans.RecentScans.Where(s => s.ItemType.ToLower() == "pallet").ToList();
-                    Console.WriteLine($"🔧 Pallet items in response: {palletItems.Count}");
-                    foreach (var pallet in palletItems)
-                    {
-                        Console.WriteLine($"    📦 {pallet.BarcodeValue} | Status: {pallet.Status} | Completed: {pallet.IsCompleted}");
-                    }
-                }
-                
                 return Json(new { success = true, data = recentScans });
             }
             catch (Exception ex)

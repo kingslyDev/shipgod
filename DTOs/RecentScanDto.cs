@@ -33,7 +33,20 @@ namespace ShipmentFinishGood.DTOs
         public string SessionInfo { get; set; } = string.Empty;
         public string LastScanTime { get; set; } = string.Empty;
         
-        // Enhanced session metadata for better pallet calculation
-        public object? SessionMetadata { get; set; }
+        // Credible typed stats sourced from POMaster (by SourceSessionId)
+        public RecentStatsDto? Stats { get; set; }
+    }
+
+    public class RecentStatsDto
+    {
+        // Totals from POMaster (sum by SourceSessionId)
+        public int BoxTotal { get; set; }
+        public int PalletTotal { get; set; }
+        public int PcsTotal { get; set; }
+
+        // Scanned counts from ScanningActivities (distinct by barcode)
+        public int BoxScanned { get; set; }
+        public int PalletScanned { get; set; }
+        public int PcsScanned { get; set; }
     }
 }
