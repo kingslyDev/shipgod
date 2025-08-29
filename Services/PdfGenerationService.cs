@@ -658,7 +658,7 @@ namespace ShipmentFinishGood.Services
                                 .SetWidth(150)
                                 .SetHeight(150)
                                 .SetHorizontalAlignment(HorizontalAlignment.CENTER)
-                                .SetMarginBottom(8));
+                                .SetMarginTop(45f));
                         }
                         else
                         {
@@ -671,7 +671,8 @@ namespace ShipmentFinishGood.Services
                             .SetFont(bodyFont)
                             .SetFontSize(10)
                             .SetFontColor(ColorConstants.RED)
-                            .SetMarginBottom(6));
+                            .SetMarginTop(40)
+                            .SetMarginBottom(10));
                     }
 
                     cell.Add(new Paragraph(displayText)
