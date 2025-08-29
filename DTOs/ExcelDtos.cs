@@ -79,6 +79,20 @@ namespace ShipmentFinishGood.DTOs
         public string ShipmentType { get; set; } = string.Empty;
         public DateTime ShipmentDate { get; set; }
         public List<ProcessedPOData> ProcessedData { get; set; } = new();
+        
+        // NEW: Hold state moves yang akan di-apply saat submit
+        public List<HoldStateMove> HoldStateMoves { get; set; } = new();
+    }
+
+    public class HoldStateMove
+    {
+        public string MoveId { get; set; } = string.Empty;
+        public string FromCountry { get; set; } = string.Empty;
+        public string ToCountry { get; set; } = string.Empty;
+        public int RowIndex { get; set; }
+        public ProcessedPOData RowData { get; set; } = new();
+        public bool IsNewCountry { get; set; }
+        public string Timestamp { get; set; } = string.Empty;
     }
 
     public class UpdateModeRequest
@@ -105,6 +119,56 @@ namespace ShipmentFinishGood.DTOs
         public string ShipmentDetail { get; set; } = string.Empty;
         public int RowIndex { get; set; }
         public string Country { get; set; } = string.Empty;
+    }
+
+    public class MoveRowToCountryRequest
+    {
+        public int SessionId { get; set; }
+        public string FromCountry { get; set; } = string.Empty;
+        public string ToCountry { get; set; } = string.Empty;
+        public int RowIndex { get; set; }
+        public ProcessedPOData RowData { get; set; } = new();
+        public bool IsNewCountry { get; set; }
+        public string ShipmentType { get; set; } = string.Empty;
+    }
+
+    public class MoveRowResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public Dictionary<string, List<ProcessedPOData>>? UpdatedDataByCountry { get; set; }
+        public bool NewCountryCreated { get; set; }
+        public string? NewCountryName { get; set; }
+    }
+
+    // PREVIEW move (non-persistent) DTOs
+    public class PreviewMoveRowRequest
+    {
+        public int SessionId { get; set; }
+        public string FromCountry { get; set; } = string.Empty;
+        public string ToCountry { get; set; } = string.Empty;
+        public int RowIndex { get; set; }
+        public ProcessedPOData RowData { get; set; } = new();
+        public bool IsNewCountry { get; set; }
+        public string ShipmentType { get; set; } = string.Empty;
+    }
+
+    public class CountryStats
+    {
+        public int TotalItems { get; set; }
+        public int TotalPallets { get; set; }
+        public int TotalBoxes { get; set; }
+        public int TotalPCS { get; set; }
+    }
+
+    public class PreviewMoveRowResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        // Only return affected countries to reduce payload
+        public Dictionary<string, List<ProcessedPOData>> AfterDataByCountry { get; set; } = new();
+        public Dictionary<string, CountryStats> BeforeStats { get; set; } = new();
+        public Dictionary<string, CountryStats> AfterStats { get; set; } = new();
     }
 
     public class CountrySubmissionResult

@@ -483,6 +483,12 @@ namespace ShipmentFinishGood.Controllers
                     });
                 }
 
+                // APPLY HOLD STATE MOVES to database sebelum submit
+                if (request.HoldStateMoves?.Any() == true)
+                {
+                    await ApplyHoldStateMovesToDatabase(request.SessionId, request.HoldStateMoves, request.ShipmentType);
+                }
+
                 // Submit country data
                 var success = await _excelService.SubmitCountryDataAsync(request, User.Identity?.Name ?? "System");
                 
@@ -506,7 +512,7 @@ namespace ShipmentFinishGood.Controllers
                         Country = request.Country,
                         NewSessionId = newSession.SessionId,
                         QRIdentity = qrIdentity,
-                        Message = $"Country {request.Country} berhasil di-submit!",
+                        Message = $"Country {request.Country} berhasil di-submit dengan hold state moves applied!",
                         RemainingCountries = remainingCountries,
                         AllCountriesSubmitted = remainingCountries.Count == 0
                     });
@@ -526,6 +532,291 @@ namespace ShipmentFinishGood.Controllers
                     Message = ex.Message
                 });
             }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> MoveRowToCountry([FromBody] MoveRowToCountryRequest request)
+        {
+            try
+            {
+                // Validate input
+                if (string.IsNullOrEmpty(request.FromCountry) || string.IsNullOrEmpty(request.ToCountry))
+                {
+                    return Json(new MoveRowResult
+                    {
+                        Success = false,
+                        Message = "From and To countries are required"
+                    });
+                }
+
+                if (request.FromCountry == request.ToCountry)
+                {
+                    return Json(new MoveRowResult
+                    {
+                        Success = false,
+                        Message = "Source and destination countries cannot be the same"
+                    });
+                }
+
+                // Get current session data
+                var preview = await _excelService.GetPreviewAsync(request.SessionId);
+                if (preview == null)
+                {
+                    return Json(new MoveRowResult
+                    {
+                        Success = false,
+                        Message = "Session not found"
+                    });
+                }
+
+                // Validate row exists in source country
+                if (!preview.ProcessedDataByCountry.ContainsKey(request.FromCountry) ||
+                    request.RowIndex >= preview.ProcessedDataByCountry[request.FromCountry].Count)
+                {
+                    return Json(new MoveRowResult
+                    {
+                        Success = false,
+                        Message = "Row not found in source country"
+                    });
+                }
+
+                // Get the row data to move
+                var rowToMove = preview.ProcessedDataByCountry[request.FromCountry][request.RowIndex];
+
+                // Update the session details in database using grouping-aware filter
+                var normalizeFrom = CountryNormalizer.Normalize(request.FromCountry);
+                var detailsQuery = _context.UploadSessionDetails
+                    .Where(d => d.SessionId == request.SessionId &&
+                                d.Model == rowToMove.Model);
+
+                if (string.Equals(request.ShipmentType, "PALLET", StringComparison.OrdinalIgnoreCase))
+                {
+                    // For PALLET mode: rows grouped by PO+Model, so restrict by PO as well
+                    detailsQuery = detailsQuery.Where(d => d.OriginalPO == rowToMove.NoPO);
+                }
+
+                var detailsCandidates = await detailsQuery.ToListAsync();
+                var detailsToUpdate = detailsCandidates
+                    .Where(d => CountryNormalizer.Normalize(d.Country ?? "") == normalizeFrom)
+                    .ToList();
+                foreach (var det in detailsToUpdate)
+                {
+                    det.Country = request.ToCountry;
+                }
+                if (detailsToUpdate.Count == 0)
+                {
+                    return Json(new MoveRowResult
+                    {
+                        Success = false,
+                        Message = "No matching raw rows found to move."
+                    });
+                }
+                await _context.SaveChangesAsync();
+
+                // Recalculate all data with current shipment type
+                // Re-fetch the preview to get updated raw data
+                var updatedPreview = await _excelService.GetPreviewAsync(request.SessionId);
+                if (updatedPreview == null)
+                {
+                    return Json(new MoveRowResult
+                    {
+                        Success = false,
+                        Message = "Failed to refresh data after move"
+                    });
+                }
+
+                // Recalculate processed data by country
+                var processedDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
+                
+                foreach (var countryData in updatedPreview.ProcessedDataByCountry)
+                {
+                    var rawDataForCountry = updatedPreview.RawData
+                        .Where(r => CountryNormalizer.Normalize(r.Country ?? "") == CountryNormalizer.Normalize(countryData.Key))
+                        .ToList();
+                        
+                    var recalculatedData = await _excelService.CalculateProcessedDataAsync(rawDataForCountry, request.ShipmentType);
+                    processedDataByCountry[countryData.Key] = recalculatedData;
+                }
+
+                return Json(new MoveRowResult
+                {
+                    Success = true,
+                    Message = $"Row moved from {request.FromCountry} to {request.ToCountry} successfully",
+                    UpdatedDataByCountry = processedDataByCountry.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Select(p => new ProcessedPOData
+                        {
+                            NoPO = p.NoPO,
+                            Model = p.Model,
+                            Country = p.Country,
+                            TotalQty = p.TotalQty,
+                            QtyPallet = p.QtyPallet,
+                            QtyBox = p.QtyBox,
+                            QtyPcs = p.QtyPcs,
+                            Container = p.Container ?? "",
+                            NoInvoice = p.NoInvoice ?? "",
+                            ShipmentDetail = p.ShipmentDetail ?? ""
+                        }).ToList()
+                    ),
+                    NewCountryCreated = request.IsNewCountry,
+                    NewCountryName = request.IsNewCountry ? request.ToCountry : null
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new MoveRowResult
+                {
+                    Success = false,
+                    Message = $"Error moving row: {ex.Message}"
+                });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> PreviewMoveRow([FromBody] PreviewMoveRowRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.FromCountry) || string.IsNullOrWhiteSpace(request.ToCountry))
+                {
+                    return Json(new PreviewMoveRowResult { Success = false, Message = "From/To country required" });
+                }
+
+                var preview = await _excelService.GetPreviewAsync(request.SessionId);
+                if (preview == null)
+                {
+                    return Json(new PreviewMoveRowResult { Success = false, Message = "Session not found" });
+                }
+
+                if (!preview.ProcessedDataByCountry.ContainsKey(request.FromCountry) ||
+                    request.RowIndex >= preview.ProcessedDataByCountry[request.FromCountry].Count)
+                {
+                    return Json(new PreviewMoveRowResult { Success = false, Message = "Row not found in source country" });
+                }
+
+                // Build BEFORE stats for impacted countries
+                var beforeStats = new Dictionary<string, CountryStats>();
+                foreach (var c in new[] { request.FromCountry, request.ToCountry }.Distinct())
+                {
+                    if (preview.ProcessedDataByCountry.TryGetValue(c, out var list))
+                    {
+                        beforeStats[c] = new CountryStats
+                        {
+                            TotalItems = list.Count,
+                            TotalPallets = list.Sum(x => x.QtyPallet),
+                            TotalBoxes = list.Sum(x => x.QtyBox),
+                            TotalPCS = list.Sum(x => x.QtyPcs)
+                        };
+                    }
+                }
+
+                // Simulate move on RAW data level
+                var simulatedRaw = preview.RawData.Select(r => new ExcelRowData
+                {
+                    NoPO = r.NoPO,
+                    Country = r.Country,
+                    Model = r.Model,
+                    Qty = r.Qty,
+                    RowIndex = r.RowIndex
+                }).ToList();
+
+                // Find candidate rows that contributed to the processed row (by Model + NoPO membership and Qty sum)
+                // We use RowIndex of processed selection to filter by model and any matching PO membership
+                var procRow = preview.ProcessedDataByCountry[request.FromCountry][request.RowIndex];
+                var normalizeFrom = ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(request.FromCountry);
+                var normalizeTo = ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(request.ToCountry);
+
+                // Move all raw rows that match model and belong to the source country and are part of the processed aggregation
+                // For PALLET: grouped by PO+Model; For LOOSE: grouped by Model (POs aggregated)
+                if (string.Equals(request.ShipmentType, "PALLET", StringComparison.OrdinalIgnoreCase))
+                {
+                    simulatedRaw.Where(r => ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(r.Country ?? "") == normalizeFrom
+                                             && r.Model == procRow.Model
+                                             && r.NoPO == procRow.NoPO)
+                                .ToList()
+                                .ForEach(r => r.Country = request.ToCountry);
+                }
+                else
+                {
+                    // LOOSE: move all rows of this model under source country
+                    simulatedRaw.Where(r => ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(r.Country ?? "") == normalizeFrom
+                                             && r.Model == procRow.Model)
+                                .ToList()
+                                .ForEach(r => r.Country = request.ToCountry);
+                }
+
+                // Recalculate for impacted countries only
+                var afterDataByCountry = new Dictionary<string, List<ProcessedPOData>>();
+                foreach (var c in new[] { request.FromCountry, request.ToCountry }.Distinct())
+                {
+                    var rawForCountry = simulatedRaw
+                        .Where(r => ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(r.Country ?? "") == ShipmentFinishGood.Utilities.CountryNormalizer.Normalize(c))
+                        .ToList();
+                    var recalculated = await _excelService.CalculateProcessedDataAsync(rawForCountry, request.ShipmentType);
+                    afterDataByCountry[c] = recalculated;
+                }
+
+                // Build AFTER stats
+                var afterStats = new Dictionary<string, CountryStats>();
+                foreach (var kvp in afterDataByCountry)
+                {
+                    afterStats[kvp.Key] = new CountryStats
+                    {
+                        TotalItems = kvp.Value.Count,
+                        TotalPallets = kvp.Value.Sum(x => x.QtyPallet),
+                        TotalBoxes = kvp.Value.Sum(x => x.QtyBox),
+                        TotalPCS = kvp.Value.Sum(x => x.QtyPcs)
+                    };
+                }
+
+                return Json(new PreviewMoveRowResult
+                {
+                    Success = true,
+                    AfterDataByCountry = afterDataByCountry,
+                    BeforeStats = beforeStats,
+                    AfterStats = afterStats,
+                    Message = "Preview generated"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new PreviewMoveRowResult { Success = false, Message = ex.Message });
+            }
+        }
+
+        // Apply hold state moves to database saat submit
+        private async Task ApplyHoldStateMovesToDatabase(int sessionId, List<HoldStateMove> holdStateMoves, string shipmentType)
+        {
+            foreach (var move in holdStateMoves)
+            {
+                var normalizeFrom = CountryNormalizer.Normalize(move.FromCountry);
+                var normalizeTo = CountryNormalizer.Normalize(move.ToCountry);
+                
+                // Find details that match this move
+                var detailsQuery = _context.UploadSessionDetails
+                    .Where(d => d.SessionId == sessionId &&
+                                d.Model == move.RowData.Model);
+
+                if (string.Equals(shipmentType, "PALLET", StringComparison.OrdinalIgnoreCase))
+                {
+                    // For PALLET mode: filter by PO as well
+                    detailsQuery = detailsQuery.Where(d => d.OriginalPO == move.RowData.NoPO);
+                }
+
+                var detailsCandidates = await detailsQuery.ToListAsync();
+                var detailsToUpdate = detailsCandidates
+                    .Where(d => CountryNormalizer.Normalize(d.Country ?? "") == normalizeFrom)
+                    .ToList();
+
+                // Update country for all matching details
+                foreach (var detail in detailsToUpdate)
+                {
+                    detail.Country = move.ToCountry;
+                }
+            }
+            
+            // Save all changes to database
+            await _context.SaveChangesAsync();
         }
 
         private async Task<string> GenerateQRIdentityAsync(int sessionId)

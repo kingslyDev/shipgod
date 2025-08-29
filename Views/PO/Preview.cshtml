@@ -398,6 +398,13 @@
             background-color: var(--white);
         }
 
+    /* Smooth UI helpers */
+    .fade-out { opacity: 0; transition: opacity 250ms ease; }
+    .fade-in { animation: fadeIn 250ms ease; }
+    @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .flash-update { animation: flashBg 600ms ease; }
+    @@keyframes flashBg { 0% { background: #fff3cd; } 100% { background: transparent; } }
+
         .form-select:focus {
             border-color: var(--primary-light);
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
@@ -777,16 +784,135 @@
             height: 36px;
         }
 
+        /* Country Move Button Styles */
+        .row-country-btn {
+            border-radius: 4px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            background: var(--info-teal);
+            border-color: var(--info-teal);
+            color: white;
+            margin-left: 0.25rem;
+        }
+        
+        body.accessible-view .row-country-btn {
+            width: 36px;
+            height: 36px;
+        }
+
+        .row-country-btn:hover {
+            background: #0d5b5b;
+            border-color: #0d5b5b;
+            color: white;
+        }
+
+        /* Country Move Modal Styles */
+        .country-move-modal .modal-header {
+            background: var(--info-teal);
+            color: white;
+        }
+
+        .country-option {
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+        }
+
+        .country-option:hover {
+            background: var(--gray-50);
+            border-color: var(--primary-blue);
+            transform: translateY(-1px);
+        }
+
+        .country-option.selected {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+
+        .country-option .country-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .country-option .country-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .country-option .country-count {
+            background: rgba(255,255,255,0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .country-option.selected .country-count {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .new-country-input {
+            border: 2px dashed var(--gray-300);
+            background: var(--gray-50);
+            transition: all 0.2s ease;
+        }
+
+        .new-country-input:focus {
+            border-color: var(--primary-blue);
+            background: white;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Action buttons container */
+        .action-buttons {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+        }
+
         .row-lock-btn[data-locked="true"] {
             background: var(--warning-orange);
             border-color: var(--warning-orange);
             color: white;
         }
 
-        .row-lock-btn[data-locked="false"] {
-            background: var(--success-green);
-            border-color: var(--success-green);
+        /* Moved row styles - untuk show pending move status */
+        tr.row-moved {
+            background-color: #fff3cd;
+            border-left: 3px solid #ffc107;
+            position: relative;
+        }
+
+        tr.row-moved:before {
+            content: 'MOVED';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: #ffc107;
             color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .move-indicator {
+            background: #ffc107;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-left: 0.5rem;
         }
 
         .row-lock-btn:hover {
@@ -1120,7 +1246,7 @@
                             <table class="table table-hover mb-0" id="table_@(countryData.Key.Replace(" ", "_"))">
                                 <thead>
                                     <tr>
-                                        <th><i class="fas fa-lock me-2"></i>Action</th>
+                                        <th><i class="fas fa-tools me-2"></i>Actions</th>
                                         <th><i class="fas fa-file-alt me-2"></i>PO Number</th>
                                         <th><i class="fas fa-cube me-2"></i>Model</th>
                                         <th><i class="fas fa-calculator me-2"></i>Total Qty</th>
@@ -1138,12 +1264,21 @@
                                         var item = countryData.Value[i];
                                         <tr data-row-index="@i" data-country="@countryData.Key">
                                             <td>
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-outline-warning row-lock-btn" 
-                                                        data-locked="true"
-                                                        onclick="toggleRowLock(this, '@countryData.Key', @i)">
-                                                    <i class="fas fa-lock"></i>
-                                                </button>
+                                                <div class="action-buttons">
+                                                    <button type="button" 
+                                                            class="btn btn-sm btn-outline-warning row-lock-btn" 
+                                                            data-locked="true"
+                                                            onclick="toggleRowLock(this, '@countryData.Key', @i)"
+                                                            title="Lock/Unlock Row">
+                                                        <i class="fas fa-lock"></i>
+                                                    </button>
+                                                    <button type="button" 
+                                                            class="btn btn-sm row-country-btn" 
+                                                            onclick="showCountryMoveModal('@countryData.Key', @i)"
+                                                            title="Move to Another Country">
+                                                        <i class="fas fa-globe"></i>
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td>
                                                 <input type="text" class="form-control form-control-sm editable-field" 
@@ -1271,6 +1406,113 @@
             </div>
         </div>
     </div>
+
+    <!-- Country Move Modal -->
+    <div class="modal fade country-move-modal" id="countryMoveModal" tabindex="-1" aria-labelledby="countryMoveModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="countryMoveModalLabel">
+                        <i class="fas fa-globe me-2"></i>
+                        Move Row to Country
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row-info mb-4 p-3 bg-light rounded">
+                        <h6 class="mb-2">
+                            <i class="fas fa-info-circle text-info me-2"></i>
+                            Row Information
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>PO Number:</strong>
+                                <div id="moveRowPO" class="text-primary">-</div>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Model:</strong>
+                                <div id="moveRowModel" class="text-success">-</div>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Quantity:</strong>
+                                <div id="moveRowQty" class="text-warning">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mb-3">
+                        <i class="fas fa-map-marked-alt me-2"></i>
+                        Select Destination Country:
+                    </h6>
+                    
+                    <div id="existingCountries" class="mb-4">
+                        <!-- Existing countries will be populated here -->
+                    </div>
+                    
+                    <div class="new-country-section">
+                        <h6 class="mb-3">
+                            <i class="fas fa-plus-circle me-2"></i>
+                            Or Create New Country:
+                        </h6>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-flag"></i>
+                            </span>
+                            <input type="text" 
+                                   class="form-control new-country-input" 
+                                   id="newCountryName" 
+                                   placeholder="Enter new country name..."
+                                   onkeyup="handleNewCountryInput(this)">
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            <i class="fas fa-lightbulb me-1"></i>
+                            Tip: Press Enter to select, or click existing countries above
+                        </small>
+                    </div>
+
+                    <div id="previewResults" style="display:none" class="mt-4">
+                        <h6 class="mb-2">
+                            <i class="fas fa-eye me-2"></i>
+                            Preview Impact
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-3"><i class="fas fa-history me-2"></i>Before</h6>
+                                        <div id="beforeStats"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-3"><i class="fas fa-check-double me-2"></i>After</h6>
+                                        <div id="afterStats"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted d-block mt-2">This is a simulation. Changes aren't saved until you click Move Row.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-outline-info" id="previewMoveBtn" onclick="previewCountryMove()" disabled>
+                        <i class="fas fa-eye me-2"></i>
+                        Preview
+                    </button>
+                    <button type="button" class="btn btn-primary" id="confirmMoveBtn" onclick="confirmCountryMove()" disabled>
+                        <i class="fas fa-exchange-alt me-2"></i>
+                        Move Row
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
@@ -1303,9 +1545,51 @@
         let currentData = @Html.Raw(Json.Serialize(Model.ProcessedDataByCountry));
         let submittedCountries = @Html.Raw(Json.Serialize(Model.SubmittedCountries));
         let sessionId = '@Model.SessionId';
+        
+        // HOLD STATE - untuk menyimpan moved rows yang belum di-submit
+        let holdState = {
+            movedRows: [], // { fromCountry, toCountry, rowIndex, rowData, moveId }
+            pendingRecalculations: {} // country -> updated processed data
+        };
+
+        // Return data to display for a country. Prefer recalculated hold-state data.
+        function getCountryDataForDisplay(country) {
+            if (holdState && holdState.pendingRecalculations && holdState.pendingRecalculations[country]) {
+                return holdState.pendingRecalculations[country].map(item => ({
+                    NoPO: item.noPO || item.NoPO,
+                    Model: item.model || item.Model,
+                    TotalQty: item.totalQty || item.TotalQty,
+                    QtyPallet: item.qtyPallet || item.QtyPallet || 0,
+                    QtyBox: item.qtyBox || item.QtyBox || 0,
+                    QtyPcs: item.qtyPcs || item.QtyPcs || 0,
+                    Country: country,
+                    Container: item.container || item.Container || '',
+                    NoInvoice: item.noInvoice || item.NoInvoice || '',
+                    ShipmentDetail: item.shipmentDetail || item.ShipmentDetail || ''
+                }));
+            }
+            return (currentData && currentData[country]) ? currentData[country] : [];
+        }
+
+        // Smoothly replace tbody content
+        function smoothReplaceTbody(tbody, html) {
+            // Fade out
+            tbody.classList.add('fade-out');
+            setTimeout(() => {
+                tbody.innerHTML = html;
+                tbody.classList.remove('fade-out');
+                tbody.classList.add('fade-in');
+                setTimeout(() => tbody.classList.remove('fade-in'), 280);
+            }, 180);
+        }
+
+        function flashTableRow(row) {
+            row.classList.add('flash-update');
+            setTimeout(() => row.classList.remove('flash-update'), 650);
+        }
 
         // Switch country view
-        function switchCountry() {
+    function switchCountry() {
             const dropdown = document.getElementById('countryDropdown');
             const selectedCountry = dropdown.value;
             
@@ -1315,6 +1599,8 @@
             });
             
             if (selectedCountry) {
+        // Ensure table exists for dynamically added countries
+        createCountryTableIfNeeded(selectedCountry);
                 // Show selected table
                 const targetTable = document.querySelector(`[data-country="${selectedCountry}"]`);
                 if (targetTable) {
@@ -1337,7 +1623,8 @@
                     }
                 }
                 
-                // Update stats
+                // Render table and stats for selected country
+                updateTableDisplay(selectedCountry);
                 updateStats(selectedCountry);
             } else {
                 // Hide panels
@@ -1413,7 +1700,7 @@
                         updateCurrentDataForCountry(country, result.dataByCountry[country]);
                     });
                     
-                    // Update display for current country
+                    // Update display for current country (respect hold-state pending recalc)
                     updateTableDisplay(selectedCountry);
                     updateStats(selectedCountry);
                     showToast('✅ Calculation updated successfully!', 'success');
@@ -1428,9 +1715,9 @@
             }
         }
 
-        // Update statistics
+        // Update statistics (uses display data, includes hold-state pending recalcs)
         function updateStats(country) {
-            const data = currentData[country];
+            const data = getCountryDataForDisplay(country);
             if (!data) return;
 
             let totalItems = data.length;
@@ -1471,11 +1758,14 @@
         function updateTableDisplay(country) {
             const tableBody = document.querySelector(`#table_${country.replace(/ /g, '_')} tbody`);
             if (!tableBody) return;
+            const data = getCountryDataForDisplay(country);
+            if (!data || data.length === 0) {
+                smoothReplaceTbody(tableBody, `<tr><td colspan="10" class="text-center text-muted py-4">No items for ${country}</td></tr>`);
+                return;
+            }
             
-            const data = currentData[country];
-            if (!data) return;
-            
-            tableBody.innerHTML = '';
+            // Build once, then swap for smoothness
+            const frag = document.createDocumentFragment();
             
             data.forEach((item, index) => {
                 const row = document.createElement('tr');
@@ -1485,12 +1775,21 @@
                 
                 row.innerHTML = `
                     <td>
-                        <button type="button" 
-                                class="btn btn-sm btn-outline-warning row-lock-btn" 
-                                data-locked="true"
-                                onclick="toggleRowLock(this, '${country}', ${index})">
-                            <i class="fas fa-lock"></i>
-                        </button>
+                        <div class="action-buttons">
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-warning row-lock-btn" 
+                                    data-locked="true"
+                                    onclick="toggleRowLock(this, '${country}', ${index})"
+                                    title="Lock/Unlock Row">
+                                <i class="fas fa-lock"></i>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-sm row-country-btn" 
+                                    onclick="showCountryMoveModal('${country}', ${index})"
+                                    title="Move to Another Country">
+                                <i class="fas fa-globe"></i>
+                            </button>
+                        </div>
                     </td>
                     <td>
                         <input type="text" class="form-control form-control-sm editable-field" 
@@ -1568,7 +1867,7 @@
                     </td>
                 `;
                 
-                tableBody.appendChild(row);
+                frag.appendChild(row);
                 
                 // Add event listeners for change detection
                 const editableFields = row.querySelectorAll('.editable-field');
@@ -1577,7 +1876,15 @@
                         markRowAsModified(row);
                     });
                 });
+                // subtle flash
+                flashTableRow(row);
             });
+
+            // Swap content smoothly
+            const temp = document.createElement('tbody');
+            temp.innerHTML = '';
+            temp.appendChild(frag);
+            smoothReplaceTbody(tableBody, temp.innerHTML);
         }
 
         // Loading state helpers
@@ -1628,27 +1935,46 @@
             button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
 
             try {
-                // Collect row data for this country
+                // Collect row data for this country INCLUDING HOLD STATE MOVES
                 const tableRows = document.querySelectorAll(`#table_${country.replace(/ /g, '_')} tbody tr`);
                 const countryData = [];
                 
+                // Get current data from UI (may have been modified)
                 tableRows.forEach((row, index) => {
+                    // Skip moved rows (they are visually there but logically moved)
+                    if (row.classList.contains('row-moved')) {
+                        return;
+                    }
+                    
                     const cells = row.querySelectorAll('td');
                     const invoice = row.querySelector(`input[name="invoice_${country.replace(/ /g, '_')}_${index}"]`).value;
                     const container = row.querySelector(`input[name="container_${country.replace(/ /g, '_')}_${index}"]`).value;
                     const detail = row.querySelector(`input[name="detail_${country.replace(/ /g, '_')}_${index}"]`).value;
                     
-                    // Get data from currentData (which includes updated calculations)
-                    const currentRowData = currentData[country][index];
+                    // Get data from currentData or holdState
+                    let currentRowData;
+                    if (holdState.pendingRecalculations[country] && holdState.pendingRecalculations[country][index]) {
+                        currentRowData = holdState.pendingRecalculations[country][index];
+                    } else {
+                        currentRowData = currentData[country][index];
+                    }
                     
-                    // Get current values from UI (in case they were updated but not yet saved)
+                    // Get current values from UI (in case they were updated)
                     const currentPO = row.querySelector(`input[name="po_${country.replace(/ /g, '_')}_${index}"]`).value;
                     const currentQty = parseInt(row.querySelector(`input[name="qty_${country.replace(/ /g, '_')}_${index}"]`).value);
                     
-                    // Get current calculated quantities from UI display
-                    const currentPallet = parseInt(row.querySelector('.qty-display[data-type="pallet"]').textContent) || 0;
-                    const currentBox = parseInt(row.querySelector('.qty-display[data-type="box"]').textContent) || 0;
-                    const currentPcs = parseInt(row.querySelector('.qty-display[data-type="pcs"]').textContent) || 0;
+                    // Get quantities from recalculated data or UI display
+                    let currentPallet, currentBox, currentPcs;
+                    if (holdState.pendingRecalculations[country] && holdState.pendingRecalculations[country][index]) {
+                        const recalcData = holdState.pendingRecalculations[country][index];
+                        currentPallet = recalcData.QtyPallet || recalcData.qtyPallet || 0;
+                        currentBox = recalcData.QtyBox || recalcData.qtyBox || 0;
+                        currentPcs = recalcData.QtyPcs || recalcData.qtyPcs || 0;
+                    } else {
+                        currentPallet = parseInt(row.querySelector('.qty-display[data-type="pallet"]').textContent) || 0;
+                        currentBox = parseInt(row.querySelector('.qty-display[data-type="box"]').textContent) || 0;
+                        currentPcs = parseInt(row.querySelector('.qty-display[data-type="pcs"]').textContent) || 0;
+                    }
                     
                     countryData.push({
                         NoPO: currentPO || currentRowData.NoPO,
@@ -1664,12 +1990,39 @@
                     });
                 });
 
+                // ADD moved-in rows from hold state for this country
+                const movedInRows = holdState.movedRows.filter(m => m.toCountry === country);
+                movedInRows.forEach(move => {
+                    // Get recalculated data for this moved row
+                    const recalcData = holdState.pendingRecalculations[country];
+                    if (recalcData) {
+                        // Find the row in recalculated data that matches this move
+                        const matchingRecalc = recalcData.find(r => r.Model === move.rowData.Model && r.NoPO === move.rowData.NoPO);
+                        if (matchingRecalc) {
+                            countryData.push({
+                                NoPO: matchingRecalc.NoPO,
+                                Model: matchingRecalc.Model,
+                                TotalQty: matchingRecalc.TotalQty,
+                                QtyPallet: matchingRecalc.QtyPallet || matchingRecalc.qtyPallet || 0,
+                                QtyBox: matchingRecalc.QtyBox || matchingRecalc.qtyBox || 0,
+                                QtyPcs: matchingRecalc.QtyPcs || matchingRecalc.qtyPcs || 0,
+                                NoInvoice: move.rowData.NoInvoice || '',
+                                Container: move.rowData.Container || '',
+                                ShipmentDetail: move.rowData.ShipmentDetail || '',
+                                Country: country
+                            });
+                        }
+                    }
+                });
+
                 const requestData = {
                     SessionId: parseInt(sessionId),
                     Country: country,
                     ShipmentType: shipmentType,
                     ShipmentDate: shipmentDate,
-                    ProcessedData: countryData
+                    ProcessedData: countryData,
+                    // INCLUDE HOLD STATE MOVES for server processing
+                    HoldStateMoves: holdState.movedRows.filter(m => m.fromCountry === country || m.toCountry === country)
                 };
 
                 const response = await fetch('/PO/SubmitCountry', {
@@ -1688,6 +2041,9 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    // SUCCESS: Clear hold state for this country
+                    clearHoldStateForCountry(country);
+                    
                     // Success feedback
                     button.innerHTML = '<i class="fas fa-check me-2"></i>Submitted ✅';
                     button.classList.remove('btn-submit-country');
@@ -1698,7 +2054,7 @@
                     const option = dropdown.querySelector(`option[value="${country}"]`);
                     if (option) option.remove();
                     
-                    // Update pending badges - Fix selector issue
+                    // Update pending badges
                     const pendingBadges = document.querySelectorAll('.pending-badge');
                     pendingBadges.forEach(badge => {
                         if (badge.textContent.includes(country)) {
@@ -1716,6 +2072,12 @@
                         document.getElementById('statsRow').style.display = 'none';
                         document.getElementById('countryTables').style.display = 'none';
                         document.getElementById('allDoneMessage').style.display = 'block';
+                        
+                        // Clear all hold state
+                        holdState.movedRows = [];
+                        holdState.pendingRecalculations = {};
+                        const holdInfo = document.getElementById('holdStateInfo');
+                        if (holdInfo) holdInfo.remove();
                     } else {
                         // Auto-select next country
                         if (dropdown.options.length > 1) {
@@ -1733,10 +2095,9 @@
                     }
                     
                     // Show success message
-                    showToast(`✅ ${country} submitted successfully!`, 'success');
+                    showToast(`✅ ${country} submitted successfully with all moves applied!`, 'success');
 
                     // Auto-download Barcode PDF for the newly created session (country-specific)
-                    // Uses the NewSessionId returned from backend (camelCased to newSessionId in JSON)
                     if (result.newSessionId) {
                         autoDownloadCountryPdf(result.newSessionId);
                     }
@@ -1750,6 +2111,25 @@
                 button.disabled = false;
                 button.innerHTML = originalText;
                 showToast(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Clear hold state for submitted country
+        function clearHoldStateForCountry(country) {
+            // Remove moves related to this country
+            holdState.movedRows = holdState.movedRows.filter(m => 
+                m.fromCountry !== country && m.toCountry !== country
+            );
+            
+            // Remove pending recalculations for this country
+            delete holdState.pendingRecalculations[country];
+            
+            // Update hold state info
+            if (holdState.movedRows.length === 0) {
+                const holdInfo = document.getElementById('holdStateInfo');
+                if (holdInfo) holdInfo.remove();
+            } else {
+                showHoldStateInfo();
             }
         }
 
@@ -2093,6 +2473,722 @@
             } catch (e) {
                 console.warn('Auto download PDF failed:', e);
             }
+        }
+
+        // ===== COUNTRY MOVE FUNCTIONALITY =====
+        let currentMoveContext = {
+            fromCountry: null,
+            rowIndex: null,
+            selectedCountry: null,
+            isNewCountry: false
+        };
+
+        // Show country move modal
+        function showCountryMoveModal(fromCountry, rowIndex) {
+            currentMoveContext = {
+                fromCountry: fromCountry,
+                rowIndex: parseInt(rowIndex),
+                selectedCountry: null,
+                isNewCountry: false
+            };
+
+            // Get row data for display
+            const rowData = currentData[fromCountry][rowIndex];
+            document.getElementById('moveRowPO').textContent = rowData.NoPO;
+            document.getElementById('moveRowModel').textContent = rowData.Model;
+            document.getElementById('moveRowQty').textContent = rowData.TotalQty + ' pcs';
+
+            // Populate existing countries
+            populateExistingCountries(fromCountry);
+
+            // Clear new country input
+            document.getElementById('newCountryName').value = '';
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('countryMoveModal'));
+            modal.show();
+            
+            updateMoveButton();
+        }
+
+        // Populate existing countries in modal
+        function populateExistingCountries(excludeCountry) {
+            const container = document.getElementById('existingCountries');
+            container.innerHTML = '';
+
+            // Get all countries except current one
+            const availableCountries = Object.keys(currentData).filter(country => country !== excludeCountry);
+            
+            // Add submitted countries as well
+            const allAvailableCountries = [...new Set([...availableCountries, ...submittedCountries])];
+
+            if (allAvailableCountries.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No other countries available. Create a new country below.
+                    </div>
+                `;
+                return;
+            }
+
+            allAvailableCountries.forEach(country => {
+                const itemCount = currentData[country] ? currentData[country].length : 0;
+                const isSubmitted = submittedCountries.includes(country);
+                
+                const countryOption = document.createElement('div');
+                countryOption.className = 'country-option';
+                countryOption.setAttribute('data-country', country);
+                countryOption.onclick = () => selectCountryOption(countryOption, country, false);
+                
+                countryOption.innerHTML = `
+                    <div class="country-info">
+                        <div>
+                            <div class="country-name">
+                                <i class="fas fa-flag me-2"></i>
+                                ${country}
+                                ${isSubmitted ? '<span class="badge bg-success ms-2">Submitted</span>' : ''}
+                            </div>
+                            <small class="text-muted">${itemCount} items currently</small>
+                        </div>
+                        <div class="country-count">${itemCount}</div>
+                    </div>
+                `;
+                
+                container.appendChild(countryOption);
+            });
+        }
+
+        // Handle country option selection
+        function selectCountryOption(element, country, isNew) {
+            // Clear previous selections
+            document.querySelectorAll('.country-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.getElementById('newCountryName').value = '';
+
+            // Select this option
+            element.classList.add('selected');
+            currentMoveContext.selectedCountry = country;
+            currentMoveContext.isNewCountry = isNew;
+
+            updateMoveButton();
+        }
+
+        // Handle new country input
+        function handleNewCountryInput(input) {
+            const value = input.value.trim();
+            
+            // Clear existing country selections
+            document.querySelectorAll('.country-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+
+            if (value) {
+                currentMoveContext.selectedCountry = value;
+                currentMoveContext.isNewCountry = true;
+            } else {
+                currentMoveContext.selectedCountry = null;
+                currentMoveContext.isNewCountry = false;
+            }
+
+            updateMoveButton();
+
+            // Handle Enter key
+            if (event.key === 'Enter' && value) {
+                confirmCountryMove();
+            }
+        }
+
+        // Update move button state
+        function updateMoveButton() {
+            const btn = document.getElementById('confirmMoveBtn');
+            const previewBtn = document.getElementById('previewMoveBtn');
+            const hasSelection = currentMoveContext.selectedCountry !== null;
+            
+            btn.disabled = !hasSelection;
+            previewBtn.disabled = !hasSelection;
+            
+            if (hasSelection) {
+                if (currentMoveContext.isNewCountry) {
+                    btn.innerHTML = '<i class="fas fa-plus me-2"></i>Create & Move';
+                } else {
+                    btn.innerHTML = '<i class="fas fa-exchange-alt me-2"></i>Move Row';
+                }
+            } else {
+                btn.innerHTML = '<i class="fas fa-exchange-alt me-2"></i>Move Row';
+            }
+        }
+
+        // Preview move (non-persistent)
+        async function previewCountryMove() {
+            if (!currentMoveContext.selectedCountry) return;
+
+            const btn = document.getElementById('previewMoveBtn');
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Previewing...';
+
+            try {
+                const fromCountry = currentMoveContext.fromCountry;
+                const toCountry = currentMoveContext.selectedCountry;
+                const rowIndex = currentMoveContext.rowIndex;
+                const shipmentType = document.querySelector('input[name="shipmentType"]:checked')?.value || 'LOOSE';
+
+                // Build request
+                const request = {
+                    sessionId: parseInt(sessionId),
+                    fromCountry,
+                    toCountry,
+                    rowIndex,
+                    rowData: currentData[fromCountry][rowIndex],
+                    isNewCountry: currentMoveContext.isNewCountry,
+                    shipmentType: shipmentType
+                };
+
+                const resp = await fetch('/PO/PreviewMoveRow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify(request)
+                });
+
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const result = await resp.json();
+                if (!result.success) throw new Error(result.message || 'Preview failed');
+
+                // Render Stats
+                renderPreviewStats(result.beforeStats, result.afterStats);
+                document.getElementById('previewResults').style.display = 'block';
+
+                showToast('👀 Preview generated. Review changes before moving.', 'success');
+            } catch (e) {
+                showToast('❌ Preview failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        }
+
+        function renderPreviewStats(beforeStats, afterStats) {
+            const beforeEl = document.getElementById('beforeStats');
+            const afterEl = document.getElementById('afterStats');
+            beforeEl.innerHTML = '';
+            afterEl.innerHTML = '';
+
+            const render = (stats, container) => {
+                Object.keys(stats).forEach(country => {
+                    const s = stats[country];
+                    const card = document.createElement('div');
+                    card.className = 'mb-2 p-2 border rounded';
+                    card.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong><i class="fas fa-flag me-1"></i>${country}</strong>
+                            <span class="badge bg-secondary">Items: ${s.totalItems}</span>
+                        </div>
+                        <div class="mt-1 small text-muted">
+                            <span class="me-3"><i class="fas fa-pallet me-1"></i>Pallets: ${s.totalPallets}</span>
+                            <span class="me-3"><i class="fas fa-box me-1"></i>Boxes: ${s.totalBoxes}</span>
+                            <span><i class="fas fa-cube me-1"></i>PCS: ${s.totalPCS}</span>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            };
+
+            render(beforeStats, beforeEl);
+            render(afterStats, afterEl);
+        }
+
+        // Confirm country move
+        async function confirmCountryMove() {
+            if (!currentMoveContext.selectedCountry) {
+                showToast('❌ Please select a destination country', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('confirmMoveBtn');
+            const originalText = btn.innerHTML;
+            
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+
+                await moveRowToCountry(
+                    currentMoveContext.fromCountry,
+                    currentMoveContext.rowIndex,
+                    currentMoveContext.selectedCountry,
+                    currentMoveContext.isNewCountry
+                );
+
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('countryMoveModal')).hide();
+
+            } catch (error) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                showToast('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        // Main function to move row to country (HOLD STATE - tidak persist ke DB)
+        async function moveRowToCountry(fromCountry, rowIndex, toCountry, isNewCountry) {
+            try {
+                showLoadingState('Moving row to hold state...');
+
+                // Get row data
+                const rowData = currentData[fromCountry][rowIndex];
+                
+                // Generate unique move ID
+                const moveId = `move_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Simulate the move untuk recalculation preview
+                const requestData = {
+                    sessionId: parseInt(sessionId),
+                    fromCountry: fromCountry,
+                    toCountry: toCountry,
+                    rowIndex: rowIndex,
+                    rowData: rowData,
+                    isNewCountry: isNewCountry,
+                    shipmentType: document.querySelector('input[name="shipmentType"]:checked')?.value || 'LOOSE'
+                };
+
+                const response = await fetch('/PO/PreviewMoveRow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Add to hold state
+                    holdState.movedRows.push({
+                        moveId: moveId,
+                        fromCountry: fromCountry,
+                        toCountry: toCountry,
+                        rowIndex: rowIndex,
+                        rowData: { ...rowData },
+                        isNewCountry: isNewCountry,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    // Store recalculated data and refresh UI for affected countries
+                    Object.keys(result.afterDataByCountry).forEach(country => {
+                        holdState.pendingRecalculations[country] = result.afterDataByCountry[country];
+                        createCountryTableIfNeeded(country);
+                        updateTableDisplay(country);
+                        updateStats(country);
+                        refreshCountryCounts(country);
+                    });
+
+                    // Update UI to show HOLD state
+                    updateUIForHoldState(fromCountry, toCountry, rowIndex, moveId, isNewCountry);
+
+                    // Show success message
+                    const action = isNewCountry ? 'moved to new country (HOLD)' : 'moved to existing country (HOLD)';
+                    showToast(`✅ Row ${action} "${toCountry}". Will be applied when you submit the country!`, 'success');
+
+                    // If new country was created, update dropdowns
+                    if (isNewCountry) {
+                        await updateUIForNewCountry(toCountry);
+                    }
+
+                } else {
+                    throw new Error(result.message || 'Failed to move row');
+                }
+
+            } catch (error) {
+                console.error('Error moving row:', error);
+                throw error;
+            } finally {
+                hideLoadingState();
+            }
+        }
+
+        // Update UI when new country is created
+    async function updateUIForNewCountry(newCountry) {
+            // Add to country dropdown if it doesn't exist
+            const dropdown = document.getElementById('countryDropdown');
+            if (dropdown && !Array.from(dropdown.options).some(opt => opt.value === newCountry)) {
+                const option = document.createElement('option');
+                option.value = newCountry;
+        const cnt = getCountryDataForDisplay(newCountry).length;
+        option.textContent = `${newCountry} (${cnt} items)`;
+                dropdown.appendChild(option);
+            }
+
+            // Add to pending countries display
+            const pendingContainer = document.querySelector('.d-flex.flex-wrap');
+            if (pendingContainer && !pendingContainer.querySelector(`[data-country="${newCountry}"]`)) {
+                const badge = document.createElement('span');
+                badge.className = 'pending-badge';
+                badge.setAttribute('data-country', newCountry);
+                const cnt = getCountryDataForDisplay(newCountry).length;
+                badge.innerHTML = `
+                    <i class="fas fa-clock"></i>
+                    ${newCountry} (${cnt} items)
+                `;
+                pendingContainer.appendChild(badge);
+            }
+
+            // Create new country table if it doesn't exist and refresh its content
+            await createCountryTableIfNeeded(newCountry);
+            updateTableDisplay(newCountry);
+            updateStats(newCountry);
+            refreshCountryCounts(newCountry);
+        }
+
+        // Handle when source country becomes empty
+        async function handleEmptyCountry(emptyCountry) {
+        // Remove from dropdown
+            const dropdown = document.getElementById('countryDropdown');
+            if (dropdown) {
+                const option = dropdown.querySelector(`option[value="${emptyCountry}"]`);
+                if (option) {
+            option.remove();
+                }
+                
+                // Switch to another country if this was selected
+                if (dropdown.value === emptyCountry) {
+                    dropdown.selectedIndex = dropdown.options.length > 1 ? 1 : 0;
+                    switchCountry();
+                }
+            }
+
+            // Remove from pending countries display
+            const pendingBadge = document.querySelector(`.pending-badge[data-country="${emptyCountry}"]`);
+            if (pendingBadge) {
+                pendingBadge.classList.add('fade-out');
+                setTimeout(() => pendingBadge.remove(), 200);
+            }
+
+            // Hide the country table
+            const countryTable = document.querySelector(`[data-country="${emptyCountry}"]`);
+            if (countryTable) {
+                countryTable.classList.add('fade-out');
+                setTimeout(() => countryTable.style.display = 'none', 220);
+            }
+        }
+
+        function removeCountryUIIfEmpty(country) {
+            const data = getCountryDataForDisplay(country);
+            if (data && data.length > 0) return;
+            // If no pending recalcs and no current data, remove UI traces
+            const dropdown = document.getElementById('countryDropdown');
+            const opt = dropdown?.querySelector(`option[value="${country}"]`);
+            if (opt) opt.remove();
+            const badge = document.querySelector(`.pending-badge[data-country="${country}"]`);
+            if (badge) { badge.classList.add('fade-out'); setTimeout(() => badge.remove(), 200); }
+            const table = document.querySelector(`[data-country="${country}"]`);
+            if (table) { table.classList.add('fade-out'); setTimeout(() => table.remove(), 220); }
+        }
+
+        // Create country table for new country
+        async function createCountryTableIfNeeded(country) {
+            const existingTable = document.querySelector(`[data-country="${country}"]`);
+            if (existingTable) return;
+
+            const container = document.getElementById('countryTables');
+            if (!container) return;
+
+            const tableId = `table_${country.replace(/ /g, '_')}`;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'country-table';
+            wrapper.setAttribute('data-country', country);
+            wrapper.innerHTML = `
+                <div class="table-container">
+                    <div class="table-header">
+                        <h5>
+                            <i class="fas fa-flag"></i>
+                            ${country} Processing
+                            <span class="badge bg-light text-primary ms-3">
+                                <i class="fas fa-list me-1"></i>
+                                <span class="country-item-count">0</span> items
+                            </span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="${tableId}">
+                                <thead>
+                                    <tr>
+                                        <th><i class="fas fa-tools me-2"></i>Actions</th>
+                                        <th><i class="fas fa-file-alt me-2"></i>PO Number</th>
+                                        <th><i class="fas fa-cube me-2"></i>Model</th>
+                                        <th><i class="fas fa-calculator me-2"></i>Total Qty</th>
+                                        <th><i class="fas fa-pallet me-2"></i>Pallet</th>
+                                        <th><i class="fas fa-box me-2"></i>Box</th>
+                                        <th><i class="fas fa-boxes me-2"></i>PCS</th>
+                                        <th><i class="fas fa-file-invoice me-2"></i>Invoice</th>
+                                        <th><i class="fas fa-shipping-fast me-2"></i>Container</th>
+                                        <th><i class="fas fa-info-circle me-2"></i>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer text-center bg-light py-4">
+                        <button type="button" class="btn btn-submit-country btn-lg" data-country="${country}" onclick="submitCountryByButton(this)">
+                            <i class="fas fa-paper-plane"></i>
+                            Submit ${country} Data
+                        </button>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Review all data before submitting. This action cannot be undone.
+                            </small>
+                        </div>
+                    </div>
+                </div>`;
+
+            container.appendChild(wrapper);
+        }
+
+        function refreshCountryCounts(country) {
+            const count = getCountryDataForDisplay(country).length;
+            const dropdown = document.getElementById('countryDropdown');
+            const opt = dropdown?.querySelector(`option[value="${country}"]`);
+            if (opt) opt.textContent = `${country} (${count} items)`;
+            const badge = document.querySelector(`.pending-badge[data-country="${country}"]`);
+            if (badge) badge.innerHTML = `<i class="fas fa-clock"></i> ${country} (${count} items)`;
+            const headerCount = document.querySelector(`[data-country="${country}"] .country-item-count`);
+            if (headerCount) headerCount.textContent = count;
+        }
+
+        // ===== HOLD STATE MANAGEMENT =====
+        
+        // Update UI to show row in HOLD state
+        function updateUIForHoldState(fromCountry, toCountry, rowIndex, moveId, isNewCountry) {
+            // Mark the row as moved in source country
+            const sourceRow = document.querySelector(`tr[data-country="${fromCountry}"][data-row-index="${rowIndex}"]`);
+            if (sourceRow) {
+                sourceRow.classList.add('row-moved');
+                sourceRow.setAttribute('data-move-id', moveId);
+                
+                // Add indicator to first cell
+                const firstCell = sourceRow.querySelector('td:first-child');
+                if (firstCell && !firstCell.querySelector('.move-indicator')) {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'move-indicator';
+                    indicator.innerHTML = `→ ${toCountry}`;
+                    firstCell.appendChild(indicator);
+                }
+                
+                // Disable editing for moved row
+                const editableFields = sourceRow.querySelectorAll('.editable-field');
+                editableFields.forEach(field => {
+                    field.disabled = true;
+                    field.style.backgroundColor = '#f8f9fa';
+                });
+                
+                // Disable buttons
+                const buttons = sourceRow.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                });
+            }
+            
+            // Show hold state info
+            showHoldStateInfo();
+        }
+        
+        // Show hold state information
+        function showHoldStateInfo() {
+            let existingInfo = document.getElementById('holdStateInfo');
+            if (!existingInfo) {
+                existingInfo = document.createElement('div');
+                existingInfo.id = 'holdStateInfo';
+                existingInfo.className = 'alert alert-warning mt-3';
+                
+                // Insert after country selector
+                const countrySelector = document.querySelector('.country-selector');
+                if (countrySelector) {
+                    countrySelector.insertAdjacentElement('afterend', existingInfo);
+                }
+            }
+            
+            const moveCount = holdState.movedRows.length;
+            const affectedCountries = [...new Set([
+                ...holdState.movedRows.map(m => m.fromCountry),
+                ...holdState.movedRows.map(m => m.toCountry)
+            ])];
+            
+            existingInfo.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="mb-1">
+                            <i class="fas fa-clock me-2"></i>
+                            Pending Moves: ${moveCount} row(s)
+                        </h6>
+                        <small class="text-muted">
+                            Affected countries: ${affectedCountries.join(', ')} | 
+                            Changes will be applied when you submit each country.
+                        </small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showHoldStateModal()">
+                        <i class="fas fa-list me-1"></i>
+                        View Details
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Show hold state modal with details
+        function showHoldStateModal() {
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-white">
+                            <h5 class="modal-title">
+                                <i class="fas fa-clock me-2"></i>
+                                Pending Moves
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>PO</th>
+                                            <th>Model</th>
+                                            <th>Qty</th>
+                                            <th>From</th>
+                                            <th>To</th>
+                                            <th>Time</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${holdState.movedRows.map(move => `
+                                            <tr>
+                                                <td>${move.rowData.NoPO}</td>
+                                                <td><span class="badge bg-primary">${move.rowData.Model}</span></td>
+                                                <td>${move.rowData.TotalQty}</td>
+                                                <td>${move.fromCountry}</td>
+                                                <td>${move.toCountry} ${move.isNewCountry ? '<span class="badge bg-success">NEW</span>' : ''}</td>
+                                                <td>${new Date(move.timestamp).toLocaleTimeString()}</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="undoMove('${move.moveId}')">
+                                                        <i class="fas fa-undo"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-warning" onclick="undoAllMoves()">
+                                <i class="fas fa-undo me-2"></i>
+                                Undo All Moves
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            modal.addEventListener('hidden.bs.modal', () => {
+                modal.remove();
+            });
+        }
+        
+        // Undo specific move
+    function undoMove(moveId) {
+            const moveIndex = holdState.movedRows.findIndex(m => m.moveId === moveId);
+            if (moveIndex === -1) return;
+            
+            const move = holdState.movedRows[moveIndex];
+            
+            // Remove from hold state
+            holdState.movedRows.splice(moveIndex, 1);
+            
+            // Restore UI
+            const row = document.querySelector(`tr[data-move-id="${moveId}"]`);
+            if (row) {
+                row.classList.remove('row-moved');
+                row.removeAttribute('data-move-id');
+                
+                // Remove indicator
+                const indicator = row.querySelector('.move-indicator');
+                if (indicator) indicator.remove();
+                
+                // Re-enable editing
+                const editableFields = row.querySelectorAll('.editable-field');
+                editableFields.forEach(field => {
+                    field.disabled = false;
+                    field.style.backgroundColor = '';
+                });
+                
+                // Re-enable buttons
+                const buttons = row.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    btn.disabled = false;
+                    btn.style.opacity = '';
+                });
+            }
+            
+            // If destination country becomes empty (e.g., it was just created for this move), clear its pending data and UI
+            const affectedCountries = [move.fromCountry, move.toCountry];
+            affectedCountries.forEach(cty => {
+                // If no more moves affect this country, try to restore or clear recalcs
+                const stillAffected = holdState.movedRows.some(m => m.fromCountry === cty || m.toCountry === cty);
+                if (!stillAffected) {
+                    // Remove recalculated snapshot to fall back to currentData
+                    delete holdState.pendingRecalculations[cty];
+                    updateTableDisplay(cty);
+                    updateStats(cty);
+                    refreshCountryCounts(cty);
+                    removeCountryUIIfEmpty(cty);
+                } else {
+                    // Just refresh counts
+                    refreshCountryCounts(cty);
+                }
+            });
+
+            // Update hold state info
+            if (holdState.movedRows.length === 0) {
+                const holdInfo = document.getElementById('holdStateInfo');
+                if (holdInfo) holdInfo.remove();
+            } else {
+                showHoldStateInfo();
+            }
+            
+            showToast(`✅ Move undone: ${move.rowData.NoPO} back to ${move.fromCountry}`, 'success');
+            
+            // Close modal and refresh if needed
+            const modal = document.querySelector('.modal.show');
+            if (modal) {
+                bootstrap.Modal.getInstance(modal).hide();
+            }
+        }
+        
+        // Undo all moves
+        function undoAllMoves() {
+            const moveIds = holdState.movedRows.map(m => m.moveId);
+            moveIds.forEach(id => undoMove(id));
+            
+            showToast(`✅ All ${moveIds.length} moves undone`, 'success');
         }
     </script>
 }
