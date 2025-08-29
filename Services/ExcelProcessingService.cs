@@ -38,6 +38,7 @@ namespace ShipmentFinishGood.Services
             }
 
             var (rawData, formatInfo) = ParseExcelFileWithFormatDetection(file);
+            // Parsing completed: rawData & formatInfo prepared
             
             var dataByCountry = rawData
                 .GroupBy(r => CountryNormalizer.NormalizeOrUnknown(r.Country))
@@ -132,6 +133,7 @@ namespace ShipmentFinishGood.Services
                 DetectedCountries = detectedCountries,
                 TotalRows = rawData.Count
             };
+            // Parse completed summary prepared in formatInfo
 
             return (rawData, formatInfo);
         }
@@ -140,32 +142,20 @@ namespace ShipmentFinishGood.Services
         {
             try
             {
-                Console.WriteLine("=== FORMAT DETECTION START ===");
-                Console.WriteLine($"Total worksheets: {workbook.Worksheets.Count}");
-                
-                foreach (var ws in workbook.Worksheets)
-                {
-                    Console.WriteLine($"Sheet: '{ws.Name}'");
-                }
-                
                 if (IsStuffingPlanFormat(workbook))
                 {
-                    Console.WriteLine("DETECTED: STUFFING_PLAN");
                     return "STUFFING_PLAN";
                 }
                 
                 if (IsOldFormat(workbook))
                 {
-                    Console.WriteLine("DETECTED: OLD_SINGLE_SHEET");
                     return "OLD_SINGLE_SHEET";
                 }
                 
-                Console.WriteLine("DETECTED: MULTI_SHEET (default)");
                 return "MULTI_SHEET";
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"FORMAT DETECTION ERROR: {ex.Message}");
                 return "MULTI_SHEET";
             }
         }
@@ -216,7 +206,6 @@ namespace ShipmentFinishGood.Services
                     // If we have stuffing plan indicators OR at least 2 of the 3 required headers
                     if (hasStuffingPlanIndicator || headerMatchCount >= 2)
                     {
-                        Console.WriteLine($"Detected Stuffing Plan format in sheet: {worksheet.Name}");
                         return true;
                     }
                 }
@@ -229,7 +218,7 @@ namespace ShipmentFinishGood.Services
             }
         }
 
-        private List<ExcelRowData> ParseStuffingPlanFormat(IXLWorkbook workbook)
+    private List<ExcelRowData> ParseStuffingPlanFormat(IXLWorkbook workbook)
         {
             var rawData = new List<ExcelRowData>();
             int globalRowIndex = 1;
@@ -240,18 +229,22 @@ namespace ShipmentFinishGood.Services
                 var countryFromSheetName = CountryNormalizer.Normalize(worksheet.Name);
                 var lastRowUsed = worksheet.LastRowUsed()?.RowNumber() ?? 1;
                 
+                
                 if (lastRowUsed <= 1) continue;
 
                 var dataStartRow = FindDataStartRow(worksheet);
                 if (dataStartRow == -1) continue;
 
-                var (poCol, modelCol, qtyCol) = FindColumnIndexes(worksheet, dataStartRow);
+        var (poCol, modelCol, qtyCol, countryCol) = FindColumnIndexes(worksheet, dataStartRow);
                 if (poCol == -1 || modelCol == -1 || qtyCol == -1) continue;
 
                 // Inheritance variables for NO PO and NO MODEL (requirements #1 & #2)
                 var currentPO = string.Empty;
                 var currentModel = string.Empty;
+                // Inheritance for COUNTRY: prefer header column if present, otherwise fallback to sheet name
+                var currentCountry = countryFromSheetName;
 
+                var parsedRows = 0;
                 for (int row = dataStartRow + 1; row <= lastRowUsed; row++)
                 {
                     globalRowIndex++;
@@ -259,6 +252,15 @@ namespace ShipmentFinishGood.Services
                     var noPOCell = worksheet.Cell(row, poCol).GetString().Trim();
                     var modelCell = worksheet.Cell(row, modelCol).GetString().Trim();
                     var qtyCell = worksheet.Cell(row, qtyCol).GetString().Trim();
+                    // Update country early even if this is a group-only row
+                    if (countryCol != -1)
+                    {
+                        var countryCell = worksheet.Cell(row, countryCol).GetString().Trim();
+                        if (!string.IsNullOrEmpty(countryCell))
+                        {
+                            currentCountry = CountryNormalizer.Normalize(countryCell);
+                        }
+                    }
 
                     // Skip completely empty rows
                     if (string.IsNullOrEmpty(noPOCell) && 
@@ -279,20 +281,22 @@ namespace ShipmentFinishGood.Services
                         continue;
 
                     // Only add valid rows with all required data
-                    if (!string.IsNullOrEmpty(currentPO) && 
+            if (!string.IsNullOrEmpty(currentPO) && 
                         !string.IsNullOrEmpty(currentModel) && 
                         qty > 0)
                     {
                         rawData.Add(new ExcelRowData
                         {
                             NoPO = currentPO,
-                            Country = countryFromSheetName,
+                Country = currentCountry,
                             Model = currentModel,
                             Qty = qty,
                             RowIndex = globalRowIndex
                         });
+            parsedRows++;
                     }
                 }
+                
             }
 
             return rawData;
@@ -309,7 +313,7 @@ namespace ShipmentFinishGood.Services
                 int matchCount = 0;
                 
                 // Check if this row contains all 3 required headers
-                for (int col = 1; col <= 15; col++)
+                for (int col = 1; col <= 30; col++)
                 {
                     var cellValue = worksheet.Cell(row, col).GetString().Trim().ToUpper();
                     
@@ -330,17 +334,16 @@ namespace ShipmentFinishGood.Services
             return -1;
         }
 
-        private (int poCol, int modelCol, int qtyCol) FindColumnIndexes(IXLWorksheet worksheet, int headerRow)
+        private (int poCol, int modelCol, int qtyCol, int countryCol) FindColumnIndexes(IXLWorksheet worksheet, int headerRow)
         {
-            int poCol = -1, modelCol = -1, qtyCol = -1;
+            int poCol = -1, modelCol = -1, qtyCol = -1, countryCol = -1;
             
             // Search for exact column headers in stuffing plan format
-            for (int col = 1; col <= 15; col++)
+            for (int col = 1; col <= 30; col++)
             {
                 var headerValue = worksheet.Cell(headerRow, col).GetString().Trim().ToUpper();
                 
-                // Debug: Print what we find in each column
-                Console.WriteLine($"Column {col}: '{headerValue}'");
+                // Read column header
                 
                 // NO PO column detection - be more specific (requirement #1)
                 if (headerValue.Equals("NO PO", StringComparison.OrdinalIgnoreCase))
@@ -353,12 +356,17 @@ namespace ShipmentFinishGood.Services
                 // QTY column detection - be more specific (requirement #3)
                 else if (headerValue.Equals("QTY", StringComparison.OrdinalIgnoreCase))
                     qtyCol = col;
+
+                // COUNTRY column detection - support common synonyms
+                else if (headerValue.Equals("COUNTRY", StringComparison.OrdinalIgnoreCase) ||
+                         headerValue.Contains("DESTINATION COUNTRY"))
+                    countryCol = col;
             }
             
             // If exact matches not found, try partial matches
-            if (poCol == -1 || modelCol == -1 || qtyCol == -1)
+            if (poCol == -1 || modelCol == -1 || qtyCol == -1 || countryCol == -1)
             {
-                for (int col = 1; col <= 15; col++)
+                for (int col = 1; col <= 30; col++)
                 {
                     var headerValue = worksheet.Cell(headerRow, col).GetString().Trim().ToUpper();
                     
@@ -368,29 +376,27 @@ namespace ShipmentFinishGood.Services
                         modelCol = col;
                     else if (qtyCol == -1 && headerValue.Contains("QTY"))
                         qtyCol = col;
+                    else if (countryCol == -1 && (headerValue.Contains("COUNTRY") || headerValue.Contains("DESTINATION")))
+                        countryCol = col;
                 }
             }
             
             // Final fallback - but warn about it
             if (poCol == -1)
             {
-                Console.WriteLine("Warning: NO PO column not found, using column 1");
                 poCol = 1;
             }
             if (modelCol == -1)
             {
-                Console.WriteLine("Warning: NO MODEL column not found, using column 2");
                 modelCol = 2;
             }
             if (qtyCol == -1)
             {
-                Console.WriteLine("Warning: QTY column not found, using column 3");
                 qtyCol = 3;
             }
             
-            Console.WriteLine($"Final column mapping: PO={poCol}, MODEL={modelCol}, QTY={qtyCol}");
             
-            return (poCol, modelCol, qtyCol);
+            return (poCol, modelCol, qtyCol, countryCol);
         }
 
         private bool ParseQuantity(string qtyCell, out int qty)
