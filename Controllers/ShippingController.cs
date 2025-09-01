@@ -5,6 +5,7 @@ using ShipmentFinishGood.Services;
 using ShipmentFinishGood.Common;
 using ShipmentFinishGood.Models;
 using ShipmentFinishGood.Repositories;
+using ShipmentFinishGood.ViewModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace ShipmentFinishGood.Controllers
@@ -203,9 +204,66 @@ namespace ShipmentFinishGood.Controllers
         }
 
         /// <summary>
+        /// API endpoint for real-time dashboard updates
+        /// </summary>
+        [HttpGet]
+        public async Task<JsonResult> GetDashboardStats(string? country = null, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            try
+            {
+                var viewModel = await BuildShippingMonitoringViewModelAsync(country, startDate, endDate);
+                
+                return Json(new
+                {
+                    success = true,
+                    totalSessions = viewModel.TotalSessions,
+                    totalQtyTarget = viewModel.TotalQtyTarget,
+                    totalQtyScanned = viewModel.TotalQtyScanned,
+                    totalQtyRemaining = viewModel.TotalQtyRemaining,
+                    overallProgress = viewModel.TotalQtyTarget > 0 ? (double)viewModel.TotalQtyScanned / viewModel.TotalQtyTarget * 100 : 0,
+                    sessionDetails = viewModel.SessionDetails?.Select(s => new
+                    {
+                        sessionId = s.SessionId,
+                        fileName = s.FileName,
+                        country = s.Country,
+                        totalQtyTarget = s.TotalQtyTarget,
+                        totalQtyScanned = s.TotalQtyScanned,
+                        totalQtyRemaining = s.TotalQtyRemaining,
+                        progressPercentage = s.ProgressPercentage,
+                        lastScanDate = s.LastScanDate?.ToString("dd/MM/yyyy HH:mm")
+                    }).ToList(),
+                    lastUpdated = DateTime.Now.ToString("HH:mm:ss")
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting dashboard stats");
+                return Json(new { success = false, error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// SHIPPING MONITORING DASHBOARD - Real-time tracking
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> Dashboard(string? country = null, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            try
+            {
+                var viewModel = await BuildShippingMonitoringViewModelAsync(country, startDate, endDate);
+                return View(viewModel);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading shipping monitoring dashboard");
+                return View(new ShippingMonitoringViewModel());
+            }
+        }
+
+        /// <summary>
         /// Executive Dashboard - Focus on barang keluar with real metrics
         /// </summary>
-        public async Task<IActionResult> Dashboard(string? selectedModel = null, DateTime? startDate = null, DateTime? endDate = null)
+        public async Task<IActionResult> DashboardOld(string? selectedModel = null, DateTime? startDate = null, DateTime? endDate = null)
         {
             try
             {
@@ -711,6 +769,258 @@ namespace ShipmentFinishGood.Controllers
             };
             
             return colors.Take(Math.Min(count, colors.Length)).ToArray();
+        }
+
+        /// <summary>
+        /// 🚀 BUILD SHIPPING MONITORING VIEW MODEL - Like PO Details Breakdown concept
+        /// Smart QTY calculation using ModelConfiguration (Pallet/Box to Pieces conversion)
+        /// </summary>
+        private async Task<ShippingMonitoringViewModel> BuildShippingMonitoringViewModelAsync(string? country, DateTime? startDate, DateTime? endDate)
+        {
+            // Set default date range (last 30 days)
+            startDate ??= DateTime.Today.AddDays(-30);
+            endDate ??= DateTime.Today.AddDays(1); // Include today
+            
+            // Get all sessions in date range, filter out NULL shipment types
+            var sessionsQuery = _context.UploadSessions
+                .Include(s => s.POMasters)
+                .Where(s => s.UploadDate >= startDate && s.UploadDate < endDate)
+                .Where(s => !string.IsNullOrEmpty(s.ShipmentType)); // Filter out NULL shipment types
+                
+            if (!string.IsNullOrEmpty(country))
+            {
+                sessionsQuery = sessionsQuery.Where(s => s.POMasters.Any(p => p.Country == country));
+            }
+            
+            var sessions = await sessionsQuery.ToListAsync();
+            
+            // Get model configurations for smart calculation
+            var modelConfigs = await _context.ModelConfigurations.ToListAsync();
+            
+            var sessionDetails = new List<SessionMonitoringInfo>();
+            
+            foreach (var session in sessions)
+            {
+                try
+                {
+                    // Get scan progress for this session
+                    var scanProgress = await _scanService.GetScanProgressAsync(session.SessionId);
+                    
+                    // Get country from first PO (sessions are usually single country)
+                    var sessionCountry = session.POMasters.FirstOrDefault()?.Country ?? "Unknown";
+                    
+                    // Calculate model breakdowns with smart QTY conversion
+                    var modelBreakdowns = await CalculateModelBreakdownsAsync(session, modelConfigs, scanProgress);
+                    
+                    // Calculate total QTY based on ModelConfig conversions
+                    var totalQtyTarget = modelBreakdowns.Sum(m => m.TotalPcsEquivalent);
+                    var totalQtyScanned = modelBreakdowns.Sum(m => m.ScannedPcsEquivalent);
+                    var totalQtyRemaining = totalQtyTarget - totalQtyScanned;
+                    
+                    var progressPercentage = totalQtyTarget > 0 ? (double)totalQtyScanned / totalQtyTarget * 100 : 0;
+                    
+                    // Determine status based on progress
+                    var status = progressPercentage >= 100 ? "COMPLETED" :
+                                progressPercentage > 0 ? "IN PROGRESS" : "PENDING";
+                    
+                    var statusClass = status switch
+                    {
+                        "COMPLETED" => "success",
+                        "IN PROGRESS" => "warning",
+                        _ => "secondary"
+                    };
+                    
+                    var progressClass = progressPercentage switch
+                    {
+                        >= 100 => "success",
+                        >= 75 => "info",
+                        >= 50 => "warning",
+                        _ => "danger"
+                    };
+                    
+                    // Calculate scanning velocity (items per hour)
+                    var scanningVelocity = CalculateScanningVelocity(session, totalQtyScanned);
+                    
+                    // Estimate completion time
+                    var estimatedCompletion = EstimateCompletionTime(totalQtyRemaining, scanningVelocity);
+                    
+                    sessionDetails.Add(new SessionMonitoringInfo
+                    {
+                        SessionId = session.SessionId,
+                        FileName = session.FileName ?? "Unknown",
+                        Country = sessionCountry,
+                        CreatedDate = session.UploadDate,
+                        LastScanDate = scanProgress.LastScanTime,
+                        
+                        // Basic PO information
+                        TotalPOs = session.POMasters.Count,
+                        
+                        // Smart QTY calculations based on ModelConfig
+                        TotalQtyTarget = totalQtyTarget,
+                        TotalQtyScanned = totalQtyScanned,
+                        TotalQtyRemaining = totalQtyRemaining,
+                        ProgressPercentage = Math.Round(progressPercentage, 1),
+                        
+                        // Raw breakdown
+                        TotalPallets = scanProgress.TotalPallets,
+                        ScannedPallets = scanProgress.ScannedPallets,
+                        TotalBoxes = scanProgress.TotalBoxes,
+                        ScannedBoxes = scanProgress.ScannedBoxes,
+                        TotalPcs = scanProgress.TotalPcs,
+                        ScannedPcs = scanProgress.ScannedPcs,
+                        
+                        // Status indicators
+                        Status = status,
+                        StatusClass = statusClass,
+                        ProgressClass = progressClass,
+                        
+                        // Performance metrics
+                        ScanningVelocity = scanningVelocity,
+                        EstimatedCompletion = estimatedCompletion,
+                        
+                        // Model breakdown details
+                        ModelBreakdowns = modelBreakdowns
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing session {SessionId}", session.SessionId);
+                    // Continue with other sessions
+                }
+            }
+            
+            // Get available countries for filter
+            var availableCountries = await _context.POMasters
+                .Where(p => !string.IsNullOrEmpty(p.Country))
+                .Select(p => p.Country!)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToListAsync();
+            
+            // Calculate summary statistics
+            var totalSessions = sessionDetails.Count;
+            var completedSessions = sessionDetails.Count(s => s.Status == "COMPLETED");
+            var inProgressSessions = sessionDetails.Count(s => s.Status == "IN PROGRESS");
+            var pendingSessions = sessionDetails.Count(s => s.Status == "PENDING");
+            var overallCompletionRate = totalSessions > 0 ? (double)completedSessions / totalSessions * 100 : 0;
+            
+            return new ShippingMonitoringViewModel
+            {
+                SelectedCountry = country,
+                StartDate = startDate,
+                EndDate = endDate?.AddDays(-1), // Adjust back for display
+                
+                TotalSessions = totalSessions,
+                CompletedSessions = completedSessions,
+                InProgressSessions = inProgressSessions,
+                PendingSessions = pendingSessions,
+                OverallCompletionRate = Math.Round(overallCompletionRate, 1),
+                
+                SessionDetails = sessionDetails.OrderByDescending(s => s.CreatedDate).ToList(),
+                AvailableCountries = availableCountries,
+                
+                TotalQtyTarget = sessionDetails.Sum(s => s.TotalQtyTarget),
+                TotalQtyScanned = sessionDetails.Sum(s => s.TotalQtyScanned),
+                TotalQtyRemaining = sessionDetails.Sum(s => s.TotalQtyRemaining),
+                
+                LastUpdateTime = DateTime.Now
+            };
+        }
+        
+        /// <summary>
+        /// Calculate model breakdowns with smart QTY conversion using ModelConfiguration
+        /// </summary>
+        private async Task<List<ModelBreakdown>> CalculateModelBreakdownsAsync(
+            UploadSession session, 
+            List<ModelConfiguration> modelConfigs,
+            ScanProgressDto scanProgress)
+        {
+            var modelBreakdowns = new List<ModelBreakdown>();
+            
+            // Filter ModelConfigs by session ShipmentType (LOOSE or PALLET)
+            var sessionType = session.ShipmentType ?? "LOOSE"; // Default to LOOSE if null
+            var filteredModelConfigs = modelConfigs
+                .Where(m => m.Type == sessionType)
+                .GroupBy(m => m.ModelName)
+                .ToDictionary(g => g.Key, g => g.First());
+            
+            // Group POMasters by model
+            var posByModel = session.POMasters.GroupBy(p => p.ModelProduk);
+            
+            foreach (var modelGroup in posByModel)
+            {
+                var modelName = modelGroup.Key;
+                var modelPOs = modelGroup.ToList();
+                
+                // Get model configuration for smart calculation
+                filteredModelConfigs.TryGetValue(modelName, out var modelConfig);
+                var pcsPerPallet = modelConfig?.PcsPerPallet ?? 1;
+                var pcsPerBox = modelConfig?.PcsPerBox ?? 1;
+                var type = modelConfig?.Type ?? "LOOSE";
+                
+                // Calculate totals for this model
+                var totalPallets = modelPOs.Sum(p => p.QtyPallet);
+                var totalBoxes = modelPOs.Sum(p => p.QtyBox);
+                var totalPcs = modelPOs.Sum(p => p.QtyPcs);
+                
+                // Calculate scanned quantities for this specific model
+                var scannedPallets = await GetScannedCountForModelAsync(session.SessionId, modelName, "SCAN_PALLET");
+                var scannedBoxes = await GetScannedCountForModelAsync(session.SessionId, modelName, "SCAN_BOX");
+                var scannedPcs = await GetScannedCountForModelAsync(session.SessionId, modelName, "SCAN_PCS");
+                
+                modelBreakdowns.Add(new ModelBreakdown
+                {
+                    ModelName = modelName,
+                    PcsPerPallet = pcsPerPallet,
+                    PcsPerBox = pcsPerBox,
+                    Type = type,
+                    
+                    TotalPallets = totalPallets,
+                    TotalBoxes = totalBoxes,
+                    TotalPcs = totalPcs,
+                    
+                    ScannedPallets = scannedPallets,
+                    ScannedBoxes = scannedBoxes,
+                    ScannedPcs = scannedPcs
+                });
+            }
+            
+            return modelBreakdowns;
+        }
+        
+        /// <summary>
+        /// Calculate scanning velocity (items per hour)
+        /// </summary>
+        private double CalculateScanningVelocity(UploadSession session, int totalScanned)
+        {
+            var timeElapsed = DateTime.Now - session.UploadDate;
+            var hoursElapsed = Math.Max(timeElapsed.TotalHours, 0.1); // Prevent division by zero
+            
+            return totalScanned / hoursElapsed;
+        }
+        
+        /// <summary>
+        /// Estimate completion time based on current velocity
+        /// </summary>
+        private TimeSpan? EstimateCompletionTime(int remaining, double velocity)
+        {
+            if (remaining <= 0 || velocity <= 0) return null;
+            
+            var hoursToComplete = remaining / velocity;
+            return TimeSpan.FromHours(hoursToComplete);
+        }
+
+        /// <summary>
+        /// Get scanned count for specific model and action type
+        /// </summary>
+        private async Task<int> GetScannedCountForModelAsync(int sessionId, string modelName, string action)
+        {
+            var sessionTag = $"QR_{sessionId}_";
+            return await _context.ScanningActivities
+                .CountAsync(sa => sa.Action == action && 
+                                sa.Result == "SUCCESS" &&
+                                sa.BarcodeValue.StartsWith(sessionTag) &&
+                                sa.BarcodeValue.Contains($"_{modelName}_"));
         }
     }
 }

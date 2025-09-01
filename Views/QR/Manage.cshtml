@@ -49,6 +49,36 @@
         .qr-container {
             animation: fadeInUp 0.3s ease-out;
         }
+        
+        /* Enhanced Download Button Styles */
+        .btn.downloading {
+            opacity: 0.8;
+            cursor: not-allowed;
+        }
+        
+        .btn.downloading:hover {
+            transform: none !important;
+        }
+        
+        .download-spinner {
+            color: #fff;
+        }
+        
+        .btn-success.downloading {
+            background-color: #198754;
+            border-color: #146c43;
+        }
+        
+        /* Dropdown item loading states */
+        .dropdown-item:disabled {
+            opacity: 0.6;
+            pointer-events: none;
+            background-color: #f8f9fa;
+        }
+        
+        .dropdown-item .fa-spin {
+            color: #0d6efd;
+        }
     </style>
 }
 
@@ -81,19 +111,19 @@
                 </button>
                 <ul class="dropdown-menu">
                     <li>
-                        <a class="dropdown-item" asp-action="DownloadPDF" asp-route-sessionId="@Model.SessionId">
+                        <button class="dropdown-item" onclick="downloadPDFBarcodes(@Model.SessionId)">
                             <i class="fas fa-list me-2"></i>Barcode List PDF
-                        </a>
+                        </button>
                     </li>
                     <li>
-                        <a class="dropdown-item" asp-action="DownloadQRIdentityPDF" asp-route-sessionId="@Model.SessionId">
+                        <button class="dropdown-item" onclick="downloadQRIdentityPDF(@Model.SessionId)">
                             <i class="fas fa-qrcode me-2"></i>QR Identity PDF
-                        </a>
+                        </button>
                     </li>
                     <li>
-                        <a class="dropdown-item" asp-action="DownloadComprehensiveReportPDF" asp-route-sessionId="@Model.SessionId">
+                        <button class="dropdown-item" onclick="downloadComprehensiveReportPDF(@Model.SessionId)">
                             <i class="fas fa-chart-line me-2"></i>Comprehensive Report PDF
-                        </a>
+                        </button>
                     </li>
                 </ul>
             </div>
@@ -293,10 +323,9 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <a asp-action="DownloadPDF" asp-route-sessionId="@Model.SessionId" 
-                           class="btn btn-success">
+                        <button type="button" class="btn btn-success" onclick="downloadPDFBarcodes(@Model.SessionId)">
                             <i class="fas fa-download me-2"></i>Download PDF Barcodes
-                        </a>
+                        </button>
 
                         <a asp-action="GetQRImage" asp-route-sessionId="@Model.SessionId" 
                            class="btn btn-info" download="QR_@(Model.SessionId).png">
@@ -705,6 +734,146 @@
                 showAlert('QR code downloaded!', 'success');
             } else {
                 showAlert('QR code not found', 'danger');
+            }
+        }
+
+        // 🚀 ENHANCED PDF DOWNLOAD WITH DELAY (SAME AS AUTO DOWNLOAD IN PREVIEW)
+        function downloadPDFBarcodes(sessionId) {
+            // Get the button that was clicked (use event.target or find by onclick)
+            const button = event.target.closest('button') || document.querySelector('button[onclick*="downloadPDFBarcodes"]');
+            
+            if (!button) {
+                console.error('Download button not found');
+                showAlert('Download button not found. Please try again.', 'danger');
+                return;
+            }
+            
+            // Store original button content
+            const originalContent = button.innerHTML;
+            
+            // Show loading state
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating PDF...';
+            button.disabled = true;
+            button.classList.add('downloading');
+            
+            try {
+                // Add the same delay as auto download to ensure backend transaction is fully committed
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = `/QR/DownloadPDF?sessionId=${sessionId}`;
+                    // Use server-provided filename with timestamp
+                    link.setAttribute('download', `Barcodes_Session_${sessionId}.pdf`);
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Show success notification
+                    showAlert('PDF download started! Check your Downloads folder.', 'success');
+                    
+                    // Reset button state after successful download
+                    setTimeout(() => {
+                        resetDownloadButton(button, originalContent);
+                    }, 1000);
+                    
+                }, 400); // Same 400ms delay as auto download in preview
+                
+            } catch (e) {
+                console.error('Enhanced PDF download failed:', e);
+                showAlert('Failed to download PDF. Please try again.', 'danger');
+                resetDownloadButton(button, originalContent);
+            }
+        }
+        
+        function resetDownloadButton(button, originalContent) {
+            if (button && originalContent) {
+                button.innerHTML = originalContent;
+                button.disabled = false;
+                button.classList.remove('downloading');
+            }
+        }
+
+        // 🚀 QR IDENTITY PDF DOWNLOAD WITH DELAY
+        function downloadQRIdentityPDF(sessionId) {
+            const menuItem = event.target.closest('.dropdown-item');
+            if (!menuItem) {
+                console.error('Menu item not found');
+                return;
+            }
+            
+            const originalText = menuItem.innerHTML;
+            
+            // Show loading state
+            menuItem.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating QR Identity PDF...';
+            menuItem.disabled = true;
+            
+            try {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = `/QR/DownloadQRIdentityPDF?sessionId=${sessionId}`;
+                    link.setAttribute('download', `QR_Identity_${sessionId}.pdf`);
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    showAlert('QR Identity PDF download started!', 'success');
+                    
+                    // Reset menu item
+                    setTimeout(() => {
+                        menuItem.innerHTML = originalText;
+                        menuItem.disabled = false;
+                    }, 1000);
+                    
+                }, 400); // Same delay as auto download
+                
+            } catch (e) {
+                console.error('QR Identity PDF download failed:', e);
+                showAlert('Failed to download QR Identity PDF. Please try again.', 'danger');
+                menuItem.innerHTML = originalText;
+                menuItem.disabled = false;
+            }
+        }
+
+        // 🚀 COMPREHENSIVE REPORT PDF DOWNLOAD WITH DELAY
+        function downloadComprehensiveReportPDF(sessionId) {
+            const menuItem = event.target.closest('.dropdown-item');
+            if (!menuItem) {
+                console.error('Menu item not found');
+                return;
+            }
+            
+            const originalText = menuItem.innerHTML;
+            
+            // Show loading state
+            menuItem.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating Comprehensive Report...';
+            menuItem.disabled = true;
+            
+            try {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = `/QR/DownloadComprehensiveReportPDF?sessionId=${sessionId}`;
+                    link.setAttribute('download', `Comprehensive_Report_${sessionId}.pdf`);
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    showAlert('Comprehensive Report PDF download started!', 'success');
+                    
+                    // Reset menu item
+                    setTimeout(() => {
+                        menuItem.innerHTML = originalText;
+                        menuItem.disabled = false;
+                    }, 1000);
+                    
+                }, 400); // Same delay as auto download
+                
+            } catch (e) {
+                console.error('Comprehensive Report PDF download failed:', e);
+                showAlert('Failed to download Comprehensive Report PDF. Please try again.', 'danger');
+                menuItem.innerHTML = originalText;
+                menuItem.disabled = false;
             }
         }
 

@@ -1,742 +1,660 @@
-@model ShipmentFinishGood.DTOs.ShippingDashboardDto
-
+@model ShipmentFinishGood.ViewModels.ShippingMonitoringViewModel
 @{
-    ViewData["Title"] = "Executive Shipping Dashboard";
+    ViewData["Title"] = "Shipping Dashboard";
     Layout = "_Layout";
 }
 
-<link rel="stylesheet" href="~/css/shipping-dashboard.css" />
+<style>
+    .dashboard-simple {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+    }
+    
+    .header-simple {
+        background: #42a5f5;
+        color: white;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+    }
+    
+    .summary-boxes {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .summary-box {
+        background: white;
+        border: 2px solid #42a5f5;
+        padding: 15px;
+        text-align: center;
+        border-radius: 5px;
+    }
+    
+    .summary-box h4 {
+        margin: 0 0 5px 0;
+        color: #42a5f5;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    
+    .summary-box small {
+        color: #666;
+        font-size: 12px;
+    }
+    
+    .filter-box {
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+    }
+    
+    .filter-row {
+        display: grid;
+        grid-template-columns: 200px 150px 150px 120px;
+        gap: 15px;
+        align-items: end;
+    }
+    
+    .filter-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        font-size: 14px;
+    }
+    
+    .btn-apply {
+        background: #42a5f5;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    .btn-apply:hover {
+        background: #1976d2;
+    }
+    
+    .btn-refresh {
+        background: #666;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 3px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+    
+    .btn-refresh:hover {
+        background: #333;
+    }
+    
+    .table-container {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    
+    .table-header {
+        background: #42a5f5;
+        color: white;
+        padding: 12px;
+        font-weight: bold;
+        font-size: 16px;
+    }
+    
+    .table-simple {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    
+    .table-simple th {
+        background: #e3f2fd;
+        padding: 12px 8px;
+        text-align: left;
+        border: 1px solid #42a5f5;
+        font-weight: bold;
+        color: #1976d2;
+    }
+    
+    .table-simple td {
+        padding: 12px 8px;
+        border: 1px solid #ddd;
+        vertical-align: top;
+    }
+    
+    .table-simple tbody tr:nth-child(even) {
+        background: #f9f9f9;
+    }
+    
+    .table-simple tbody tr:hover {
+        background: #e3f2fd;
+    }
+    
+    .country-tag {
+        background: #42a5f5;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .progress-simple {
+        background: #f0f0f0;
+        height: 18px;
+        border-radius: 3px;
+        position: relative;
+        border: 1px solid #ddd;
+    }
+    
+    .progress-fill {
+        background: #42a5f5;
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.3s ease;
+    }
+    
+    .progress-text {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .total-row {
+        background: #e3f2fd;
+        font-weight: bold;
+        color: #1976d2;
+    }
+    
+    .file-info {
+        line-height: 1.4;
+    }
+    
+    .file-name {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 3px;
+    }
+    
+    .file-date {
+        color: #666;
+        font-size: 12px;
+    }
+    
+    .qty-number {
+        font-weight: bold;
+        font-size: 15px;
+    }
+    
+    .qty-scanned {
+        color: #4caf50;
+    }
+    
+    .qty-remaining {
+        color: #ff9800;
+    }
+    
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+        font-style: italic;
+    }
+    
+    /* Simple responsive */
+    @@media (max-width: 768px) {
+        .summary-boxes {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .filter-row {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        
+        .table-simple {
+            font-size: 12px;
+        }
+        
+        .table-simple th,
+        .table-simple td {
+            padding: 8px 4px;
+        }
+    }
+</style>
 
-<div class="dashboard-container">
-    <!-- Executive Header -->
-    <div class="dashboard-header">
-        <h1><i class="fas fa-chart-line"></i> Executive Shipping Dashboard</h1>
-        <p>Real-time insights for outbound operations & business intelligence</p>
-        <div class="last-updated">
-            <i class="fas fa-clock"></i> Last updated: @DateTime.Now.ToString("MMM dd, yyyy HH:mm")
+<div class="dashboard-simple">
+    <div class="header-simple">
+        <h3 style="margin: 0;">📊 Shipping Monitoring Dashboard</h3>
+        <small>Real-time tracking with ModelConfig conversion</small>
+        <button class="btn-refresh" onclick="manualRefresh()" style="float: right;">
+            🔄 Refresh
+        </button>
+    </div>
+    
+    <!-- Summary Boxes -->
+    <div class="summary-boxes">
+        <div class="summary-box">
+            <h4>@Model.TotalSessions</h4>
+            <small>Total Files</small>
+        </div>
+        <div class="summary-box">
+            <h4>@Model.TotalQtyTarget.ToString("N0")</h4>
+            <small>Total QTY Target</small>
+        </div>
+        <div class="summary-box">
+            <h4>@Model.TotalQtyScanned.ToString("N0")</h4>
+            <small>Scanned QTY</small>
+        </div>
+        <div class="summary-box">
+            <h4>@Model.TotalQtyRemaining.ToString("N0")</h4>
+            <small>Remaining QTY</small>
         </div>
     </div>
 
-    <!-- Key Performance Indicators (Big Numbers for Executives) -->
-    <div class="kpi-section">
-        <div class="kpi-grid">
-            <div class="kpi-card primary">
-                <div class="kpi-icon">
-                    <i class="fas fa-boxes"></i>
-                </div>
-                <div class="kpi-content">
-                    <h3 class="kpi-value" data-target="@Model.TotalItemsGenerated">0</h3>
-                    <p class="kpi-label">Total Items Generated</p>
-                    <span class="kpi-sublabel">Ready for processing</span>
-                </div>
-            </div>
-            
-            <div class="kpi-card success">
-                <div class="kpi-icon">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="kpi-content">
-                    <h3 class="kpi-value" data-target="@Model.TotalItemsScanned">0</h3>
-                    <p class="kpi-label">Items Scanned</p>
-                    <div class="kpi-progress">
-                        <div class="progress-bar" style="width: @(Model.OverallEfficiency)%"></div>
-                    </div>
-                    <span class="kpi-sublabel">@Model.OverallEfficiency.ToString("F1")% completion rate</span>
-                </div>
-            </div>
-            
-            <div class="kpi-card warning">
-                <div class="kpi-icon">
-                    <i class="fas fa-shipping-fast"></i>
-                </div>
-                <div class="kpi-content">
-                    <h3 class="kpi-value" data-target="@Model.TotalItemsShipped">0</h3>
-                    <p class="kpi-label">Ready to Ship</p>
-                    <span class="kpi-sublabel">Awaiting dispatch</span>
-                </div>
-            </div>
-            
-            <div class="kpi-card info">
-                <div class="kpi-icon">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div class="kpi-content">
-                    <h3 class="kpi-value" data-target="@Model.TotalItemsPending">0</h3>
-                    <p class="kpi-label">Pending Scan</p>
-                    <span class="kpi-sublabel">In queue</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Today's Performance Snapshot -->
-    <div class="performance-section">
-        <div class="section-header">
-            <h2><i class="fas fa-calendar-day"></i> Today's Performance</h2>
-        </div>
-        <div class="today-metrics">
-            <div class="metric-item">
-                <div class="metric-value">@Model.TodayGenerated</div>
-                <div class="metric-label">Generated Today</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-value">@Model.TodayScanned</div>
-                <div class="metric-label">Scanned Today</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-value">@Model.TodayCompletionRate.ToString("F1")%</div>
-                <div class="metric-label">Today's Rate</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-value">@Model.ActiveSessions</div>
-                <div class="metric-label">Active Sessions</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters Section -->
-    <div class="filters-section">
-        <form id="filterForm" class="filter-form">
+    <!-- Filter -->
+    <form method="get" class="filter-box">
+        <div class="filter-row">
             <div class="filter-group">
-                <label for="countryFilter"><i class="fas fa-globe"></i> Country Destination</label>
-                <select id="countryFilter" name="countryFilter" class="filter-select">
+                <label>Country Filter:</label>
+                <select name="country">
                     <option value="">All Countries</option>
                     @foreach (var country in Model.AvailableCountries)
                     {
-                        @if (ViewBag.SelectedCountry?.ToString() == country)
-                        {
-                            <option value="@country" selected>@country</option>
-                        }
-                        else
-                        {
-                            <option value="@country">@country</option>
-                        }
+                        <option value="@country" selected="@(country == Model.SelectedCountry)">@country</option>
                     }
                 </select>
             </div>
-            
             <div class="filter-group">
-                <label for="dateFromFilter"><i class="fas fa-calendar-alt"></i> From Date</label>
-                <input type="date" id="dateFromFilter" name="dateFromFilter" value="@ViewBag.DateFrom" class="filter-input" />
+                <label>Start Date:</label>
+                <input type="date" name="startDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")">
             </div>
-            
             <div class="filter-group">
-                <label for="dateToFilter"><i class="fas fa-calendar-alt"></i> To Date</label>
-                <input type="date" id="dateToFilter" name="dateToFilter" value="@ViewBag.DateTo" class="filter-input" />
+                <label>End Date:</label>
+                <input type="date" name="endDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")">
             </div>
-            
             <div class="filter-group">
-                <label for="statusFilter">Status</label>
-                <select id="statusFilter" name="statusFilter" class="filter-select">
-                    <option value="">All Status</option>
-                    @{
-                        var selectedStatus = ViewBag.SelectedStatus?.ToString();
-                    }
-                    @if (selectedStatus == "SCAN_COMPLETED")
-                    {
-                        <option value="SCAN_COMPLETED" selected>Completed</option>
-                    }
-                    else
-                    {
-                        <option value="SCAN_COMPLETED">Completed</option>
-                    }
-                    
-                    @if (selectedStatus == "IN_PROGRESS")
-                    {
-                        <option value="IN_PROGRESS" selected>In Progress</option>
-                    }
-                    else
-                    {
-                        <option value="IN_PROGRESS">In Progress</option>
-                    }
-                    
-                    @if (selectedStatus == "VALIDATED")
-                    {
-                        <option value="VALIDATED" selected>Validated</option>
-                    }
-                    else
-                    {
-                        <option value="VALIDATED">Validated</option>
-                    }
-                    
-                    @if (selectedStatus == "QR_GENERATED")
-                    {
-                        <option value="QR_GENERATED" selected>QR Generated</option>
-                    }
-                    else
-                    {
-                        <option value="QR_GENERATED">QR Generated</option>
-                    }
-                </select>
-            </div>
-            
-            <div class="filter-actions">
-                <button type="submit" class="btn-apply">Apply Filters</button>
-                <button type="button" id="clearFilters" class="btn-clear">Clear</button>
-                <button type="button" id="refreshData" class="btn-refresh">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Executive Analytics & Charts -->
-    <div class="analytics-section">
-        <div class="charts-grid">
-            <!-- Business Intelligence Chart -->
-            <div class="chart-container large">
-                <div class="chart-header">
-                    <h3><i class="fas fa-globe-americas"></i> Country Distribution</h3>
-                    <span class="chart-subtitle">Shipment destinations breakdown</span>
-                </div>
-                <div class="chart-wrapper">
-                    <canvas id="countryChart"></canvas>
-                </div>
-            </div>
-            
-            <!-- Operational Status Chart -->
-            <div class="chart-container medium">
-                <div class="chart-header">
-                    <h3><i class="fas fa-chart-pie"></i> Status Overview</h3>
-                    <span class="chart-subtitle">Current pipeline status</span>
-                </div>
-                <div class="chart-wrapper">
-                    <canvas id="statusChart"></canvas>
-                </div>
-            </div>
-            
-            <!-- Hourly Trends Chart -->
-            <div class="chart-container wide">
-                <div class="chart-header">
-                    <h3><i class="fas fa-chart-line"></i> Today's Scanning Activity</h3>
-                    <span class="chart-subtitle">Hourly progress tracking</span>
-                </div>
-                <div class="chart-wrapper">
-                    <canvas id="hourlyChart"></canvas>
-                </div>
-            </div>
-            
-            <!-- Top Products Chart -->
-            <div class="chart-container medium">
-                <div class="chart-header">
-                    <h3><i class="fas fa-cubes"></i> Top Products</h3>
-                    <span class="chart-subtitle">High-volume models</span>
-                </div>
-                <div class="chart-wrapper">
-                    <canvas id="modelsChart"></canvas>
-                </div>
+                <label>&nbsp;</label>
+                <button type="submit" class="btn-apply">Apply Filter</button>
             </div>
         </div>
-    </div>
+    </form>
 
-    <!-- Session Performance Table -->
-    <div class="sessions-section">
-        <div class="section-header">
-            <h2><i class="fas fa-tasks"></i> Session Performance</h2>
-            <div class="header-actions">
-                <button class="btn-export" onclick="exportSessionData()">
-                    <i class="fas fa-download"></i> Export
-                </button>
+    <!-- Main Table -->
+    @if (Model.SessionDetails?.Any() == true)
+    {
+        <div class="table-container">
+            <div class="table-header">
+                📋 File Details (@Model.SessionDetails.Count files found)
             </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="sessions-table">
+            <table class="table-simple">
                 <thead>
                     <tr>
-                        <th>Session ID</th>
-                        <th>File Name</th>
-                        <th>Country</th>
-                        <th>Progress</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th>Action</th>
+                        <th style="width: 25%;">File Name</th>
+                        <th style="width: 12%;">Country</th>
+                        <th style="width: 12%;">Total QTY</th>
+                        <th style="width: 12%;">Scanned QTY</th>
+                        <th style="width: 12%;">Remaining QTY</th>
+                        <th style="width: 27%;">Progress</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var session in Model.SessionMetrics.Take(20))
+                    @foreach (var session in Model.SessionDetails)
                     {
                         <tr>
-                            <td><span class="session-id">#@session.SessionId</span></td>
-                            <td>@session.FileName</td>
                             <td>
-                                <span class="country-badge">@session.Country</span>
-                            </td>
-                            <td>
-                                <div class="progress-cell">
-                                    <div class="progress-bar-container">
-                                        <div class="progress-bar @session.ProgressClass" style="width: @session.CompletionRate%"></div>
-                                    </div>
-                                    <span class="progress-text">@session.CompletionRate.ToString("F1")%</span>
-                                    <small>(@session.ScannedItems/@session.TotalItems)</small>
+                                <div class="file-info">
+                                    <div class="file-name">@session.FileName</div>
+                                    <div class="file-date">Created: @session.CreatedDate.ToString("dd/MM/yyyy HH:mm")</div>
+                                    @if (session.LastScanDate.HasValue)
+                                    {
+                                        <div class="file-date">Last scan: @session.LastScanDate.Value.ToString("dd/MM/yyyy HH:mm")</div>
+                                    }
                                 </div>
                             </td>
                             <td>
-                                <span class="status-badge @session.StatusClass">@session.Status</span>
+                                <span class="country-tag">@session.Country</span>
                             </td>
-                            <td>@session.CreatedDate.ToString("MMM dd, HH:mm")</td>
                             <td>
-                                <button class="btn-detail" onclick="viewSessionDetail(@session.SessionId)">
-                                    <i class="fas fa-eye"></i>
-                                </button>
+                                <span class="qty-number">@session.TotalQtyTarget.ToString("N0")</span>
+                            </td>
+                            <td>
+                                <span class="qty-number qty-scanned">@session.TotalQtyScanned.ToString("N0")</span>
+                            </td>
+                            <td>
+                                <span class="qty-number qty-remaining">@session.TotalQtyRemaining.ToString("N0")</span>
+                            </td>
+                            <td>
+                                <div class="progress-simple">
+                                    <div class="progress-fill" style="width: @session.ProgressPercentage%"></div>
+                                    <div class="progress-text">@session.ProgressPercentage% Complete</div>
+                                </div>
+                                <small style="color: #666; margin-top: 3px; display: block;">
+                                    @session.TotalQtyScanned.ToString("N0") of @session.TotalQtyTarget.ToString("N0") items
+                                </small>
                             </td>
                         </tr>
                     }
                 </tbody>
-            </table>
-        </div>
-    </div>
-                <p>Pending Shipments</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts Section -->
-    <div class="charts-section">
-        <div class="chart-card">
-            <div class="chart-header">
-                <h3>Status Distribution</h3>
-                <div class="chart-controls">
-                    <button class="chart-refresh" data-chart="status">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="chart-container">
-                <canvas id="statusPieChart"></canvas>
-                <div id="statusChartLoading" class="chart-loading">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading chart data...</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="chart-card">
-            <div class="chart-header">
-                <h3>Shipments by Country</h3>
-                <div class="chart-controls">
-                    <button class="chart-refresh" data-chart="country">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="chart-container">
-                <canvas id="countryBarChart"></canvas>
-                <div id="countryChartLoading" class="chart-loading">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading chart data...</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="chart-card full-width">
-            <div class="chart-header">
-                <h3>Monthly Shipping Trends</h3>
-                <div class="chart-controls">
-                    <button class="chart-refresh" data-chart="trend">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="chart-container">
-                <canvas id="trendLineChart"></canvas>
-                <div id="trendChartLoading" class="chart-loading">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading chart data...</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Shipments Table -->
-    <div class="table-section">
-        <div class="table-header">
-            <h3>Recent Shipments</h3>
-            <div class="table-actions">
-                <button id="exportData" class="btn-export">
-                    <i class="fas fa-download"></i> Export
-                </button>
-            </div>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Session ID</th>
-                        <th>File Name</th>
-                        <th>Status</th>
-                        <th>Total Boxes</th>
-                        <th>Ship Date</th>
-                        <th>Created Date</th>
+                <tfoot>
+                    <tr class="total-row">
+                        <th colspan="2">📊 TOTAL SUMMARY:</th>
+                        <th>@Model.TotalQtyTarget.ToString("N0")</th>
+                        <th>@Model.TotalQtyScanned.ToString("N0")</th>
+                        <th>@Model.TotalQtyRemaining.ToString("N0")</th>
+                        <th>
+                            @{
+                                var overallProgress = Model.TotalQtyTarget > 0 ? (double)Model.TotalQtyScanned / Model.TotalQtyTarget * 100 : 0;
+                            }
+                            <div class="progress-simple">
+                                <div class="progress-fill" style="width: @overallProgress%"></div>
+                                <div class="progress-text">@overallProgress.ToString("F1")% Overall</div>
+                            </div>
+                        </th>
                     </tr>
-                </thead>
-                <tbody id="shipmentsTableBody">
-                    @if (Model?.RecentShipments != null && Model.RecentShipments.Any())
-                    {
-                        @foreach (var item in Model.RecentShipments)
-                        {
-                            <tr>
-                                <td>@item.SessionId</td>
-                                <td>@item.FileName</td>
-                                <td>
-                                    <span class="status-badge @(item.Status == "SCAN_COMPLETED" ? "completed" : item.Status == "IN_PROGRESS" ? "in-process" : "pending")">
-                                        @item.Status
-                                    </span>
-                                </td>
-                                <td>@item.TotalBoxes</td>
-                                <td>@(item.ShipmentDate?.ToString("MM/dd/yyyy") ?? "N/A")</td>
-                                <td>@item.CreatedDate.ToString("MM/dd/yyyy")</td>
-                            </tr>
-                        }
-                    }
-                    else
-                    {
-                        <tr>
-                            <td colspan="6" class="no-data">No data available</td>
-                        </tr>
-                    }
-                </tbody>
+                </tfoot>
             </table>
         </div>
-    </div>
+    }
+    else
+    {
+        <div class="table-container">
+            <div class="no-data">
+                <h4>📭 No Data Found</h4>
+                <p>No shipping sessions found for the selected filters.<br>
+                Please check your date range or country filter.</p>
+            </div>
+        </div>
+    }
 </div>
 
-<!-- Include Chart.js and FontAwesome -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
-
 <script>
-// Executive Dashboard JavaScript
-class ExecutiveDashboard {
-    constructor() {
-        this.charts = {};
-        this.init();
+    // 🚀 REAL-TIME DASHBOARD UPDATES - Inspired by QR Manage
+    let refreshInterval;
+    let currentFilters = {
+        country: '@Model.SelectedCountry',
+        startDate: '@Model.StartDate?.ToString("yyyy-MM-dd")',
+        endDate: '@Model.EndDate?.ToString("yyyy-MM-dd")'
+    };
+    
+    // Auto refresh every 15 seconds (faster than QR Manage for dashboard)
+    function startAutoRefresh() {
+        refreshInterval = setInterval(function() {
+            refreshDashboardStats();
+        }, 15000); // 15 seconds
+        
+        console.log('🔄 Auto-refresh started for Shipping Dashboard');
     }
-
-    init() {
-        this.initKpiCounters();
-        this.initCharts();
-        this.initFilters();
-        this.initAutoRefresh();
-    }
-
-    // Animate KPI numbers (impressive for executives)
-    initKpiCounters() {
-        document.querySelectorAll('.kpi-value[data-target]').forEach(counter => {
-            const target = parseInt(counter.getAttribute('data-target'));
-            const duration = 2000;
-            const step = target / (duration / 16);
-            let current = 0;
-            
-            const updateCounter = () => {
-                current += step;
-                if (current < target) {
-                    counter.textContent = Math.floor(current).toLocaleString();
-                    requestAnimationFrame(updateCounter);
-                } else {
-                    counter.textContent = target.toLocaleString();
-                }
-            };
-            
-            updateCounter();
-        });
-    }
-
-    // Initialize executive charts
-    async initCharts() {
-        await this.loadCountryChart();
-        await this.loadStatusChart();
-        await this.loadHourlyChart();
-        await this.loadModelsChart();
-    }
-
-    async loadCountryChart() {
-        try {
-            const response = await fetch('/Shipping/legacy-chart-data?chartType=country');
-            const data = await response.json();
-            
-            const ctx = document.getElementById('countryChart').getContext('2d');
-            this.charts.country = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        data: data.data,
-                        backgroundColor: data.backgroundColor,
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 20,
-                                usePointStyle: true,
-                                font: { size: 12 }
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = ((context.parsed * 100) / total).toFixed(1);
-                                    return `${context.label}: ${context.parsed.toLocaleString()} (${percentage}%)`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error loading country chart:', error);
+    
+    function stopAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            console.log('⏹️ Auto-refresh stopped');
         }
     }
-
-    async loadStatusChart() {
-        try {
-            const response = await fetch('/Shipping/legacy-chart-data?chartType=status');
-            const data = await response.json();
-            
-            const ctx = document.getElementById('statusChart').getContext('2d');
-            this.charts.status = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        data: data.data,
-                        backgroundColor: data.backgroundColor,
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 15,
-                                usePointStyle: true,
-                                font: { size: 11 }
-                            }
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error loading status chart:', error);
+    
+    // Manual refresh function
+    function refreshDashboardStats() {
+        const refreshBtn = document.querySelector('.btn-refresh');
+        if (refreshBtn) {
+            refreshBtn.innerHTML = '🔄 Refreshing...';
+            refreshBtn.disabled = true;
         }
-    }
-
-    async loadHourlyChart() {
-        try {
-            const response = await fetch('/Shipping/legacy-chart-data?chartType=hourly');
-            const data = await response.json();
-            
-            const ctx = document.getElementById('hourlyChart').getContext('2d');
-            this.charts.hourly = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        label: 'Scans per Hour',
-                        data: data.data,
-                        borderColor: '#007bff',
-                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#007bff',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0,0,0,0.1)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                color: 'rgba(0,0,0,0.1)'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error loading hourly chart:', error);
-        }
-    }
-
-    async loadModelsChart() {
-        try {
-            const response = await fetch('/Shipping/legacy-chart-data?chartType=models');
-            const data = await response.json();
-            
-            const ctx = document.getElementById('modelsChart').getContext('2d');
-            this.charts.models = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        data: data.data,
-                        backgroundColor: data.backgroundColor,
-                        borderWidth: 1,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0,0,0,0.1)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 45
-                            }
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error loading models chart:', error);
-        }
-    }
-
-    initFilters() {
-        const filterForm = document.getElementById('filterForm');
-        if (filterForm) {
-            filterForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.applyFilters();
-            });
-        }
-
-        const clearButton = document.getElementById('clearFilters');
-        if (clearButton) {
-            clearButton.addEventListener('click', () => {
-                filterForm.reset();
-                this.applyFilters();
-            });
-        }
-
-        const refreshButton = document.getElementById('refreshData');
-        if (refreshButton) {
-            refreshButton.addEventListener('click', () => {
-                this.refreshDashboard();
-            });
-        }
-    }
-
-    applyFilters() {
-        const formData = new FormData(document.getElementById('filterForm'));
+        
+        // Build query parameters
         const params = new URLSearchParams();
+        if (currentFilters.country) params.append('country', currentFilters.country);
+        if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
+        if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
         
-        for (let [key, value] of formData.entries()) {
-            if (value) params.append(key, value);
-        }
-        
-        window.location.href = `/Shipping/Dashboard?${params.toString()}`;
+        fetch(`/Shipping/GetDashboardStats?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateDashboardUI(data);
+                    showUpdateNotification('Dashboard updated successfully!', 'success');
+                } else {
+                    showUpdateNotification('Failed to update dashboard: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Dashboard refresh error:', error);
+                showUpdateNotification('Network error during refresh', 'error');
+            })
+            .finally(() => {
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = '🔄 Refresh';
+                    refreshBtn.disabled = false;
+                }
+            });
     }
-
-    async refreshDashboard() {
-        // Add loading states
-        this.showLoading();
+    
+    // Update UI with new data
+    function updateDashboardUI(data) {
+        // Update summary boxes
+        updateSummaryBox(0, data.totalSessions);
+        updateSummaryBox(1, data.totalQtyTarget.toLocaleString());
+        updateSummaryBox(2, data.totalQtyScanned.toLocaleString());
+        updateSummaryBox(3, data.totalQtyRemaining.toLocaleString());
         
-        try {
-            // Refresh all charts
-            await this.initCharts();
-            this.initKpiCounters();
+        // Update table rows
+        updateTableRows(data.sessionDetails);
+        
+        // Update overall progress in footer
+        updateOverallProgress(data.overallProgress, data.totalQtyScanned, data.totalQtyTarget);
+        
+        // Update last updated time
+        updateLastUpdatedTime(data.lastUpdated);
+        
+        console.log('✅ Dashboard UI updated with real-time data');
+    }
+    
+    function updateSummaryBox(index, value) {
+        const summaryBoxes = document.querySelectorAll('.summary-box h4');
+        if (summaryBoxes[index]) {
+            // Add animation effect
+            summaryBoxes[index].style.transform = 'scale(1.1)';
+            summaryBoxes[index].style.color = '#42a5f5';
             
-            // Show success notification
-            this.showNotification('Dashboard refreshed successfully', 'success');
-        } catch (error) {
-            this.showNotification('Error refreshing dashboard', 'error');
-        } finally {
-            this.hideLoading();
+            setTimeout(() => {
+                summaryBoxes[index].textContent = value;
+                summaryBoxes[index].style.transform = 'scale(1)';
+            }, 150);
         }
     }
-
-    initAutoRefresh() {
-        // Auto-refresh every 5 minutes (300000ms)
-        setInterval(() => {
-            this.refreshDashboard();
-        }, 300000);
-    }
-
-    showLoading() {
-        document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
-            wrapper.style.opacity = '0.5';
-        });
-    }
-
-    hideLoading() {
-        document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
-            wrapper.style.opacity = '1';
-        });
-    }
-
-    showNotification(message, type = 'info') {
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-            <span>${message}</span>
-        `;
+    
+    function updateTableRows(sessionDetails) {
+        const tbody = document.querySelector('.table-simple tbody');
+        if (!tbody || !sessionDetails) return;
         
+        // Get current rows
+        const currentRows = tbody.querySelectorAll('tr');
+        
+        sessionDetails.forEach((session, index) => {
+            const row = currentRows[index];
+            if (row) {
+                // Update scanned QTY (column 4)
+                const scannedCell = row.cells[3];
+                if (scannedCell) {
+                    const currentValue = scannedCell.textContent.replace(/,/g, '');
+                    const newValue = session.totalQtyScanned.toLocaleString();
+                    
+                    if (currentValue !== newValue) {
+                        // Highlight changes
+                        scannedCell.style.backgroundColor = '#e3f2fd';
+                        scannedCell.querySelector('.qty-number').textContent = newValue;
+                        
+                        setTimeout(() => {
+                            scannedCell.style.backgroundColor = '';
+                        }, 2000);
+                    }
+                }
+                
+                // Update remaining QTY (column 5)
+                const remainingCell = row.cells[4];
+                if (remainingCell) {
+                    remainingCell.querySelector('.qty-number').textContent = session.totalQtyRemaining.toLocaleString();
+                }
+                
+                // Update progress bar (column 6)
+                const progressCell = row.cells[5];
+                if (progressCell) {
+                    const progressFill = progressCell.querySelector('.progress-fill');
+                    const progressText = progressCell.querySelector('.progress-text');
+                    const progressInfo = progressCell.querySelector('small');
+                    
+                    if (progressFill && progressText) {
+                        progressFill.style.width = session.progressPercentage + '%';
+                        progressText.textContent = session.progressPercentage + '% Complete';
+                        
+                        if (progressInfo) {
+                            progressInfo.textContent = `${session.totalQtyScanned.toLocaleString()} of ${session.totalQtyTarget.toLocaleString()} items`;
+                        }
+                    }
+                }
+                
+                // Update last scan date if available
+                if (session.lastScanDate) {
+                    const fileInfo = row.cells[0].querySelector('.file-info');
+                    if (fileInfo) {
+                        let lastScanDiv = fileInfo.querySelector('.last-scan-date');
+                        if (!lastScanDiv) {
+                            lastScanDiv = document.createElement('div');
+                            lastScanDiv.className = 'file-date last-scan-date';
+                            fileInfo.appendChild(lastScanDiv);
+                        }
+                        lastScanDiv.textContent = `Last scan: ${session.lastScanDate}`;
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateOverallProgress(progressPercentage, scanned, target) {
+        const footerProgress = document.querySelector('tfoot .progress-fill');
+        const footerText = document.querySelector('tfoot .progress-text');
+        const scannedCell = document.querySelector('tfoot tr th:nth-child(4)');
+        const remainingCell = document.querySelector('tfoot tr th:nth-child(5)');
+        
+        if (footerProgress && footerText) {
+            footerProgress.style.width = progressPercentage + '%';
+            footerText.textContent = progressPercentage.toFixed(1) + '% Overall';
+        }
+        
+        if (scannedCell) {
+            scannedCell.textContent = scanned.toLocaleString();
+        }
+        
+        if (remainingCell) {
+            remainingCell.textContent = (target - scanned).toLocaleString();
+        }
+    }
+    
+    function updateLastUpdatedTime(timestamp) {
+        let updateInfo = document.querySelector('.last-updated-info');
+        if (!updateInfo) {
+            updateInfo = document.createElement('small');
+            updateInfo.className = 'last-updated-info';
+            updateInfo.style.cssText = 'position: fixed; bottom: 10px; right: 10px; background: #42a5f5; color: white; padding: 5px 10px; border-radius: 3px; font-size: 11px; z-index: 1000;';
+            document.body.appendChild(updateInfo);
+        }
+        updateInfo.textContent = `Last updated: ${timestamp}`;
+        
+        // Fade out after 3 seconds
+        setTimeout(() => {
+            updateInfo.style.opacity = '0.7';
+        }, 3000);
+    }
+    
+    function showUpdateNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            background: ${type === 'success' ? '#4caf50' : '#f44336'}; 
+            color: white; 
+            padding: 10px 15px; 
+            border-radius: 5px; 
+            font-size: 14px; 
+            z-index: 1001;
+            animation: slideIn 0.3s ease-out;
+        `;
+        notification.textContent = message;
         document.body.appendChild(notification);
         
-        // Auto-remove after 3 seconds
         setTimeout(() => {
             notification.remove();
         }, 3000);
     }
-}
-
-// Global functions for template
-function viewSessionDetail(sessionId) {
-    window.location.href = `/Scan/SessionDetail/${sessionId}`;
-}
-
-function exportSessionData() {
-    // Implement CSV export functionality
-    const csvData = this.generateCSVData();
-    this.downloadCSV(csvData, 'session_performance.csv');
-}
-
-// Initialize dashboard when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new ExecutiveDashboard();
-});
+    
+    // Add CSS animation for notifications
+    const style = document.createElement('style');
+    style.textContent = `
+        @@keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Initialize auto-refresh when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 Shipping Dashboard Real-time Updates Initialized');
+        startAutoRefresh();
+        
+        // Stop auto-refresh when user leaves the page
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
+        
+        // Pause auto-refresh when tab is not visible
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
+            }
+        });
+    });
+    
+    // Manual refresh button click
+    function manualRefresh() {
+        refreshDashboardStats();
+    }
+    
+    // Update current filters when form is submitted
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form.method.toLowerCase() === 'get') {
+            currentFilters = {
+                country: form.querySelector('[name="country"]')?.value || '',
+                startDate: form.querySelector('[name="startDate"]')?.value || '',
+                endDate: form.querySelector('[name="endDate"]')?.value || ''
+            };
+        }
+    });
 </script>
