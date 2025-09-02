@@ -207,11 +207,12 @@ namespace ShipmentFinishGood.Controllers
         /// API endpoint for real-time dashboard updates
         /// </summary>
         [HttpGet]
-        public async Task<JsonResult> GetDashboardStats(string? country = null, DateTime? startDate = null, DateTime? endDate = null)
+        [HttpGet]
+        public async Task<JsonResult> GetDashboardStats(string? country = null, DateTime? startDate = null, DateTime? endDate = null, string? shipmentType = null)
         {
             try
             {
-                var viewModel = await BuildShippingMonitoringViewModelAsync(country, startDate, endDate);
+                var viewModel = await BuildShippingMonitoringViewModelAsync(country, startDate, endDate, shipmentType);
                 
                 return Json(new
                 {
@@ -246,11 +247,11 @@ namespace ShipmentFinishGood.Controllers
         /// SHIPPING MONITORING DASHBOARD - Real-time tracking
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Dashboard(string? country = null, DateTime? startDate = null, DateTime? endDate = null)
+        public async Task<IActionResult> Dashboard(string? country = null, DateTime? startDate = null, DateTime? endDate = null, string? shipmentType = null)
         {
             try
             {
-                var viewModel = await BuildShippingMonitoringViewModelAsync(country, startDate, endDate);
+                var viewModel = await BuildShippingMonitoringViewModelAsync(country, startDate, endDate, shipmentType);
                 return View(viewModel);
             }
             catch (Exception ex)
@@ -775,7 +776,7 @@ namespace ShipmentFinishGood.Controllers
         /// 🚀 BUILD SHIPPING MONITORING VIEW MODEL - Like PO Details Breakdown concept
         /// Smart QTY calculation using ModelConfiguration (Pallet/Box to Pieces conversion)
         /// </summary>
-        private async Task<ShippingMonitoringViewModel> BuildShippingMonitoringViewModelAsync(string? country, DateTime? startDate, DateTime? endDate)
+        private async Task<ShippingMonitoringViewModel> BuildShippingMonitoringViewModelAsync(string? country, DateTime? startDate, DateTime? endDate, string? shipmentType = null)
         {
             // Set default date range (last 30 days)
             startDate ??= DateTime.Today.AddDays(-30);
@@ -790,6 +791,11 @@ namespace ShipmentFinishGood.Controllers
             if (!string.IsNullOrEmpty(country))
             {
                 sessionsQuery = sessionsQuery.Where(s => s.POMasters.Any(p => p.Country == country));
+            }
+            
+            if (!string.IsNullOrEmpty(shipmentType))
+            {
+                sessionsQuery = sessionsQuery.Where(s => s.ShipmentType == shipmentType);
             }
             
             var sessions = await sessionsQuery.ToListAsync();
@@ -849,6 +855,7 @@ namespace ShipmentFinishGood.Controllers
                         SessionId = session.SessionId,
                         FileName = session.FileName ?? "Unknown",
                         Country = sessionCountry,
+                        ShipmentType = session.ShipmentType ?? "Unknown",
                         CreatedDate = session.UploadDate,
                         LastScanDate = scanProgress.LastScanTime,
                         
@@ -897,6 +904,14 @@ namespace ShipmentFinishGood.Controllers
                 .OrderBy(c => c)
                 .ToListAsync();
             
+            // Get available shipment types for filter
+            var availableShipmentTypes = await _context.UploadSessions
+                .Where(s => !string.IsNullOrEmpty(s.ShipmentType))
+                .Select(s => s.ShipmentType!)
+                .Distinct()
+                .OrderBy(t => t)
+                .ToListAsync();
+            
             // Calculate summary statistics
             var totalSessions = sessionDetails.Count;
             var completedSessions = sessionDetails.Count(s => s.Status == "COMPLETED");
@@ -907,6 +922,7 @@ namespace ShipmentFinishGood.Controllers
             return new ShippingMonitoringViewModel
             {
                 SelectedCountry = country,
+                SelectedShipmentType = shipmentType,
                 StartDate = startDate,
                 EndDate = endDate?.AddDays(-1), // Adjust back for display
                 
@@ -918,6 +934,7 @@ namespace ShipmentFinishGood.Controllers
                 
                 SessionDetails = sessionDetails.OrderByDescending(s => s.CreatedDate).ToList(),
                 AvailableCountries = availableCountries,
+                AvailableShipmentTypes = availableShipmentTypes,
                 
                 TotalQtyTarget = sessionDetails.Sum(s => s.TotalQtyTarget),
                 TotalQtyScanned = sessionDetails.Sum(s => s.TotalQtyScanned),

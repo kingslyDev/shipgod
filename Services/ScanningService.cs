@@ -1099,9 +1099,19 @@ namespace ShipmentFinishGood.Services
 
                 Console.WriteLine($"🔍 RECENT: BOX barcodes for session {sessionId}: {allSessionBarcodes.Count}");
 
-                // Get scanning activities in this session scope
+                // Get scanning activities for this session
+                // BOX scans: Match by barcode prefix (no AssignedArea)
+                // PALLET/PCS scans: Match by AssignedArea 
+                var sessionTag = $"Session_{sessionId}";
+                var masterBarcode = await _context.BarcodeRegistries
+                    .Where(b => b.SessionId == sessionId && b.BarcodeType == "MASTER" && b.IsActive)
+                    .Select(b => b.BarcodeValue)
+                    .FirstOrDefaultAsync();
+                
                 var scanningActivities = await _context.ScanningActivities
-                    .Where(sa => sa.Result == "SUCCESS" && sa.AssignedArea == $"Session_{sessionId}" && sa.Action != "SCAN_MASTER")
+                    .Where(sa => sa.Result == "SUCCESS" && sa.Action != "SCAN_MASTER" && 
+                                (sa.AssignedArea == sessionTag || 
+                                 (sa.Action == "SCAN_BOX" && masterBarcode != null && sa.BarcodeValue.StartsWith(masterBarcode))))
                     .ToListAsync();
 
                 // Extract pallet & pcs scans (actual only)

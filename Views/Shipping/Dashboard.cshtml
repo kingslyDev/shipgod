@@ -5,171 +5,364 @@
 }
 
 <style>
+    /* 🚀 BABY BOOMER FRIENDLY DASHBOARD - Large Text, Clear Visual Hierarchy */
     .dashboard-simple {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: 18px; /* Much larger base font for no squinting */
+        line-height: 1.6;
+        color: #333;
+        background: #fafafa; /* Soft background to reduce eye strain */
+        padding: 20px;
+        min-height: 100vh;
     }
     
     .header-simple {
-        background: #42a5f5;
+        background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);
         color: white;
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 5px;
+        padding: 30px;
+        margin-bottom: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(66, 165, 245, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .header-simple::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: linear-gradient(90deg, #4caf50, #ffeb3b, #ff9800, #f44336);
+    }
+    
+    .header-simple h3 {
+        font-size: 32px !important; /* Extra large header */
+        font-weight: 700;
+        margin: 0 0 8px 0;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .header-simple small {
+        font-size: 18px; /* Large subtitle */
+        opacity: 0.9;
+        display: block;
+        margin-top: 8px;
     }
     
     .summary-boxes {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-        margin-bottom: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive but larger boxes */
+        gap: 25px;
+        margin-bottom: 30px;
     }
     
     .summary-box {
         background: white;
-        border: 2px solid #42a5f5;
-        padding: 15px;
+        border: 3px solid #42a5f5; /* Thicker borders for better visibility */
+        padding: 25px;
         text-align: center;
-        border-radius: 5px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(66, 165, 245, 0.15);
+        transition: all 0.3s ease;
+        position: relative;
+        min-height: 120px; /* Consistent height */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    .summary-box:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(66, 165, 245, 0.25);
+        border-color: #1976d2;
     }
     
     .summary-box h4 {
-        margin: 0 0 5px 0;
+        margin: 0 0 10px 0;
         color: #42a5f5;
-        font-size: 24px;
-        font-weight: bold;
+        font-size: 36px; /* Very large numbers */
+        font-weight: 800;
+        text-shadow: 1px 1px 2px rgba(66, 165, 245, 0.1);
+        line-height: 1.2;
     }
     
     .summary-box small {
-        color: #666;
-        font-size: 12px;
+        color: #555;
+        font-size: 16px; /* Larger label text */
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .filter-box {
-        background: #f5f5f5;
-        border: 1px solid #ddd;
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 5px;
+        background: white;
+        border: 2px solid #e0e0e0;
+        padding: 25px;
+        margin-bottom: 30px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
     }
     
     .filter-row {
         display: grid;
-        grid-template-columns: 200px 150px 150px 120px;
-        gap: 15px;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
         align-items: end;
     }
     
     .filter-group label {
         display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
+        margin-bottom: 8px;
+        font-weight: 700; /* Bolder labels */
         color: #333;
+        font-size: 16px; /* Larger label text */
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .filter-group select,
     .filter-group input {
         width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 3px;
-        font-size: 14px;
+        padding: 15px; /* Much larger padding for easier clicking */
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 16px; /* Larger input text */
+        font-weight: 500;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .filter-group select:focus,
+    .filter-group input:focus {
+        border-color: #42a5f5;
+        box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.2);
+        outline: none;
     }
     
     .btn-apply {
-        background: #42a5f5;
+        background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);
         color: white;
         border: none;
-        padding: 8px 16px;
-        border-radius: 3px;
+        padding: 15px 25px; /* Larger buttons */
+        border-radius: 8px;
         cursor: pointer;
-        font-weight: bold;
+        font-weight: 700;
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(66, 165, 245, 0.3);
+        min-width: 140px;
     }
     
     .btn-apply:hover {
-        background: #1976d2;
+        background: linear-gradient(135deg, #1976d2 0%, #0d47a1 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(66, 165, 245, 0.4);
     }
     
     .btn-refresh {
-        background: #666;
+        background: linear-gradient(135deg, #666 0%, #424242 100%);
         color: white;
         border: none;
-        padding: 8px 16px;
-        border-radius: 3px;
+        padding: 15px 25px;
+        border-radius: 8px;
         cursor: pointer;
-        margin-left: 10px;
+        font-weight: 700;
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        margin-left: 15px;
+        min-width: 140px;
+        float: right;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
     
     .btn-refresh:hover {
-        background: #333;
+        background: linear-gradient(135deg, #424242 0%, #212121 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+    }
+    }
+    
+    .btn-refresh:hover {
+        background: linear-gradient(135deg, #424242 0%, #212121 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+    }
+    
+    .btn-clear {
+        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 3px 8px rgba(244, 67, 54, 0.3);
+        min-width: 180px;
+    }
+    
+    .btn-clear:hover {
+        background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 12px rgba(244, 67, 54, 0.4);
     }
     
     .table-container {
         background: white;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
     }
     
     .table-header {
-        background: #42a5f5;
+        background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);
         color: white;
-        padding: 12px;
-        font-weight: bold;
-        font-size: 16px;
+        padding: 20px 25px;
+        font-weight: 700;
+        font-size: 20px; /* Larger header text */
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        position: relative;
+    }
+    
+    .table-header::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #4caf50, #ffeb3b, #ff9800);
     }
     
     .table-simple {
         width: 100%;
         border-collapse: collapse;
-        font-size: 14px;
+        font-size: 16px; /* Larger table text */
+        line-height: 1.5;
     }
     
     .table-simple th {
-        background: #e3f2fd;
-        padding: 12px 8px;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        padding: 18px 15px; /* More padding for easier reading */
         text-align: left;
-        border: 1px solid #42a5f5;
-        font-weight: bold;
+        border: 2px solid #42a5f5;
+        font-weight: 700;
         color: #1976d2;
+        font-size: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
     
     .table-simple td {
-        padding: 12px 8px;
-        border: 1px solid #ddd;
+        padding: 20px 15px; /* Much more padding */
+        border: 1px solid #e0e0e0;
         vertical-align: top;
+        font-size: 16px;
+        line-height: 1.6;
+    }
+    
+    .table-simple tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 2px solid #f5f5f5;
     }
     
     .table-simple tbody tr:nth-child(even) {
-        background: #f9f9f9;
+        background: #fafafa;
     }
     
     .table-simple tbody tr:hover {
-        background: #e3f2fd;
+        background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+        transform: scale(1.01);
+        box-shadow: 0 4px 15px rgba(66, 165, 245, 0.2);
+        border-color: #42a5f5;
     }
     
     .country-tag {
-        background: #42a5f5;
+        background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);
         color: white;
-        padding: 3px 8px;
-        border-radius: 3px;
-        font-size: 12px;
-        font-weight: bold;
+        padding: 8px 15px; /* Larger tags */
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 8px rgba(66, 165, 245, 0.3);
+        display: inline-block;
+    }
+    
+    .shipment-tag {
+        color: white;
+        padding: 8px 12px;
+        border-radius: 18px;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        display: inline-block;
+        text-align: center;
+        min-width: 80px;
+    }
+    
+    .shipment-tag.loose {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    }
+    
+    .shipment-tag.pallet {
+        background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+    }
+    
+    .shipment-tag.unknown {
+        background: linear-gradient(135deg, #9e9e9e 0%, #616161 100%);
     }
     
     .progress-simple {
         background: #f0f0f0;
-        height: 18px;
-        border-radius: 3px;
+        height: 25px; /* Taller progress bars */
+        border-radius: 15px;
         position: relative;
-        border: 1px solid #ddd;
+        border: 2px solid #e0e0e0;
+        overflow: hidden;
+        margin-bottom: 8px;
     }
     
     .progress-fill {
-        background: #42a5f5;
+        background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);
         height: 100%;
-        border-radius: 2px;
-        transition: width 0.3s ease;
+        border-radius: 13px;
+        transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .progress-fill::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        animation: progressShine 2s infinite;
+    }
+    
+    @@keyframes progressShine {
+        0% { left: -100%; }
+        100% { left: 100%; }
     }
     
     .progress-text {
@@ -177,82 +370,308 @@
         top: 0;
         left: 50%;
         transform: translateX(-50%);
-        font-size: 12px;
-        line-height: 18px;
-        font-weight: bold;
+        font-size: 14px; /* Larger progress text */
+        line-height: 25px;
+        font-weight: 700;
         color: #333;
+        text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        z-index: 5;
     }
     
     .total-row {
-        background: #e3f2fd;
-        font-weight: bold;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        font-weight: 700;
         color: #1976d2;
+        border-top: 3px solid #42a5f5 !important;
+    }
+    
+    .total-row th {
+        font-size: 18px; /* Larger total row text */
+        padding: 25px 15px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
     
     .file-info {
-        line-height: 1.4;
+        line-height: 1.6;
     }
     
     .file-name {
-        font-weight: bold;
+        font-weight: 700;
         color: #333;
-        margin-bottom: 3px;
+        margin-bottom: 8px;
+        font-size: 17px; /* Larger file names */
     }
     
     .file-date {
         color: #666;
-        font-size: 12px;
+        font-size: 14px; /* Larger date text */
+        font-weight: 500;
+        margin-bottom: 4px;
     }
     
     .qty-number {
-        font-weight: bold;
-        font-size: 15px;
+        font-weight: 800;
+        font-size: 18px; /* Much larger numbers */
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     }
     
     .qty-scanned {
         color: #4caf50;
+        background: rgba(76, 175, 80, 0.1);
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid rgba(76, 175, 80, 0.3);
     }
     
     .qty-remaining {
         color: #ff9800;
+        background: rgba(255, 152, 0, 0.1);
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 152, 0, 0.3);
     }
     
     .no-data {
         text-align: center;
-        padding: 40px;
+        padding: 60px 40px;
         color: #666;
         font-style: italic;
+        font-size: 18px;
+        line-height: 1.8;
     }
     
-    /* Simple responsive */
-    @@media (max-width: 768px) {
+    .no-data h4 {
+        font-size: 24px;
+        color: #42a5f5;
+        margin-bottom: 15px;
+        font-weight: 700;
+    }
+    
+    /* Status Indicators - Clear Visual Feedback */
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+    }
+    
+    .status-active { background: #4caf50; }
+    .status-warning { background: #ff9800; }
+    .status-error { background: #f44336; }
+    
+    @@keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
+    /* Error/Success Messages - Plain English */
+    .message-box {
+        background: white;
+        border-left: 5px solid #42a5f5;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        font-size: 16px;
+        line-height: 1.6;
+    }
+    
+    .message-success { border-left-color: #4caf50; background: #f8fff8; }
+    .message-error { border-left-color: #f44336; background: #fff8f8; }
+    .message-warning { border-left-color: #ff9800; background: #fffaf0; }
+    
+    /* Reduced Cognitive Load - Clear Information Hierarchy */
+    .info-section {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    .info-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #42a5f5;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .info-content {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #555;
+    }
+    
+    /* Baby Boomer Responsive - Maintain Large Text on All Devices */
+    @@media (max-width: 1024px) {
+        .dashboard-simple {
+            padding: 15px;
+            font-size: 17px; /* Keep large text on tablets */
+        }
+        
+        .header-simple h3 {
+            font-size: 28px !important;
+        }
+        
         .summary-boxes {
             grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .summary-box h4 {
+            font-size: 32px; /* Still large on tablets */
         }
         
         .filter-row {
             grid-template-columns: 1fr;
-            gap: 10px;
+            gap: 15px;
+        }
+        
+        .btn-refresh {
+            float: none;
+            margin: 15px 0 0 0;
+            width: 100%;
+        }
+    }
+    
+    @@media (max-width: 768px) {
+        .dashboard-simple {
+            font-size: 16px; /* Still larger than typical mobile */
+        }
+        
+        .header-simple {
+            padding: 20px;
+        }
+        
+        .header-simple h3 {
+            font-size: 24px !important;
+        }
+        
+        .summary-boxes {
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        
+        .summary-box {
+            padding: 20px;
+            min-height: 100px;
+        }
+        
+        .summary-box h4 {
+            font-size: 28px; /* Large numbers even on mobile */
+        }
+        
+        .summary-box small {
+            font-size: 15px; /* Readable labels on mobile */
         }
         
         .table-simple {
-            font-size: 12px;
+            font-size: 15px; /* Larger than typical mobile tables */
         }
         
         .table-simple th,
         .table-simple td {
-            padding: 8px 4px;
+            padding: 15px 8px; /* More padding than typical */
+        }
+        
+        .qty-number {
+            font-size: 16px; /* Keep numbers large on mobile */
+        }
+        
+        .country-tag {
+            font-size: 13px; /* Readable tags on mobile */
+            padding: 6px 12px;
+        }
+        
+        .progress-simple {
+            height: 22px; /* Taller progress bars on mobile */
+        }
+        
+        .progress-text {
+            font-size: 13px;
+            line-height: 22px;
+        }
+        
+        .file-name {
+            font-size: 16px; /* Large file names on mobile */
+        }
+        
+        .file-date {
+            font-size: 13px; /* Readable dates on mobile */
+        }
+    }
+    
+    /* Focus States for Better Accessibility */
+    button:focus,
+    input:focus,
+    select:focus {
+        outline: 3px solid #42a5f5;
+        outline-offset: 2px;
+    }
+    
+    /* High Contrast Mode Support */
+    @@media (prefers-contrast: high) {
+        .dashboard-simple {
+            background: white;
+        }
+        
+        .summary-box {
+            border-width: 4px;
+        }
+        
+        .table-simple th {
+            background: #000;
+            color: #fff;
+        }
+        
+        .progress-fill {
+            background: #000;
+        }
+    }
+    
+    /* Reduced Motion for Those Who Prefer It */
+    @@media (prefers-reduced-motion: reduce) {
+        * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+        
+        .progress-fill::after {
+            animation: none;
         }
     }
 </style>
 
 <div class="dashboard-simple">
+    <!-- Status Message Box -->
+    <div id="statusMessage" class="message-box" style="display: none;">
+        <div id="statusText"></div>
+    </div>
+    
     <div class="header-simple">
-        <h3 style="margin: 0;">📊 Shipping Monitoring Dashboard</h3>
-        <small>Real-time tracking with ModelConfig conversion</small>
-        <button class="btn-refresh" onclick="manualRefresh()" style="float: right;">
-            🔄 Refresh
+        <div class="status-indicator status-active"></div>
+        <h3 style="margin: 0; display: inline-block;">📊 Shipping Monitoring Dashboard</h3>
+        <small>Real-time tracking with ModelConfig conversion - Always up to date</small>
+        <button class="btn-refresh" onclick="manualRefresh()" id="refreshButton">
+            🔄 Refresh Now
         </button>
+    </div>
+    
+    <!-- Summary Information Section -->
+    <div class="info-section">
+        <div class="info-title">📋 Current Status Overview</div>
+        <div class="info-content">
+            Showing shipping progress for all files. Numbers update automatically every 15 seconds.
+            <br><strong>Last Updated:</strong> <span id="lastUpdateTime">@DateTime.Now.ToString("HH:mm:ss")</span>
+        </div>
     </div>
     
     <!-- Summary Boxes -->
@@ -276,30 +695,71 @@
     </div>
 
     <!-- Filter -->
-    <form method="get" class="filter-box">
+    <form method="get" action="/Shipping/Dashboard" class="filter-box" id="filterForm">
         <div class="filter-row">
             <div class="filter-group">
                 <label>Country Filter:</label>
-                <select name="country">
-                    <option value="">All Countries</option>
+                <select name="country" id="countryFilter">
+                    <option value="">🌍 All Countries</option>
                     @foreach (var country in Model.AvailableCountries)
                     {
-                        <option value="@country" selected="@(country == Model.SelectedCountry)">@country</option>
+                        if (country == Model.SelectedCountry)
+                        {
+                            <option value="@country" selected>🏳️ @country</option>
+                        }
+                        else
+                        {
+                            <option value="@country">🏳️ @country</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Shipment Type:</label>
+                <select name="shipmentType" id="shipmentTypeFilter">
+                    <option value="">📦 All Types</option>
+                    @foreach (var type in Model.AvailableShipmentTypes)
+                    {
+                        if (type == Model.SelectedShipmentType)
+                        {
+                            <option value="@type" selected>
+                                @if (type == "LOOSE") { <text>📦 LOOSE (No Pallet)</text> }
+                                else if (type == "PALLET") { <text>🚛 PALLET (With Pallet)</text> }
+                                else { <text>📋 @type</text> }
+                            </option>
+                        }
+                        else
+                        {
+                            <option value="@type">
+                                @if (type == "LOOSE") { <text>📦 LOOSE (No Pallet)</text> }
+                                else if (type == "PALLET") { <text>🚛 PALLET (With Pallet)</text> }
+                                else { <text>📋 @type</text> }
+                            </option>
+                        }
                     }
                 </select>
             </div>
             <div class="filter-group">
                 <label>Start Date:</label>
-                <input type="date" name="startDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")">
+                <input type="date" name="startDate" id="startDateFilter" value="@Model.StartDate?.ToString("yyyy-MM-dd")">
             </div>
             <div class="filter-group">
                 <label>End Date:</label>
-                <input type="date" name="endDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")">
+                <input type="date" name="endDate" id="endDateFilter" value="@Model.EndDate?.ToString("yyyy-MM-dd")">
             </div>
             <div class="filter-group">
                 <label>&nbsp;</label>
-                <button type="submit" class="btn-apply">Apply Filter</button>
+                <button type="submit" class="btn-apply" id="applyFilterBtn">
+                    🔍 Apply Filter
+                </button>
             </div>
+        </div>
+        
+        <!-- Clear Filter Button -->
+        <div style="margin-top: 15px; text-align: center;">
+            <button type="button" class="btn-clear" onclick="clearAllFilters()" id="clearFilterBtn">
+                🗑️ Clear All Filters
+            </button>
         </div>
     </form>
 
@@ -308,17 +768,19 @@
     {
         <div class="table-container">
             <div class="table-header">
-                📋 File Details (@Model.SessionDetails.Count files found)
+                <div class="status-indicator status-active"></div>
+                📋 File Details (@Model.SessionDetails.Count files found) - Live Data
             </div>
             <table class="table-simple">
                 <thead>
                     <tr>
-                        <th style="width: 25%;">File Name</th>
-                        <th style="width: 12%;">Country</th>
-                        <th style="width: 12%;">Total QTY</th>
-                        <th style="width: 12%;">Scanned QTY</th>
-                        <th style="width: 12%;">Remaining QTY</th>
-                        <th style="width: 27%;">Progress</th>
+                        <th style="width: 20%;">File Name</th>
+                        <th style="width: 10%;">Country</th>
+                        <th style="width: 12%;">Shipment Type</th>
+                        <th style="width: 10%;">Total QTY</th>
+                        <th style="width: 10%;">Scanned QTY</th>
+                        <th style="width: 10%;">Remaining QTY</th>
+                        <th style="width: 28%;">Progress</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -337,6 +799,22 @@
                             </td>
                             <td>
                                 <span class="country-tag">@session.Country</span>
+                            </td>
+                            <td>
+                                @if (session.ShipmentType == "LOOSE")
+                                {
+                                    <span class="shipment-tag loose">📦 LOOSE</span>
+                                    <small style="display: block; color: #666; margin-top: 3px;">No Pallet</small>
+                                }
+                                else if (session.ShipmentType == "PALLET")
+                                {
+                                    <span class="shipment-tag pallet">🚛 PALLET</span>
+                                    <small style="display: block; color: #666; margin-top: 3px;">With Pallet</small>
+                                }
+                                else
+                                {
+                                    <span class="shipment-tag unknown">📋 @session.ShipmentType</span>
+                                }
                             </td>
                             <td>
                                 <span class="qty-number">@session.TotalQtyTarget.ToString("N0")</span>
@@ -361,7 +839,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <th colspan="2">📊 TOTAL SUMMARY:</th>
+                        <th colspan="3">📊 TOTAL SUMMARY:</th>
                         <th>@Model.TotalQtyTarget.ToString("N0")</th>
                         <th>@Model.TotalQtyScanned.ToString("N0")</th>
                         <th>@Model.TotalQtyRemaining.ToString("N0")</th>
@@ -396,6 +874,7 @@
     let refreshInterval;
     let currentFilters = {
         country: '@Model.SelectedCountry',
+        shipmentType: '@Model.SelectedShipmentType',
         startDate: '@Model.StartDate?.ToString("yyyy-MM-dd")',
         endDate: '@Model.EndDate?.ToString("yyyy-MM-dd")'
     };
@@ -418,15 +897,19 @@
     
     // Manual refresh function
     function refreshDashboardStats() {
-        const refreshBtn = document.querySelector('.btn-refresh');
+        const refreshBtn = document.getElementById('refreshButton');
         if (refreshBtn) {
-            refreshBtn.innerHTML = '🔄 Refreshing...';
+            refreshBtn.innerHTML = '🔄 Updating...';
             refreshBtn.disabled = true;
         }
+        
+        // Show loading message
+        showStatusMessage('Updating dashboard with latest data...', 'info');
         
         // Build query parameters
         const params = new URLSearchParams();
         if (currentFilters.country) params.append('country', currentFilters.country);
+        if (currentFilters.shipmentType) params.append('shipmentType', currentFilters.shipmentType);
         if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
         if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
         
@@ -435,18 +918,18 @@
             .then(data => {
                 if (data.success) {
                     updateDashboardUI(data);
-                    showUpdateNotification('Dashboard updated successfully!', 'success');
+                    showStatusMessage('Dashboard updated successfully! All data is now current.', 'success');
                 } else {
-                    showUpdateNotification('Failed to update dashboard: ' + data.error, 'error');
+                    showStatusMessage('Unable to update dashboard: ' + data.error, 'error');
                 }
             })
             .catch(error => {
                 console.error('Dashboard refresh error:', error);
-                showUpdateNotification('Network error during refresh', 'error');
+                showStatusMessage('Connection problem - please check your internet and try again.', 'error');
             })
             .finally(() => {
                 if (refreshBtn) {
-                    refreshBtn.innerHTML = '🔄 Refresh';
+                    refreshBtn.innerHTML = '🔄 Refresh Now';
                     refreshBtn.disabled = false;
                 }
             });
@@ -574,41 +1057,53 @@
     }
     
     function updateLastUpdatedTime(timestamp) {
+        // Update main info section
+        const lastUpdateSpan = document.getElementById('lastUpdateTime');
+        if (lastUpdateSpan) {
+            lastUpdateSpan.textContent = timestamp;
+        }
+        
+        // Update floating indicator
         let updateInfo = document.querySelector('.last-updated-info');
         if (!updateInfo) {
             updateInfo = document.createElement('small');
             updateInfo.className = 'last-updated-info';
-            updateInfo.style.cssText = 'position: fixed; bottom: 10px; right: 10px; background: #42a5f5; color: white; padding: 5px 10px; border-radius: 3px; font-size: 11px; z-index: 1000;';
+            updateInfo.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #42a5f5; color: white; padding: 10px 15px; border-radius: 8px; font-size: 14px; z-index: 1000; box-shadow: 0 4px 12px rgba(66, 165, 245, 0.3);';
             document.body.appendChild(updateInfo);
         }
-        updateInfo.textContent = `Last updated: ${timestamp}`;
+        updateInfo.textContent = `✅ Updated: ${timestamp}`;
         
-        // Fade out after 3 seconds
+        // Fade out after 4 seconds
         setTimeout(() => {
-            updateInfo.style.opacity = '0.7';
-        }, 3000);
+            updateInfo.style.opacity = '0.8';
+        }, 4000);
+    }
+    
+    function showStatusMessage(message, type) {
+        const statusBox = document.getElementById('statusMessage');
+        const statusText = document.getElementById('statusText');
+        
+        if (statusBox && statusText) {
+            statusText.textContent = message;
+            statusBox.className = `message-box message-${type}`;
+            statusBox.style.display = 'block';
+            
+            // Add icon based on type
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+            statusText.textContent = `${icon} ${message}`;
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    statusBox.style.display = 'none';
+                }, 5000);
+            }
+        }
     }
     
     function showUpdateNotification(message, type) {
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed; 
-            top: 20px; 
-            right: 20px; 
-            background: ${type === 'success' ? '#4caf50' : '#f44336'}; 
-            color: white; 
-            padding: 10px 15px; 
-            border-radius: 5px; 
-            font-size: 14px; 
-            z-index: 1001;
-            animation: slideIn 0.3s ease-out;
-        `;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
+        // Use the new status message system
+        showStatusMessage(message, type);
     }
     
     // Add CSS animation for notifications
@@ -624,6 +1119,10 @@
     // Initialize auto-refresh when page loads
     document.addEventListener('DOMContentLoaded', function() {
         console.log('🚀 Shipping Dashboard Real-time Updates Initialized');
+        
+        // Show welcome message
+        showStatusMessage('Dashboard loaded successfully! Data will update automatically every 15 seconds.', 'success');
+        
         startAutoRefresh();
         
         // Stop auto-refresh when user leaves the page
@@ -635,15 +1134,157 @@
         document.addEventListener('visibilitychange', function() {
             if (document.hidden) {
                 stopAutoRefresh();
+                showStatusMessage('Dashboard paused - will resume when you return to this tab.', 'info');
             } else {
                 startAutoRefresh();
+                showStatusMessage('Dashboard resumed - now updating automatically.', 'success');
             }
         });
+        
+        // Add keyboard shortcuts for accessibility
+        document.addEventListener('keydown', function(e) {
+            // R key for refresh
+            if (e.key === 'r' || e.key === 'R') {
+                if (e.ctrlKey || e.metaKey) return; // Don't interfere with browser refresh
+                e.preventDefault();
+                manualRefresh();
+                showStatusMessage('Manual refresh triggered by keyboard shortcut.', 'info');
+            }
+            
+            // C key for clear filters
+            if (e.key === 'c' || e.key === 'C') {
+                if (e.ctrlKey || e.metaKey) return; // Don't interfere with copy
+                if (e.altKey) {
+                    e.preventDefault();
+                    clearAllFilters();
+                }
+            }
+        });
+        
+        // Add form submission handler
+        const filterForm = document.getElementById('filterForm');
+        if (filterForm) {
+            filterForm.addEventListener('submit', function(e) {
+                if (!validateFilterDates()) {
+                    e.preventDefault();
+                    return false;
+                }
+                return handleFilterSubmission(e);
+            });
+        }
+        
+        // Add real-time filter change detection
+        const countryFilter = document.getElementById('countryFilter');
+        const shipmentTypeFilter = document.getElementById('shipmentTypeFilter');
+        const startDateFilter = document.getElementById('startDateFilter');
+        const endDateFilter = document.getElementById('endDateFilter');
+        
+        if (countryFilter) {
+            countryFilter.addEventListener('change', function() {
+                const selectedCountry = this.value;
+                if (selectedCountry) {
+                    showStatusMessage(`Country filter changed to: ${selectedCountry}. Click "Apply Filter" to update the data.`, 'info');
+                } else {
+                    showStatusMessage('Country filter cleared. Click "Apply Filter" to show all countries.', 'info');
+                }
+            });
+        }
+        
+        if (shipmentTypeFilter) {
+            shipmentTypeFilter.addEventListener('change', function() {
+                const selectedType = this.value;
+                if (selectedType) {
+                    const typeName = selectedType === 'LOOSE' ? 'LOOSE (No Pallet)' : 
+                                    selectedType === 'PALLET' ? 'PALLET (With Pallet)' : selectedType;
+                    showStatusMessage(`Shipment type filter changed to: ${typeName}. Click "Apply Filter" to update the data.`, 'info');
+                } else {
+                    showStatusMessage('Shipment type filter cleared. Click "Apply Filter" to show all types.', 'info');
+                }
+            });
+        }
+        
+        if (startDateFilter) {
+            startDateFilter.addEventListener('change', function() {
+                if (this.value) {
+                    showStatusMessage(`Start date set to: ${this.value}. Click "Apply Filter" to update the data.`, 'info');
+                }
+                validateFilterDates();
+            });
+        }
+        
+        if (endDateFilter) {
+            endDateFilter.addEventListener('change', function() {
+                if (this.value) {
+                    showStatusMessage(`End date set to: ${this.value}. Click "Apply Filter" to update the data.`, 'info');
+                }
+                validateFilterDates();
+            });
+        }
     });
     
     // Manual refresh button click
     function manualRefresh() {
         refreshDashboardStats();
+    }
+    
+    // Clear all filters function
+    function clearAllFilters() {
+        document.getElementById('countryFilter').value = '';
+        document.getElementById('shipmentTypeFilter').value = '';
+        document.getElementById('startDateFilter').value = '';
+        document.getElementById('endDateFilter').value = '';
+        
+        // Update current filters
+        currentFilters = {
+            country: '',
+            shipmentType: '',
+            startDate: '',
+            endDate: ''
+        };
+        
+        // Show message
+        showStatusMessage('All filters cleared. Showing data for all countries, types, and dates.', 'info');
+        
+        // Submit form to refresh with no filters
+        document.getElementById('filterForm').submit();
+    }
+    
+    // Enhanced form submission handler
+    function handleFilterSubmission(event) {
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        // Update current filters from form
+        currentFilters = {
+            country: formData.get('country') || '',
+            shipmentType: formData.get('shipmentType') || '',
+            startDate: formData.get('startDate') || '',
+            endDate: formData.get('endDate') || ''
+        };
+        
+        // Show loading message
+        showStatusMessage('Applying filters... Please wait while we update the data.', 'info');
+        
+        // Disable apply button during submission
+        const applyBtn = document.getElementById('applyFilterBtn');
+        if (applyBtn) {
+            applyBtn.disabled = true;
+            applyBtn.innerHTML = '⏳ Applying...';
+        }
+        
+        return true; // Allow form submission to continue
+    }
+    
+    // Filter validation
+    function validateFilterDates() {
+        const startDate = document.getElementById('startDateFilter').value;
+        const endDate = document.getElementById('endDateFilter').value;
+        
+        if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+            showStatusMessage('Start date cannot be later than end date. Please check your date selection.', 'error');
+            return false;
+        }
+        return true;
     }
     
     // Update current filters when form is submitted

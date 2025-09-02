@@ -6,6 +6,7 @@ namespace ShipmentFinishGood.ViewModels
     {
         // Filter parameters
         public string? SelectedCountry { get; set; }
+        public string? SelectedShipmentType { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         
@@ -21,6 +22,7 @@ namespace ShipmentFinishGood.ViewModels
         
         // Filter options
         public List<string> AvailableCountries { get; set; } = new();
+        public List<string> AvailableShipmentTypes { get; set; } = new();
         
         // Additional metrics
         public int TotalQtyScanned { get; set; }
@@ -36,6 +38,7 @@ namespace ShipmentFinishGood.ViewModels
         public int SessionId { get; set; }
         public string FileName { get; set; } = string.Empty;
         public string Country { get; set; } = string.Empty;
+        public string ShipmentType { get; set; } = string.Empty;
         public DateTime CreatedDate { get; set; }
         public DateTime? LastScanDate { get; set; }
         
