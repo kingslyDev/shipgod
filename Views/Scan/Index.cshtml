@@ -6,6 +6,145 @@
 <link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/recent-scans.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/scanner-card.css" asp-append-version="true" />
+<style>
+/* PO Selection Dialog Styles */
+.po-selection-dialog {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.po-selection-header h5 {
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.po-selection-list {
+    max-height: 400px;
+    overflow-y: auto;
+    margin: 1rem 0;
+}
+
+.po-option {
+    display: flex;
+    align-items: center;
+    justify-content: between;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.po-option:hover:not(.completed) {
+    border-color: #007bff;
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,123,255,0.1);
+}
+
+.po-option.completed {
+    background: #f8f9fa;
+    border-color: #28a745;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.po-info {
+    flex: 1;
+}
+
+.po-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.po-main strong {
+    color: #333;
+    font-size: 1.1em;
+}
+
+.po-model {
+    color: #666;
+    font-size: 0.9em;
+    background: #e9ecef;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.po-details {
+    display: flex;
+    gap: 15px;
+    font-size: 0.85em;
+    color: #666;
+}
+
+.po-qty::before {
+    content: "📦 ";
+}
+
+.po-progress::before {
+    content: "📊 ";
+}
+
+.po-status {
+    font-size: 1.2em;
+}
+
+.po-selection-actions {
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Enhanced lock status indicator */
+#lockStatusIndicator {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#lockStatusIndicator .btn {
+    font-size: 0.75em;
+    padding: 2px 8px;
+}
+
+/* PO Lock Section Styles */
+.po-lock-group {
+    border-left: 3px solid #007bff;
+    padding-left: 10px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.po-dropdown {
+    border-color: #007bff;
+}
+
+.po-dropdown:focus {
+    border-color: #0056b3;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.po-info-mini {
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 5px;
+    padding: 5px 8px;
+    background: rgba(0, 123, 255, 0.1);
+    border-radius: 4px;
+}
+
+.po-info-mini strong {
+    color: #0056b3;
+}
+</style>
 }
 
 <div class="container py-4">
@@ -135,6 +274,29 @@
                         </div>
                     </div>
                     
+                    <!-- Quick PO Lock - Shows when session is locked -->
+                    <div class="col-xl-3 col-lg-3 col-md-5 mb-3" id="poLockSection" style="display: none;">
+                        <div class="session-selector-group po-lock-group">
+                            <label class="form-label session-label d-none d-lg-flex">
+                                <i class="fas fa-boxes me-1"></i>Quick PO Lock
+                            </label>
+                            <div class="input-group session-input-group">
+                                <select class="form-select po-dropdown" id="poSelect" onchange="onQuickPOChange()">
+                                    <option value="">-- Select PO --</option>
+                                </select>
+                                <button class="btn btn-outline-primary session-lock-btn" type="button" onclick="quickLockPO()" id="quickPOLockBtn" disabled title="Lock to selected PO">
+                                    <i class="fas fa-lock"></i>
+                                </button>
+                                <button class="btn btn-outline-warning session-lock-btn" type="button" onclick="quickUnlockPO()" id="quickPOUnlockBtn" style="display: none;" title="Unlock current PO">
+                                    <i class="fas fa-unlock"></i>
+                                </button>
+                            </div>
+                            <div class="po-info-mini" id="poInfoMini" style="display: none;">
+                                <!-- PO info will be displayed here -->
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Status Panel - Enhanced for tablet -->
                     <div class="col-xl-5 col-lg-4 col-md-7 mb-3">
                         <div id="scanStatus" class="scanner-status-panel tablet-enhanced" role="status" aria-live="polite">
@@ -163,6 +325,25 @@
     <!-- Recent Scans Container - Shows when locked to session -->
     <div id="recent-scans-container" class="recent-scans-container" style="display: none;">
         <!-- Content will be populated by JavaScript -->
+    </div>
+
+    <!-- PO Lock Container - Shows after Master QR scanned -->
+    <div id="po-lock-container" class="po-lock-container" style="display: none;">
+        <div class="card shadow-sm">
+            <div class="card-header bg-gradient-info text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lock me-2"></i>PO Lock Selection
+                    </h6>
+                    <button class="btn btn-outline-light btn-sm" onclick="skipPOLock()" title="Skip PO lock and scan all">
+                        <i class="fas fa-forward me-1"></i>Skip
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" id="po-lock-content">
+                <!-- PO selection will be populated here -->
+            </div>
+        </div>
     </div>
 
     @if (Model?.Any() == true)
@@ -208,6 +389,11 @@
         let signalRConnection = null; // SignalR connection
         let currentSessionGroup = null; // Track current session group
         let recentScansManager = null; // Recent scans manager
+
+        // NEW: PO Lock variables
+        let currentPOLock = null; // Current PO lock info
+        let availablePOs = []; // Available POs for current session
+        let poLockMode = true; // Whether PO lock is enabled (now default true for hierarchical locking)
 
         // Session Lock Control Functions - Simplified
         function populateSessionDropdown() {
@@ -286,14 +472,24 @@
             // Use existing lock mechanism
             lockToSession(selectedSession);
             
+            // After session lock, automatically show PO selection
+            setTimeout(() => {
+                showPOSelectionForQuickLock(selectedSession);
+            }, 1000);
+            
             // Update UI
             onQuickSessionChange();
             updateLockStatusIndicator();
             
-            provideFeedback('success', 'Session locked successfully!');
+            provideFeedback('success', 'Session locked successfully! Please select a PO...');
         }
 
         function quickUnlockSession() {
+            // First unlock from PO if locked
+            if (currentPOLock) {
+                unlockFromPO();
+            }
+            
             // Use existing unlock mechanism
             unlockFromSession();
             
@@ -306,7 +502,102 @@
             // Refresh dropdown
             populateSessionDropdown();
             
-            provideFeedback('info', 'Session unlocked');
+            // Clear PO related variables
+            currentPOLock = null;
+            availablePOs = [];
+            poLockMode = false;
+            
+            provideFeedback('info', 'Session and PO unlocked');
+        }
+        
+        // PO Lock Functions
+        function onQuickPOChange() {
+            const select = document.getElementById('poSelect');
+            const lockBtn = document.getElementById('quickPOLockBtn');
+            const unlockBtn = document.getElementById('quickPOUnlockBtn');
+            const infoMini = document.getElementById('poInfoMini');
+            
+            if (select.value) {
+                lockBtn.disabled = false;
+                const selectedPOId = parseInt(select.value);
+                const po = availablePOs.find(p => p.poId === selectedPOId);
+                
+                if (po) {
+                    const progress = po.qtyBox > 0 ? po.scannedBoxes / po.qtyBox * 100 : 0;
+                    infoMini.innerHTML = `<strong>${po.noPO}</strong> - ${po.model} | ${po.scannedBoxes}/${po.qtyBox} boxes (${Math.round(progress)}%)`;
+                    infoMini.style.display = 'block';
+                }
+            } else {
+                lockBtn.disabled = true;
+                infoMini.style.display = 'none';
+            }
+        }
+
+        function quickLockPO() {
+            const select = document.getElementById('poSelect');
+            const selectedPOId = parseInt(select.value);
+
+            if (!selectedPOId) {
+                provideFeedback('warning', 'Please select a PO first');
+                return;
+            }
+
+            // Use existing PO lock mechanism
+            selectPOForLock(selectedPOId, currentSessionGroup);
+            
+            provideFeedback('success', 'PO locked successfully!');
+        }
+
+        function quickUnlockPO() {
+            // Use existing unlock mechanism
+            unlockFromPO();
+            
+            // Update dropdown
+            const select = document.getElementById('poSelect');
+            select.value = '';
+            onQuickPOChange();
+            
+            provideFeedback('info', 'PO unlocked');
+        }
+        
+        function populatePODropdown() {
+            const select = document.getElementById('poSelect');
+            const poSection = document.getElementById('poLockSection');
+            
+            if (!currentUserLock || !availablePOs || availablePOs.length === 0) {
+                poSection.style.display = 'none';
+                return;
+            }
+            
+            // Show PO section when session is locked
+            poSection.style.display = 'block';
+            
+            // Clear existing options
+            select.innerHTML = '<option value="">-- Select PO --</option>';
+            
+            // Add PO options
+            availablePOs.forEach(po => {
+                const progress = po.qtyBox > 0 ? po.scannedBoxes / po.qtyBox * 100 : 0;
+                const isCompleted = progress >= 100;
+                const option = document.createElement('option');
+                option.value = po.poId;
+                option.textContent = `${po.noPO} - ${po.model} (${Math.round(progress)}%)${isCompleted ? ' ✓' : ''}`;
+                option.disabled = isCompleted;
+                select.appendChild(option);
+            });
+            
+            // If there's a current PO lock, select it
+            if (currentPOLock) {
+                select.value = currentPOLock.poId;
+                onQuickPOChange();
+                
+                // Show unlock button
+                document.getElementById('quickPOLockBtn').style.display = 'none';
+                document.getElementById('quickPOUnlockBtn').style.display = 'inline-block';
+            } else {
+                document.getElementById('quickPOLockBtn').style.display = 'inline-block';
+                document.getElementById('quickPOUnlockBtn').style.display = 'none';
+            }
         }
 
         function updateLockStatusIndicator() {
@@ -328,6 +619,319 @@
             } else {
                 indicator.textContent = 'Scan QR Identity to begin';
             }
+        }
+
+        // NEW: PO Lock Functions for Quick Lock Integration
+        function showPOSelectionForQuickLock(qrIdentity) {
+            const session = activeSessions.find(s => s.qrIdentity === qrIdentity);
+            if (!session) {
+                console.log('Session not found for PO selection');
+                return;
+            }
+
+            // Get available POs for this session
+            $.ajax({
+                url: '@Url.Action("GetAvailablePOs", "Scan")',
+                type: 'GET',
+                data: { sessionId: session.sessionId },
+                success: function(response) {
+                    if (response.success) {
+                        availablePOs = response.data.availablePOs;
+                        currentPOLock = response.data.currentLock;
+                        
+                        // Populate PO dropdown
+                        populatePODropdown();
+                        
+                        if (currentPOLock) {
+                            // User already has PO lock
+                            updateUIForPOLock();
+                            showAlert(`You are already locked to PO: ${currentPOLock.noPO}`, 'info');
+                        } else if (availablePOs.length > 0) {
+                            // Show PO selection dialog
+                            showPOSelectionDialog(session.sessionId);
+                        } else {
+                            showAlert('No POs available for selection in this session', 'warning');
+                        }
+                    } else {
+                        showAlert('Error loading POs: ' + response.message, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Error connecting to server for PO data', 'danger');
+                }
+            });
+        }
+
+        function showPOSelectionDialog(sessionId) {
+            let dialogHtml = `
+                <div class="po-selection-dialog">
+                    <div class="po-selection-header">
+                        <h5><i class="fas fa-list-ul me-2"></i>Select PO to Lock</h5>
+                        <p class="text-muted">Choose which PO you want to focus on for scanning:</p>
+                    </div>
+                    <div class="po-selection-list">
+            `;
+
+            availablePOs.forEach(po => {
+                const progress = po.qtyBox > 0 ? (po.scannedBoxes || 0) / po.qtyBox * 100 : 0;
+                const isCompleted = progress >= 100;
+                
+                dialogHtml += `
+                    <div class="po-option ${isCompleted ? 'completed' : ''}" 
+                         data-po-id="${po.poId}" 
+                         onclick="${isCompleted ? '' : `selectPOForLock(${po.poId}, ${sessionId})`}">
+                        <div class="po-info">
+                            <div class="po-main">
+                                <strong>${po.noPO}</strong>
+                                <span class="po-model">${po.modelProduk}</span>
+                            </div>
+                            <div class="po-details">
+                                <span class="po-qty">${po.qtyBox} boxes</span>
+                                <span class="po-progress">${Math.round(progress)}%</span>
+                            </div>
+                        </div>
+                        <div class="po-status">
+                            ${isCompleted ? 
+                                '<i class="fas fa-check-circle text-success"></i>' : 
+                                '<i class="fas fa-box text-primary"></i>'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            dialogHtml += `
+                    </div>
+                    <div class="po-selection-actions">
+                        <button class="btn btn-secondary" onclick="closePOSelectionDialog()">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Show in a modal or inline
+            showAlert(dialogHtml, 'info', 0); // 0 = don't auto-dismiss
+        }
+
+        function selectPOForLock(poId, sessionId) {
+            $.ajax({
+                url: '@Url.Action("LockToPO", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: sessionId,
+                    poId: poId
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        currentPOLock = response.data;
+                        poLockMode = true;
+                        
+                        // Update UI
+                        updateUIForPOLock();
+                        closePOSelectionDialog();
+                        
+                        // Update PO dropdown
+                        populatePODropdown();
+                        
+                        // Update Recent Scans to show only this PO
+                        if (recentScansManager) {
+                            recentScansManager.filterByPO(poId);
+                        }
+                        
+                        showAlert(`✅ Successfully locked to PO: ${currentPOLock.noPO}`, 'success');
+                    } else {
+                        showAlert(`❌ Failed to lock to PO: ${response.message}`, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Error locking to PO. Please try again.', 'danger');
+                }
+            });
+        }
+
+        function unlockFromPO() {
+            if (!currentPOLock) return;
+
+            $.ajax({
+                url: '@Url.Action("UnlockFromPO", "Scan")',
+                type: 'POST',
+                data: {
+                    sessionId: currentPOLock.sessionId
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        currentPOLock = null;
+                        poLockMode = false;
+                        
+                        // Update UI
+                        updateUIForPOLock();
+                        
+                        // Update PO dropdown
+                        populatePODropdown();
+                        
+                        // Update Recent Scans to show all items
+                        if (recentScansManager) {
+                            recentScansManager.clearPOFilter();
+                        }
+                        
+                        showAlert('✅ Unlocked from PO', 'success');
+                    } else {
+                        showAlert(`❌ Failed to unlock from PO: ${response.message}`, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Error unlocking from PO. Please try again.', 'danger');
+                }
+            });
+        }
+
+        function updateUIForPOLock() {
+            const indicator = document.getElementById('lockStatusIndicator');
+            
+            if (currentPOLock) {
+                const progress = currentPOLock.qtyBox > 0 ? currentPOLock.scannedBoxes / currentPOLock.qtyBox * 100 : 0;
+                indicator.innerHTML = `
+                    <i class="fas fa-lock text-success me-1"></i>
+                    Session + PO: <strong>${currentPOLock.noPO}</strong> (${Math.round(progress)}%)
+                    <button class="btn btn-outline-warning btn-sm ms-2" onclick="unlockFromPO()" title="Unlock from PO">
+                        <i class="fas fa-unlock"></i>
+                    </button>
+                `;
+            } else if (currentUserLock) {
+                const session = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                indicator.innerHTML = `
+                    <i class="fas fa-lock text-warning me-1"></i>
+                    Locked to: <strong>${session?.materialCode || currentUserLock}</strong>
+                    <button class="btn btn-outline-info btn-sm ms-2" onclick="showPOSelectionForQuickLock('${currentUserLock}')" title="Select PO">
+                        <i class="fas fa-list-ul"></i> Select PO
+                    </button>
+                `;
+            } else {
+                indicator.textContent = 'Scan QR Identity to begin';
+            }
+        }
+
+        function closePOSelectionDialog() {
+            // Close any visible alerts/modals containing PO selection
+            $('.alert').fadeOut();
+        }
+
+        function updatePOProgress() {
+            if (!currentPOLock) return;
+            
+            // Get updated PO lock info
+            $.ajax({
+                url: '@Url.Action("GetCurrentPOLock", "Scan")',
+                type: 'GET',
+                data: { sessionId: currentPOLock.sessionId },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentPOLock = response.data;
+                        updateUIForPOLock();
+                        
+                        // Check if PO is completed
+                        if (currentPOLock.isCompleted) {
+                            showAlert(`🎉 PO ${currentPOLock.noPO} completed! You can select another PO or continue scanning.`, 'success');
+                            
+                            // Auto-unlock from completed PO after 3 seconds
+                            setTimeout(() => {
+                                unlockFromPO();
+                                showPOSelectionForQuickLock(currentUserLock);
+                            }, 3000);
+                        }
+                    }
+                },
+                error: function() {
+                    console.log('Error updating PO progress');
+                }
+            });
+        }
+        
+        // Check PO completion and auto-unlock if 100% complete
+        function checkPOCompletionAndAutoUnlock() {
+            if (!currentPOLock) return;
+            
+            // Get fresh PO progress data from server
+            $.ajax({
+                url: '@Url.Action("GetUserPOLock", "Scan")',
+                type: 'GET',
+                data: {
+                    sessionId: currentPOLock.sessionId
+                },
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const updatedPOLock = response.data;
+                        
+                        // Calculate completion percentage
+                        const completionPercentage = updatedPOLock.qtyBox > 0 ? 
+                            (updatedPOLock.scannedBoxes / updatedPOLock.qtyBox) * 100 : 0;
+                        
+                        console.log(`📊 PO ${updatedPOLock.noPO} completion: ${Math.round(completionPercentage)}% (${updatedPOLock.scannedBoxes}/${updatedPOLock.qtyBox})`);
+                        
+                        // Update current PO lock data
+                        currentPOLock = updatedPOLock;
+                        updateUIForPOLock();
+                        
+                        // Update PO dropdown to reflect latest progress
+                        populatePODropdown();
+                        
+                        // Auto-unlock if 100% complete
+                        if (completionPercentage >= 100) {
+                            showAlert(`🎉 PO ${updatedPOLock.noPO} COMPLETED 100%!<br/>
+                                <strong>All ${updatedPOLock.qtyBox} boxes scanned!</strong><br/>
+                                <br/>
+                                Automatically unlocking in 3 seconds...<br/>
+                                <button class="btn btn-sm btn-success me-2" onclick="proceedToNextPO()">
+                                    Select Next PO
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="cancelAutoUnlock()">
+                                    Stay Locked
+                                </button>`, 'success', 5000);
+                            
+                            // Auto-unlock timer
+                            window.autoUnlockTimer = setTimeout(() => {
+                                unlockFromPO();
+                                showAlert('✅ Auto-unlocked from completed PO. Select next PO or scan Master QR for different session.', 'info');
+                                setTimeout(() => {
+                                    showPOSelectionForQuickLock(currentUserLock);
+                                }, 1000);
+                            }, 3000);
+                        }
+                    }
+                },
+                error: function() {
+                    console.log('Error checking PO completion');
+                }
+            });
+        }
+        
+        // Proceed to next PO selection
+        function proceedToNextPO() {
+            if (window.autoUnlockTimer) {
+                clearTimeout(window.autoUnlockTimer);
+            }
+            unlockFromPO();
+            setTimeout(() => {
+                showPOSelectionForQuickLock(currentUserLock);
+            }, 500);
+        }
+        
+        // Cancel auto-unlock and stay locked to current PO
+        function cancelAutoUnlock() {
+            if (window.autoUnlockTimer) {
+                clearTimeout(window.autoUnlockTimer);
+                window.autoUnlockTimer = null;
+            }
+            showAlert(`Staying locked to PO ${currentPOLock.noPO}`, 'info');
         }
 
         // Scanner Card Interactions
@@ -745,6 +1349,11 @@
                         }
                         
                         showAlert(`✅ Successfully locked to session: ${session.fileName}`, 'success');
+                        
+                        // Auto-trigger PO selection for hierarchical lock
+                        setTimeout(() => {
+                            showPOSelectionForQuickLock(qrIdentity);
+                        }, 500);
                     } else {
                         showAlert(`❌ Failed to lock to session: ${response.message}`, 'danger');
                     }
@@ -809,6 +1418,17 @@
                     showAlert('Error unlocking from session. Please try again.', 'danger');
                 }
             });
+        }
+
+        // Switch to a different session
+        function switchToSession(qrIdentity) {
+            // First unlock from current session
+            unlockFromSession();
+            
+            // Wait a bit then lock to new session
+            setTimeout(() => {
+                lockToSession(qrIdentity);
+            }, 1000);
         }
 
         // Initialize SignalR connection
@@ -1324,6 +1944,11 @@
                         if (recentScansManager) {
                             recentScansManager.show(session.sessionId);
                         }
+                        
+                        // Auto-trigger PO selection for hierarchical lock
+                        setTimeout(() => {
+                            showPOSelectionForQuickLock(qrCode);
+                        }, 500);
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                     }
@@ -1342,7 +1967,7 @@
             }
 
             // Find which session this barcode belongs to
-            const session = activeSessions.find(s => barcode.startsWith(s.qrIdentity + '_BOX_'));
+            const session = activeSessions.find(s => barcode.includes(s.qrIdentity) && barcode.includes('_BOX_'));
             if (!session) {
                 showAlert('Invalid barcode format', 'danger');
                 return;
@@ -1350,7 +1975,46 @@
 
             // Verify user is locked to this session
             if (currentUserLock !== session.qrIdentity) {
-                showAlert(`This barcode belongs to a different session. You are locked to: ${currentUserLock}`, 'warning');
+                const currentSession = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                const targetSession = session;
+                
+                showAlert(`⚠️ Session Mismatch!<br/>
+                    <strong>Current:</strong> ${currentSession ? currentSession.fileName : currentUserLock}<br/>
+                    <strong>Box belongs to:</strong> ${targetSession.fileName}<br/>
+                    <br/>
+                    <button class="btn btn-sm btn-primary me-2" onclick="switchToSession('${targetSession.qrIdentity}')">
+                        Switch to ${targetSession.fileName}
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="$('#mainScanInput').val('').focus()">
+                        Cancel
+                    </button>`, 'warning', 8000);
+                return;
+            }
+
+            // NEW: Check PO lock if enabled
+            if (poLockMode && currentPOLock) {
+                // Extract model from barcode: QR_3_MAU7901065464/120744A112_RF-D10GN-K_BOX_001
+                // Format: QR_{sessionId}_{PO}_{Model}_BOX_{number}
+                const parts = barcode.split('_');
+                if (parts.length >= 6) {
+                    const barcodeModel = parts[3]; // RF-D10GN-K
+                    if (barcodeModel !== currentPOLock.model) {
+                        showAlert(`⚠️ PO Lock Mismatch!<br/>
+                            <strong>You are locked to:</strong> ${currentPOLock.noPO} (${currentPOLock.model})<br/>
+                            <strong>This box belongs to:</strong> ${barcodeModel}<br/>
+                            <br/>
+                            <button class="btn btn-sm btn-warning me-2" onclick="showPOSelectionForQuickLock('${currentUserLock}')">
+                                Change PO Lock
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="$('#mainScanInput').val('').focus()">
+                                Cancel
+                            </button>`, 'warning', 8000);
+                        return;
+                    }
+                }
+            } else if (poLockMode && !currentPOLock) {
+                showAlert('Please select a PO first before scanning boxes', 'warning');
+                showPOSelectionForQuickLock(currentUserLock);
                 return;
             }
 
@@ -1375,6 +2039,14 @@
                         // Update progress if available
                         if (response.data) {
                             updateScanProgress(response.data);
+                        }
+                        
+                        // Update PO progress if locked
+                        if (currentPOLock) {
+                            updatePOProgress();
+                            
+                            // Check if PO is 100% complete for auto-unlock
+                            checkPOCompletionAndAutoUnlock();
                         }
                         
                         // No need to refresh - cache and local state are sufficient
@@ -1580,6 +2252,11 @@
                         if (recentScansManager) {
                             recentScansManager.show(sessionId);
                         }
+                        
+                        // Auto-trigger PO selection for hierarchical lock
+                        setTimeout(() => {
+                            showPOSelectionForQuickLock(qrIdentity);
+                        }, 500);
                     } else {
                         showAlert(`❌ ${response.message}`, 'danger');
                     }
@@ -2482,7 +3159,7 @@
             }, 2000);
         }
 
-        function showAlert(message, type) {
+        function showAlert(message, type, timeout = 5000) {
             const alertContainer = document.querySelector('.container');
             const alertElement = document.createElement('div');
 
@@ -2496,8 +3173,10 @@
             alertContainer.insertBefore(alertElement, alertContainer.children[1]);
 
             setTimeout(() => {
-                alertElement.remove();
-            }, 5000);
+                if (alertElement.parentNode) {
+                    alertElement.remove();
+                }
+            }, timeout);
         }
 
         // Manual refresh function for the button

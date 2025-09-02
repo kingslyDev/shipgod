@@ -19,5 +19,12 @@ namespace ShipmentFinishGood.Services
         Task<Result<string>> GetUserLockedSessionAsync(string userId);
         Task<Result<string>> GenerateQRForSessionAsync(int sessionId);
         Task<RecentScansResponseDto> GetRecentScansAsync(int sessionId, int limit = 10);
+        
+        // NEW: PO Lock Methods
+        Task<Result<bool>> LockUserToPOAsync(string userId, int sessionId, int poId);
+        Task<Result<bool>> UnlockUserFromPOAsync(string userId, int sessionId);
+        Task<Result<POLockDto?>> GetUserPOLockAsync(string userId, int sessionId);
+        Task<List<POMasterDto>> GetAvailablePOsForSessionAsync(int sessionId);
+        Task<Result<bool>> CheckUserPOLockAsync(string userId, int sessionId, int poId);
     }
 }

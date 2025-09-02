@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<PODetail> PODetails => Set<PODetail>();
     public DbSet<BarcodeRegistry> BarcodeRegistries => Set<BarcodeRegistry>();
     public DbSet<ScanningActivity> ScanningActivities => Set<ScanningActivity>();
+    public DbSet<POLock> POLocks => Set<POLock>(); // NEW: PO Lock support
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,5 +65,22 @@ public class AppDbContext : DbContext
             
         modelBuilder.Entity<BarcodeRegistry>()
             .HasIndex(b => new { b.POId, b.BoxNumber });
+            
+        // Configure POLock relationships
+        modelBuilder.Entity<POLock>()
+            .HasOne(pl => pl.Session)
+            .WithMany()
+            .HasForeignKey(pl => pl.SessionId);
+            
+        modelBuilder.Entity<POLock>()
+            .HasOne(pl => pl.PO)
+            .WithMany()
+            .HasForeignKey(pl => pl.POId);
+            
+        // Ensure only one active PO lock per user per session
+        modelBuilder.Entity<POLock>()
+            .HasIndex(pl => new { pl.UserId, pl.SessionId, pl.IsActive })
+            .IsUnique()
+            .HasFilter("[IsActive] = 1");
     }
 }

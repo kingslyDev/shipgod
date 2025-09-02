@@ -315,6 +315,27 @@ namespace ShipmentFinishGood.Services
             if (!lockedSessionResult.IsSuccess || lockedSessionResult.Value != masterBarcode.BarcodeValue)
                 return Result<ScanResultDto>.Failure("You can only scan boxes from your locked session");
 
+            // NEW: Check PO Lock validation if PO lock exists
+            if (barcodeRegistry.POId.HasValue)
+            {
+                var poLockResult = await CheckUserPOLockAsync(scannedBy, sessionId, barcodeRegistry.POId.Value);
+                if (!poLockResult.IsSuccess)
+                {
+                    // Get PO info for better error message
+                    var po = await _context.POMasters.FindAsync(barcodeRegistry.POId.Value);
+                    var currentPOLock = await GetUserPOLockAsync(scannedBy, sessionId);
+                    
+                    if (currentPOLock.IsSuccess && currentPOLock.Value != null)
+                    {
+                        return Result<ScanResultDto>.Failure($"You are locked to PO {currentPOLock.Value.NoPO}. This barcode belongs to PO {po?.NoPO ?? "Unknown"}");
+                    }
+                    else
+                    {
+                        return Result<ScanResultDto>.Failure($"You must lock to PO {po?.NoPO ?? "Unknown"} first before scanning its barcodes");
+                    }
+                }
+            }
+
             // Check if master QR was scanned first
             var masterScanned = await IsMasterQRScannedAsync(sessionId);
             if (!masterScanned)
@@ -1439,5 +1460,212 @@ namespace ShipmentFinishGood.Services
                 Console.WriteLine($"❌ Stack trace: {ex.StackTrace}");
             }
         }
+
+        #region PO Lock Methods
+
+        /// <summary>
+        /// Lock user to specific PO within a session
+        /// </summary>
+        public async Task<Result<bool>> LockUserToPOAsync(string userId, int sessionId, int poId)
+        {
+            try
+            {
+                // Check if user is locked to session first
+                var sessionLockResult = await CheckUserLockAsync(userId);
+                if (!sessionLockResult.IsSuccess)
+                    return Result<bool>.Failure("User must be locked to session first");
+
+                // Check if PO exists in the session
+                var po = await _context.POMasters
+                    .FirstOrDefaultAsync(p => p.POId == poId && p.SourceSessionId == sessionId);
+                if (po == null)
+                    return Result<bool>.Failure("PO not found in this session");
+
+                // Check if PO is already completed
+                var scannedBoxes = await _context.BarcodeRegistries
+                    .CountAsync(b => b.POId == poId && b.BarcodeType == "BOX" && b.Status == "SCANNED" && b.IsActive);
+                if (scannedBoxes >= po.QtyBox)
+                    return Result<bool>.Failure("PO is already completed");
+
+                // Remove any existing PO lock for this user in this session
+                var existingLock = await _context.POLocks
+                    .FirstOrDefaultAsync(pl => pl.UserId == userId && pl.SessionId == sessionId && pl.IsActive);
+                if (existingLock != null)
+                {
+                    existingLock.IsActive = false;
+                }
+
+                // Create new PO lock
+                var poLock = new POLock
+                {
+                    UserId = userId,
+                    SessionId = sessionId,
+                    POId = poId,
+                    LockedAt = DateTime.Now,
+                    IsActive = true,
+                    LockedBy = userId
+                };
+
+                _context.POLocks.Add(poLock);
+                await _context.SaveChangesAsync();
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Error locking user to PO: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Unlock user from current PO in session
+        /// </summary>
+        public async Task<Result<bool>> UnlockUserFromPOAsync(string userId, int sessionId)
+        {
+            try
+            {
+                var existingLock = await _context.POLocks
+                    .FirstOrDefaultAsync(pl => pl.UserId == userId && pl.SessionId == sessionId && pl.IsActive);
+
+                if (existingLock == null)
+                    return Result<bool>.Failure("No active PO lock found");
+
+                existingLock.IsActive = false;
+                await _context.SaveChangesAsync();
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Error unlocking user from PO: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get current PO lock for user in session
+        /// </summary>
+        public async Task<Result<POLockDto?>> GetUserPOLockAsync(string userId, int sessionId)
+        {
+            try
+            {
+                var poLock = await _context.POLocks
+                    .Include(pl => pl.PO)
+                    .FirstOrDefaultAsync(pl => pl.UserId == userId && pl.SessionId == sessionId && pl.IsActive);
+
+                if (poLock == null)
+                    return Result<POLockDto?>.Success(null);
+
+                // Get scanned boxes count
+                var scannedBoxes = await _context.BarcodeRegistries
+                    .CountAsync(b => b.POId == poLock.POId && b.BarcodeType == "BOX" && b.Status == "SCANNED" && b.IsActive);
+
+                var poLockDto = new POLockDto
+                {
+                    POLockId = poLock.POLockId,
+                    UserId = poLock.UserId,
+                    SessionId = poLock.SessionId,
+                    POId = poLock.POId,
+                    NoPO = poLock.PO.NoPO,
+                    ModelProduk = poLock.PO.ModelProduk,
+                    LockedAt = poLock.LockedAt,
+                    IsActive = poLock.IsActive,
+                    LockedBy = poLock.LockedBy,
+                    QtyBox = poLock.PO.QtyBox,
+                    QtyTotal = poLock.PO.QtyTotal,
+                    Status = poLock.PO.Status,
+                    ScannedBoxes = scannedBoxes
+                };
+
+                return Result<POLockDto?>.Success(poLockDto);
+            }
+            catch (Exception ex)
+            {
+                return Result<POLockDto?>.Failure($"Error getting user PO lock: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get available POs for locking in a session
+        /// </summary>
+        public async Task<List<POMasterDto>> GetAvailablePOsForSessionAsync(int sessionId)
+        {
+            try
+            {
+                var pos = await _context.POMasters
+                    .Where(p => p.SourceSessionId == sessionId)
+                    .OrderBy(p => p.NoPO)
+                    .ToListAsync();
+
+                var availablePOs = new List<POMasterDto>();
+
+                foreach (var po in pos)
+                {
+                    // Get scanned boxes count
+                    var scannedBoxes = await _context.BarcodeRegistries
+                        .CountAsync(b => b.POId == po.POId && b.BarcodeType == "BOX" && b.Status == "SCANNED" && b.IsActive);
+
+                    // Check if PO is locked by someone
+                    var currentLock = await _context.POLocks
+                        .FirstOrDefaultAsync(pl => pl.POId == po.POId && pl.IsActive);
+
+                    var poDto = new POMasterDto
+                    {
+                        POId = po.POId,
+                        NoPO = po.NoPO,
+                        ModelProduk = po.ModelProduk,
+                        QtyTotal = po.QtyTotal,
+                        QtyBox = po.QtyBox,
+                        QtyPallet = po.QtyPallet,
+                        QtyPcs = po.QtyPcs,
+                        Container = po.Container,
+                        ShipmentDetail = po.ShipmentDetail,
+                        Status = po.Status,
+                        Country = po.Country,
+                        SourceSessionId = po.SourceSessionId
+                    };
+
+                    availablePOs.Add(poDto);
+                }
+
+                return availablePOs;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting available POs: {ex.Message}");
+                return new List<POMasterDto>();
+            }
+        }
+
+        /// <summary>
+        /// Check if user can scan from specific PO (validates PO lock)
+        /// </summary>
+        public async Task<Result<bool>> CheckUserPOLockAsync(string userId, int sessionId, int poId)
+        {
+            try
+            {
+                // First check if user has session lock
+                var sessionLockResult = await CheckUserLockAsync(userId);
+                if (!sessionLockResult.IsSuccess)
+                    return Result<bool>.Failure("User not locked to session");
+
+                // Check if user has PO lock in this session
+                var poLock = await _context.POLocks
+                    .FirstOrDefaultAsync(pl => pl.UserId == userId && pl.SessionId == sessionId && pl.IsActive);
+
+                if (poLock == null)
+                    return Result<bool>.Failure("User not locked to any PO in this session");
+
+                if (poLock.POId != poId)
+                    return Result<bool>.Failure($"User locked to different PO. Current: {poLock.POId}, Attempted: {poId}");
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Error checking user PO lock: {ex.Message}");
+            }
+        }
+
+        #endregion
     }
 }

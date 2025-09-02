@@ -535,5 +535,98 @@ namespace ShipmentFinishGood.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
+
+        #region PO Lock Methods
+
+        [HttpPost]
+        public async Task<IActionResult> LockToPO(int sessionId, int poId)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _scanService.LockUserToPOAsync(userName, sessionId, poId);
+                
+                if (result.IsSuccess)
+                {
+                    var poLock = await _scanService.GetUserPOLockAsync(userName, sessionId);
+                    return Json(new { 
+                        success = true, 
+                        message = "Successfully locked to PO", 
+                        data = poLock.Value 
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error locking to PO: {ex.Message}" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UnlockFromPO(int sessionId)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _scanService.UnlockUserFromPOAsync(userName, sessionId);
+                
+                return Json(new { 
+                    success = result.IsSuccess, 
+                    message = result.IsSuccess ? "Successfully unlocked from PO" : result.Error 
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error unlocking from PO: {ex.Message}" });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAvailablePOs(int sessionId)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var availablePOs = await _scanService.GetAvailablePOsForSessionAsync(sessionId);
+                var currentPOLock = await _scanService.GetUserPOLockAsync(userName, sessionId);
+                
+                return Json(new { 
+                    success = true, 
+                    data = new {
+                        availablePOs = availablePOs,
+                        currentLock = currentPOLock.Value
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetCurrentPOLock(int sessionId)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var poLock = await _scanService.GetUserPOLockAsync(userName, sessionId);
+                
+                return Json(new { 
+                    success = true, 
+                    data = poLock.Value 
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        #endregion
     }
 }
