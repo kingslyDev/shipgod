@@ -10,6 +10,7 @@ namespace ShipmentFinishGood.Services
         Task<Result> GenerateBarcodesForSessionAsync(int sessionId, string generatedBy);
         Task<Result> RegenerateBarcodesForPOAsync(int poId, string generatedBy);
         Task<Result> UpdateBarcodeQuantityAsync(int poId, int newQtyBox, string updatedBy);
+        Task<Result> AutoFixMissingBarcodesAsync(int sessionId, string fixedBy = "auto_fix_system"); // 🆕 NEW METHOD
         
         // Query methods
         Task<List<BarcodeDto>> GetBarcodesForSessionAsync(int sessionId);

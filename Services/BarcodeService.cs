@@ -29,26 +29,27 @@ namespace ShipmentFinishGood.Services
                 if (string.IsNullOrEmpty(session.IdentityQRCode))
                     return Result.Failure("Session does not have QR Identity generated");
 
-                // Check if barcodes already exist
-                var existingCount = await _context.BarcodeRegistries
-                    .CountAsync(b => b.SessionId == sessionId && b.IsActive);
+                // ✅ ROBUST: Cancel ALL existing barcodes first to prevent conflicts
+                await _context.BarcodeRegistries
+                    .Where(b => b.SessionId == sessionId && b.IsActive)
+                    .ExecuteUpdateAsync(b => b
+                        .SetProperty(x => x.Status, "CANCELLED")
+                        .SetProperty(x => x.IsActive, false));
+                
+                // ✅ FORCE: Ensure transaction is committed before proceeding
+                await _context.SaveChangesAsync();
 
-                if (existingCount > 0)
+                // ✅ VALIDATION: Check POMasters data integrity first
+                var poMastersWithIssues = session.POMasters.Where(p => p.QtyBox <= 0).ToList();
+                if (poMastersWithIssues.Any())
                 {
-                    // Regenerate - mark old as cancelled first
-                    await _context.BarcodeRegistries
-                        .Where(b => b.SessionId == sessionId && b.IsActive)
-                        .ExecuteUpdateAsync(b => b
-                            .SetProperty(x => x.Status, "CANCELLED")
-                            .SetProperty(x => x.IsActive, false));
-                    
-                    // Force completion of the deactivation before proceeding
-                    await _context.SaveChangesAsync();
+                    var issueDetails = string.Join(", ", poMastersWithIssues.Select(p => $"POId {p.POId}: QtyBox={p.QtyBox}"));
+                    return Result.Failure($"POMasters have invalid QtyBox values: {issueDetails}");
                 }
 
                 var barcodesToInsert = new List<BarcodeRegistry>();
 
-                // Generate Master QR
+                // ✅ MASTER QR: Always generate master first
                 barcodesToInsert.Add(new BarcodeRegistry
                 {
                     BarcodeValue = session.IdentityQRCode,
@@ -60,77 +61,116 @@ namespace ShipmentFinishGood.Services
                     IsActive = true
                 });
 
-                // Generate Box Barcodes
-                foreach (var poMaster in session.POMasters)
+                // ✅ BOX BARCODES: Generate with full validation and logging
+                var expectedTotalBoxes = session.POMasters.Sum(p => p.QtyBox);
+                var actualBoxesGenerated = 0;
+
+                foreach (var poMaster in session.POMasters.OrderBy(p => p.POId))
                 {
-                    for (int i = 1; i <= poMaster.QtyBox; i++)
+                    // ✅ VALIDATION: Skip invalid POMasters
+                    if (poMaster.QtyBox <= 0)
                     {
-                        var barcode = $"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}";
+                        continue;
+                    }
+
+                    // ✅ SEQUENTIAL GENERATION: Ensure all boxes are generated
+                    for (int boxNumber = 1; boxNumber <= poMaster.QtyBox; boxNumber++)
+                    {
+                        // 🆕 NEW FORMAT: QR_{SessionId}_{NoPO}_{Model}_{BoxNumber}
+                        var barcode = $"QR_{sessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_{boxNumber:D3}";
                         
-                        // Additional safety check - ensure no duplicate barcode values in memory
-                        if (!barcodesToInsert.Any(b => b.BarcodeValue == barcode))
+                        // ✅ DUPLICATE CHECK: Prevent duplicates in memory
+                        if (barcodesToInsert.Any(b => b.BarcodeValue == barcode))
                         {
-                            barcodesToInsert.Add(new BarcodeRegistry
-                            {
-                                BarcodeValue = barcode,
-                                BarcodeType = "BOX",
-                                SessionId = sessionId,
-                                POId = poMaster.POId,
-                                ModelProduct = poMaster.ModelProduk,
-                                BoxNumber = i,
-                                Status = "GENERATED",
-                                GeneratedBy = generatedBy,
-                                GeneratedDate = DateTime.Now,
-                                IsActive = true
-                            });
+                            // Make unique by adding timestamp suffix if somehow duplicate exists
+                            barcode = $"QR_{sessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_{boxNumber:D3}_{DateTime.Now.Ticks}";
                         }
+
+                        barcodesToInsert.Add(new BarcodeRegistry
+                        {
+                            BarcodeValue = barcode,
+                            BarcodeType = "BOX",
+                            SessionId = sessionId,
+                            POId = poMaster.POId,
+                            ModelProduct = poMaster.ModelProduk,
+                            BoxNumber = boxNumber,
+                            Status = "GENERATED",
+                            GeneratedBy = generatedBy,
+                            GeneratedDate = DateTime.Now,
+                            IsActive = true
+                        });
+
+                        actualBoxesGenerated++;
                     }
                 }
 
-                // Bulk insert with additional error handling
+                // ✅ FINAL VALIDATION: Ensure we generated the correct count
+                var expectedBoxBarcodes = expectedTotalBoxes;
+                var actualBoxBarcodes = barcodesToInsert.Count(b => b.BarcodeType == "BOX");
+                
+                if (actualBoxBarcodes != expectedBoxBarcodes)
+                {
+                    return Result.Failure($"Barcode generation mismatch! Expected: {expectedBoxBarcodes}, Generated: {actualBoxBarcodes}");
+                }
+
+                // ✅ TRANSACTIONAL INSERT: Use transaction for atomicity
+                using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    await _context.BarcodeRegistries.AddRangeAsync(barcodesToInsert);
-                    await _context.SaveChangesAsync();
+                    // Insert in batches for better performance and error handling
+                    const int batchSize = 100;
+                    for (int i = 0; i < barcodesToInsert.Count; i += batchSize)
+                    {
+                        var batch = barcodesToInsert.Skip(i).Take(batchSize).ToList();
+                        await _context.BarcodeRegistries.AddRangeAsync(batch);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    await transaction.CommitAsync();
                 }
-                catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx) 
-                when (dbEx.InnerException?.Message?.Contains("duplicate key") == true)
+                catch (Exception ex)
                 {
-                    // If duplicate key error occurs, try to recover by checking existing records
-                    var duplicateBarcodeValue = ExtractDuplicateBarcodeValue(dbEx.InnerException.Message);
-                    if (!string.IsNullOrEmpty(duplicateBarcodeValue))
+                    await transaction.RollbackAsync();
+                    throw new Exception($"Failed to insert barcodes in transaction: {ex.Message}", ex);
+                }
+
+                // ✅ POST-GENERATION VERIFICATION: Verify all barcodes were saved
+                await Task.Delay(100); // Small delay to ensure DB consistency
+                
+                var savedCount = await _context.BarcodeRegistries
+                    .CountAsync(b => b.SessionId == sessionId && b.IsActive);
+                
+                var expectedTotal = barcodesToInsert.Count;
+                if (savedCount != expectedTotal)
+                {
+                    return Result.Failure($"❌ CRITICAL: Verification failed! Expected: {expectedTotal}, Saved: {savedCount}. Some barcodes may be missing!");
+                }
+
+                // ✅ DETAILED VERIFICATION: Check each PO has correct barcode count
+                var verificationResults = await _context.POMasters
+                    .Where(p => p.SourceSessionId == sessionId)
+                    .Select(p => new
                     {
-                        // Remove duplicates from our insertion list and try again
-                        var existingBarcode = await _context.BarcodeRegistries
-                            .FirstOrDefaultAsync(b => b.BarcodeValue == duplicateBarcodeValue && b.IsActive);
-                        
-                        if (existingBarcode != null)
-                        {
-                            // Remove the duplicate from our list and try to insert the rest
-                            barcodesToInsert.RemoveAll(b => b.BarcodeValue == duplicateBarcodeValue);
-                            
-                            if (barcodesToInsert.Any())
-                            {
-                                await _context.BarcodeRegistries.AddRangeAsync(barcodesToInsert);
-                                await _context.SaveChangesAsync();
-                            }
-                        }
-                        else
-                        {
-                            throw; // Re-throw if we can't handle it
-                        }
-                    }
-                    else
-                    {
-                        throw; // Re-throw if we can't extract the duplicate value
-                    }
+                        p.POId,
+                        p.NoPO,
+                        p.ModelProduk,
+                        ExpectedBoxes = p.QtyBox,
+                        ActualBarcodes = _context.BarcodeRegistries.Count(b => b.POId == p.POId && b.BarcodeType == "BOX" && b.IsActive)
+                    })
+                    .ToListAsync();
+
+                var missingPOs = verificationResults.Where(v => v.ActualBarcodes != v.ExpectedBoxes).ToList();
+                if (missingPOs.Any())
+                {
+                    var details = string.Join(", ", missingPOs.Select(m => $"PO {m.NoPO} ({m.ModelProduk}): Expected {m.ExpectedBoxes}, Got {m.ActualBarcodes}"));
+                    return Result.Failure($"❌ CRITICAL: Missing barcodes detected! {details}");
                 }
 
                 return Result.Success();
             }
             catch (Exception ex)
             {
-                return Result.Failure($"Error generating barcodes: {ex.Message}");
+                return Result.Failure($"❌ ERROR generating barcodes: {ex.Message}");
             }
         }
 
@@ -156,11 +196,12 @@ namespace ShipmentFinishGood.Services
                         .SetProperty(x => x.Status, "CANCELLED")
                         .SetProperty(x => x.IsActive, false));
 
-                // Generate new barcodes
+                // Generate new barcodes with NEW FORMAT
                 var barcodesToInsert = new List<BarcodeRegistry>();
                 for (int i = 1; i <= poMaster.QtyBox; i++)
                 {
-                    var barcode = $"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}";
+                    // 🆕 NEW FORMAT: QR_{SessionId}_{NoPO}_{Model}_{BoxNumber}
+                    var barcode = $"QR_{session.SessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_{i:D3}";
                     barcodesToInsert.Add(new BarcodeRegistry
                     {
                         BarcodeValue = barcode,
@@ -525,6 +566,102 @@ namespace ShipmentFinishGood.Services
             catch (Exception)
             {
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// 🚨 MISSION CRITICAL: Auto-fix missing barcodes untuk SessionId tertentu
+        /// Method ini akan memastikan TIDAK ADA BARCODE YANG MISS!
+        /// </summary>
+        public async Task<Result> AutoFixMissingBarcodesAsync(int sessionId, string fixedBy = "auto_fix_system")
+        {
+            try
+            {
+                var session = await _context.UploadSessions
+                    .Include(s => s.POMasters)
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+                if (session == null)
+                    return Result.Failure($"Session {sessionId} not found");
+
+                if (string.IsNullOrEmpty(session.IdentityQRCode))
+                    return Result.Failure($"Session {sessionId} does not have QR Identity");
+
+                var missingBarcodes = new List<BarcodeRegistry>();
+                var fixReport = new List<string>();
+
+                // Check setiap POMaster
+                foreach (var poMaster in session.POMasters)
+                {
+                    if (poMaster.QtyBox <= 0) continue;
+
+                    // Hitung berapa barcode yang sudah ada
+                    var existingCount = await _context.BarcodeRegistries
+                        .CountAsync(b => b.POId == poMaster.POId && b.BarcodeType == "BOX" && b.IsActive);
+
+                    var missingCount = poMaster.QtyBox - existingCount;
+                    
+                    if (missingCount > 0)
+                    {
+                        // Generate missing barcodes
+                        var existingBoxNumbers = await _context.BarcodeRegistries
+                            .Where(b => b.POId == poMaster.POId && b.BarcodeType == "BOX" && b.IsActive)
+                            .Select(b => b.BoxNumber)
+                            .ToListAsync();
+
+                        for (int boxNumber = 1; boxNumber <= poMaster.QtyBox; boxNumber++)
+                        {
+                            if (!existingBoxNumbers.Contains(boxNumber))
+                            {
+                                var barcode = $"QR_{sessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_{boxNumber:D3}";
+                                
+                                missingBarcodes.Add(new BarcodeRegistry
+                                {
+                                    BarcodeValue = barcode,
+                                    BarcodeType = "BOX",
+                                    SessionId = sessionId,
+                                    POId = poMaster.POId,
+                                    ModelProduct = poMaster.ModelProduk,
+                                    BoxNumber = boxNumber,
+                                    Status = "GENERATED",
+                                    GeneratedBy = fixedBy,
+                                    GeneratedDate = DateTime.Now,
+                                    IsActive = true
+                                });
+                            }
+                        }
+
+                        fixReport.Add($"PO {poMaster.NoPO} ({poMaster.ModelProduk}): Added {missingCount} missing barcodes");
+                    }
+                }
+
+                if (missingBarcodes.Any())
+                {
+                    // Insert missing barcodes dalam transaction
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        await _context.BarcodeRegistries.AddRangeAsync(missingBarcodes);
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        var report = $"✅ AUTO-FIX COMPLETED: Added {missingBarcodes.Count} missing barcodes. Details: {string.Join("; ", fixReport)}";
+                        return Result.Success();
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync();
+                        return Result.Failure($"❌ AUTO-FIX FAILED: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    return Result.Success(); // No missing barcodes
+                }
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"❌ AUTO-FIX ERROR: {ex.Message}");
             }
         }
 

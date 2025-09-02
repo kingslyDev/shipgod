@@ -530,7 +530,55 @@ namespace ShipmentFinishGood.Controllers
             }
         }
 
+        /// <summary>
+        /// 🚨 EMERGENCY: Auto-fix missing barcodes untuk session tertentu
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> AutoFixMissingBarcodes([FromBody] AutoFixRequest request)
+        {
+            try
+            {
+                // Validate request
+                if (request.SessionId <= 0)
+                {
+                    return Json(new { success = false, message = "Invalid SessionId" });
+                }
 
+                // Get BarcodeService
+                var barcodeService = HttpContext.RequestServices.GetRequiredService<IBarcodeService>();
+                
+                // Execute auto-fix
+                var result = await barcodeService.AutoFixMissingBarcodesAsync(
+                    request.SessionId, 
+                    $"manual_fix_{User.Identity?.Name ?? "System"}"
+                );
+
+                if (result.IsSuccess)
+                {
+                    return Json(new 
+                    { 
+                        success = true, 
+                        message = $"✅ Auto-fix completed successfully for Session {request.SessionId}"
+                    });
+                }
+                else
+                {
+                    return Json(new 
+                    { 
+                        success = false, 
+                        message = $"❌ Auto-fix failed: {result.Error}"
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new 
+                { 
+                    success = false, 
+                    message = $"❌ Error during auto-fix: {ex.Message}"
+                });
+            }
+        }
 
         private async Task<string> GenerateQRIdentityAsync(int sessionId)
         {

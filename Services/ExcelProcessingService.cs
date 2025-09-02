@@ -782,6 +782,10 @@ namespace ShipmentFinishGood.Services
             await _context.SaveChangesAsync();
 
             await _barcodeService.GenerateBarcodesForSessionAsync(newSession.SessionId, createdBy);
+            
+            // 🚨 CRITICAL: Auto-fix any missing barcodes to ensure 100% completeness
+            await _barcodeService.AutoFixMissingBarcodesAsync(newSession.SessionId, $"auto_fix_{createdBy}");
+            
             return true;
         }
 
