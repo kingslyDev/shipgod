@@ -572,11 +572,10 @@ namespace ShipmentFinishGood.Services
                 TotalPcs = totalPcs,
                 ScannedPcs = scannedPcs,
                 
-                // Enhanced completion logic
+                // Enhanced completion logic: use the higher value for accuracy
                 CanComplete = masterScanned && 
-                            (totalBoxes == 0 || scannedBoxes >= totalBoxes) &&
-                            (totalPallets == 0 || scannedPallets >= totalPallets) &&
-                            (totalPcs == 0 || scannedPcs >= totalPcs)
+                            ((totalItems > 0 && scannedItems >= totalItems) ||
+                             (totalBarcodes > 0 && scannedCount >= totalBarcodes))
             };
         }
 
@@ -668,7 +667,10 @@ namespace ShipmentFinishGood.Services
 
         public async Task<Result<bool>> CompleteScanAsync(int sessionId, string completedBy)
         {
-            var session = await _context.UploadSessions.FindAsync(sessionId);
+            var session = await _context.UploadSessions
+                .Include(s => s.POMasters)
+                .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+            
             if (session == null)
                 return Result<bool>.Failure("Session not found");
 
@@ -683,8 +685,16 @@ namespace ShipmentFinishGood.Services
             if (!canComplete)
                 return Result<bool>.Failure("Cannot complete scan. Not all items are scanned or master QR not scanned.");
 
-            // Mark as completed
+            // Update session status
             session.Status = "SCAN_COMPLETED";
+            
+            // Update all POMaster status to COMPLETED
+            foreach (var poMaster in session.POMasters)
+            {
+                poMaster.Status = "COMPLETED";
+                Console.WriteLine($"✅ Updated POMaster {poMaster.NoPO} status to COMPLETED");
+            }
+            
             await _context.SaveChangesAsync();
 
             Console.WriteLine($"✅ AUTO-COMPLETE: Session {sessionId} completed by {completedBy}");
@@ -755,7 +765,7 @@ namespace ShipmentFinishGood.Services
             {
                 for (int i = 1; i <= poMaster.QtyBox; i++)
                 {
-                    var barcode = $"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}";
+                    var barcode = $"QR_{session.SessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_BOX_{i:D3}";
                     barcodes.Add(new BarcodeDto
                     {
                         BarcodeValue = barcode,
@@ -776,7 +786,7 @@ namespace ShipmentFinishGood.Services
             {
                 for (int i = 1; i <= poMaster.QtyBox; i++)
                 {
-                    barcodes.Add($"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}");
+                    barcodes.Add($"QR_{session.SessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_BOX_{i:D3}");
                 }
             }
 
@@ -859,11 +869,13 @@ namespace ShipmentFinishGood.Services
             // Enhanced completion logic: check all types are complete AND master is scanned
             var canComplete = progress.IsMasterScanned && progress.IsAllComplete;
             
-            Console.WriteLine($"🔍 COMPLETION CHECK Session {sessionId}: Master={progress.IsMasterScanned}, " +
-                            $"Box={progress.IsBoxComplete}({progress.ScannedBoxes}/{progress.TotalBoxes}), " +
-                            $"Pallet={progress.IsPalletComplete}({progress.ScannedPallets}/{progress.TotalPallets}), " +
-                            $"PCS={progress.IsPcsComplete}({progress.ScannedPcs}/{progress.TotalPcs}), " +
-                            $"CanComplete={canComplete}");
+            Console.WriteLine($"🔍 COMPLETION CHECK Session {sessionId}:");
+            Console.WriteLine($"  📊 Master Scanned: {progress.IsMasterScanned}");
+            Console.WriteLine($"  📦 Box: {progress.ScannedBoxes}/{progress.TotalBoxes} (Complete: {progress.IsBoxComplete})");
+            Console.WriteLine($"  🚛 Pallet: {progress.ScannedPallets}/{progress.TotalPallets} (Complete: {progress.IsPalletComplete})");
+            Console.WriteLine($"  🔢 PCS: {progress.ScannedPcs}/{progress.TotalPcs} (Complete: {progress.IsPcsComplete})");
+            Console.WriteLine($"  ✅ All Complete: {progress.IsAllComplete}");
+            Console.WriteLine($"  🎯 Can Complete: {canComplete}");
             
             return canComplete;
         }
@@ -991,18 +1003,18 @@ namespace ShipmentFinishGood.Services
             
             if (itemType == ScanItemType.Box)
             {
-                // For BOX items, we can use the existing barcode registry approach
-                var masterBarcode = await _context.BarcodeRegistries
-                    .FirstOrDefaultAsync(b => b.SessionId == sessionId && 
-                                            b.BarcodeType == "MASTER" && 
-                                            b.IsActive);
+                // For BOX items, use the new barcode format: QR_{sessionId}_
+                var sessionPrefix = $"QR_{sessionId}_";
                 
-                if (masterBarcode == null) return 0;
+                // Count from BarcodeRegistry (more accurate for BOX items)
+                var scannedBoxCount = await _context.BarcodeRegistries
+                    .CountAsync(b => b.SessionId == sessionId && 
+                                   b.BarcodeType == "BOX" && 
+                                   b.IsActive && 
+                                   b.Status == "SCANNED");
                 
-                return await _context.ScanningActivities
-                    .CountAsync(sa => sa.Action == actionName && 
-                                    sa.Result == "SUCCESS" &&
-                                    sa.BarcodeValue.StartsWith(masterBarcode.BarcodeValue));
+                Console.WriteLine($"🔍 BOX SCAN COUNT: Session {sessionId} has {scannedBoxCount} scanned boxes");
+                return scannedBoxCount;
             }
             else
             {
@@ -1088,57 +1100,66 @@ namespace ShipmentFinishGood.Services
                 var hasMaster = await _context.BarcodeRegistries
                     .AnyAsync(b => b.SessionId == sessionId && b.BarcodeType == "MASTER" && b.IsActive);
 
-                // Get ALL BOX barcodes for this session (not just scanned ones)
+                // Get ALL BOX barcodes for the locked session
                 var allSessionBarcodes = await _context.BarcodeRegistries
                     .Include(b => b.POMaster)
                     .Where(b => b.SessionId == sessionId && 
-                               b.BarcodeType == "BOX" && 
+                               (b.BarcodeType == "BOX" || b.BarcodeValue.Contains("_BOX_")) && 
                                b.IsActive)
                     .OrderBy(b => b.BarcodeValue)
                     .ToListAsync();
 
-                Console.WriteLine($"🔍 RECENT: BOX barcodes for session {sessionId}: {allSessionBarcodes.Count}");
+                // Debug info to verify BOX count
+                var expectedBoxCount = await _context.POMasters
+                    .Where(p => p.SourceSessionId == sessionId)
+                    .SumAsync(p => p.QtyBox);
+
+                if (allSessionBarcodes.Count != expectedBoxCount)
+                {
+                    // Auto-fix missing barcodes if count doesn't match
+                    await _barcodeService.AutoFixMissingBarcodesAsync(sessionId, "recent_scan_auto_fix");
+                    
+                    // Re-query after fix
+                    allSessionBarcodes = await _context.BarcodeRegistries
+                        .Include(b => b.POMaster)
+                        .Where(b => b.SessionId == sessionId && 
+                                   (b.BarcodeType == "BOX" || b.BarcodeValue.Contains("_BOX_")) && 
+                                   b.IsActive)
+                        .OrderBy(b => b.BarcodeValue)
+                        .ToListAsync();
+                }
 
                 // Get scanning activities for this session
-                // BOX scans: Match by barcode prefix (no AssignedArea)
-                // PALLET/PCS scans: Match by AssignedArea 
-                var sessionTag = $"Session_{sessionId}";
-                var masterBarcode = await _context.BarcodeRegistries
-                    .Where(b => b.SessionId == sessionId && b.BarcodeType == "MASTER" && b.IsActive)
-                    .Select(b => b.BarcodeValue)
-                    .FirstOrDefaultAsync();
-                
+                var sessionPrefix = $"QR_{sessionId}_";
                 var scanningActivities = await _context.ScanningActivities
                     .Where(sa => sa.Result == "SUCCESS" && sa.Action != "SCAN_MASTER" && 
-                                (sa.AssignedArea == sessionTag || 
-                                 (sa.Action == "SCAN_BOX" && masterBarcode != null && sa.BarcodeValue.StartsWith(masterBarcode))))
+                                (sa.BarcodeValue.StartsWith(sessionPrefix) || 
+                                 sa.AssignedArea == $"Session_{sessionId}"))
                     .ToListAsync();
 
-                // Extract pallet & pcs scans (actual only)
-                var palletScans = scanningActivities.Where(sa => sa.Action == "SCAN_PALLET").ToList();
-                var pcsScans = scanningActivities.Where(sa => sa.Action == "SCAN_PCS").ToList();
-
-                Console.WriteLine($"🚛 Found {palletScans.Count} pallet scans for session {sessionId}");
-                foreach (var palletScan in palletScans)
-                {
-                    Console.WriteLine($"  📦 Pallet: {palletScan.BarcodeValue} | User: {palletScan.UserId} | Time: {palletScan.Timestamp}");
-                }
-
+                // Categorize scans by type
+                var boxScans = scanningActivities.Where(sa => 
+                    sa.Action == "SCAN_BOX" || 
+                    sa.BarcodeValue.Contains("_BOX_")).ToList();
+                var palletScans = scanningActivities.Where(sa => 
+                    sa.Action == "SCAN_PALLET" || 
+                    sa.BarcodeValue.Contains("_PALLET_")).ToList();
+                var pcsScans = scanningActivities.Where(sa => 
+                    sa.Action == "SCAN_PCS" || 
+                    sa.BarcodeValue.StartsWith("%Q")).ToList();
                 Console.WriteLine($"📦 Found {pcsScans.Count} PCS scans for session {sessionId}");
-                foreach (var pcsScan in pcsScans)
-                {
-                    Console.WriteLine($"  🔢 PCS: {pcsScan.BarcodeValue} | User: {pcsScan.UserId} | Time: {pcsScan.Timestamp}");
-                }
+                Console.WriteLine($"� Found {boxScans.Count} BOX scans for session {sessionId}");
 
-                // Build scan list with status
+                // Build scan list - BOX items show all (scanned & pending), PALLET/PCS only if scanned
                 var enrichedScans = new List<RecentScanDto>();
                 int sequenceNumber = 1;
                 
+                // Show ALL BOX items (both scanned and pending) for visibility
                 foreach (var barcode in allSessionBarcodes)
                 {
-                    // Check if this barcode has been scanned
-                    var scanActivity = scanningActivities
-                        .Where(sa => sa.BarcodeValue == barcode.BarcodeValue && sa.Action == "SCAN_BOX")
+                    // Check if this barcode has been scanned (improved detection)
+                    var scanActivity = boxScans
+                        .Where(sa => sa.BarcodeValue == barcode.BarcodeValue)
                         .OrderByDescending(sa => sa.Timestamp)
                         .FirstOrDefault();
 
@@ -1228,8 +1249,8 @@ namespace ShipmentFinishGood.Services
                     })
                     .FirstOrDefaultAsync();
 
-                // Scanned counts per type
-                var boxScanned = scanningActivities.Count(sa => sa.Action == "SCAN_BOX");
+                // Scanned counts per type (updated calculation)
+                var boxScanned = boxScans.Count;
                 var palletScanned = palletScans.Count;
                 var pcsScanned = pcsScans.Count;
 
@@ -1357,15 +1378,26 @@ namespace ShipmentFinishGood.Services
         {
             try
             {
+                Console.WriteLine($"🔍 AUTO-COMPLETE CHECK: Starting for session {sessionId} after scanning {lastScannedBarcode}");
+                
                 // Get current session status to avoid unnecessary work
                 var session = await _context.UploadSessions
                     .Select(s => new { s.SessionId, s.Status })
                     .FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-                if (session == null || session.Status == "SCAN_COMPLETED")
+                if (session == null)
                 {
-                    return; // Session not found or already completed
+                    Console.WriteLine($"❌ AUTO-COMPLETE: Session {sessionId} not found");
+                    return; // Session not found
                 }
+
+                if (session.Status == "SCAN_COMPLETED")
+                {
+                    Console.WriteLine($"⏭️ AUTO-COMPLETE: Session {sessionId} already completed, skipping");
+                    return; // Session already completed
+                }
+
+                Console.WriteLine($"📊 AUTO-COMPLETE: Session {sessionId} status is '{session.Status}', checking completion...");
 
                 // Check if all scanning is complete
                 var canComplete = await CanCompleteScanAsync(sessionId);
@@ -1404,6 +1436,7 @@ namespace ShipmentFinishGood.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ Error in auto-completion check for session {sessionId}: {ex.Message}");
+                Console.WriteLine($"❌ Stack trace: {ex.StackTrace}");
             }
         }
     }

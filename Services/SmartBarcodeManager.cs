@@ -92,9 +92,13 @@ namespace ShipmentFinishGood.Services
         {
             var newBarcodes = new List<string>();
 
+            // Get POMaster untuk mendapatkan NoPO
+            var poMaster = await _context.POMasters.FirstOrDefaultAsync(p => p.POId == poId);
+            if (poMaster == null) return newBarcodes;
+
             for (int i = startBoxNumber; i <= endBoxNumber; i++)
             {
-                var barcode = $"{qrIdentity}_BOX_{modelName}_{i:D3}";
+                var barcode = $"QR_{sessionId}_{poMaster.NoPO}_{modelName}_BOX_{i:D3}";
                 
                 // 🔍 CHECK FOR DUPLICATES
                 var existingBarcode = await _context.BarcodeRegistries

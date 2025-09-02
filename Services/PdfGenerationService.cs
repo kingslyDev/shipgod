@@ -708,24 +708,33 @@ namespace ShipmentFinishGood.Services
         {
             if (string.IsNullOrEmpty(fullBarcode)) return "N/A";
 
-            // Find BOX pattern and extract the meaningful part
-            // Example: QR_3_20250825115813_BOX_RP-2400DBG-K_001 -> BOX_RP-2400DBG-K_001
+            // Expected format: QR_{sessionId}_{NoPO}_{Model}_BOX_{number}
+            // We want: {NoPO(max6)}_{Model}_BOX_{number}
+            var parts = fullBarcode.Split('_');
+            
+            if (parts.Length >= 5 && parts[parts.Length - 2].Equals("BOX", StringComparison.OrdinalIgnoreCase))
+            {
+                // Extract parts: [QR, sessionId, NoPO, Model, BOX, number]
+                var noPO = parts[2];
+                var model = parts[3];
+                var boxNumber = parts[parts.Length - 1];
+                
+                // Limit NoPO to maximum 6 characters
+                if (noPO.Length > 6)
+                {
+                    noPO = noPO.Substring(0, 6);
+                }
+                
+                return $"{noPO}_{model}_BOX_{boxNumber}";
+            }
+
+            // Fallback: if format doesn't match expected pattern
             var boxIndex = fullBarcode.IndexOf("_BOX_", StringComparison.OrdinalIgnoreCase);
             if (boxIndex >= 0)
             {
-                // Return from BOX onwards
-                return fullBarcode.Substring(boxIndex + 1); // Skip the first underscore
+                return fullBarcode.Substring(boxIndex + 1);
             }
 
-            // Fallback: if no BOX pattern, try to find last meaningful part
-            var parts = fullBarcode.Split('_');
-            if (parts.Length >= 3)
-            {
-                // Return last 2-3 parts joined
-                return string.Join("_", parts.TakeLast(Math.Min(3, parts.Length)));
-            }
-
-            // Final fallback: return as is
             return fullBarcode;
         }
 

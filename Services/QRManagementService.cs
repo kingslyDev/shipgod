@@ -103,7 +103,7 @@ namespace ShipmentFinishGood.Services
                 };
             }
 
-            // Use comprehensive scanning data
+            // Use comprehensive scanning data from ScanningService (already fixed)
             var totalScanned = scanProgress.ScannedBoxes + scanProgress.ScannedPallets + scanProgress.ScannedPcs;
             var totalItems = scanProgress.TotalBoxes + scanProgress.TotalPallets + scanProgress.TotalPcs;
             var lastScanned = scannedBoxActivities.FirstOrDefault(); // Keep BOX for last scanned info
@@ -111,7 +111,12 @@ namespace ShipmentFinishGood.Services
             // Calculate scan percentage based on total items (BOX + PALLET + PCS)
             var scanPercentage = totalItems > 0 ? (int)Math.Round((double)totalScanned / totalItems * 100) : 0;
 
-            // Create PO summaries with scan count per PO
+            Console.WriteLine($"🔍 QR MANAGEMENT: Session {sessionId}");
+            Console.WriteLine($"  📊 Total Items: {totalItems} (Box: {scanProgress.TotalBoxes}, Pallet: {scanProgress.TotalPallets}, PCS: {scanProgress.TotalPcs})");
+            Console.WriteLine($"  ✅ Total Scanned: {totalScanned} (Box: {scanProgress.ScannedBoxes}, Pallet: {scanProgress.ScannedPallets}, PCS: {scanProgress.ScannedPcs})");
+            Console.WriteLine($"  📈 Scan Percentage: {scanPercentage}%");
+
+            // Create PO summaries with scan count per PO (use BarcodeRegistry for accuracy)
             var poSummaries = new List<POSummaryInfo>();
             foreach (var po in poMasters)
             {
@@ -120,9 +125,13 @@ namespace ShipmentFinishGood.Services
                 var poNumber = po.NoPO ?? "";
                 var status = po.Status ?? "PENDING";
                 
-                // Get scan count for this specific PO by matching model product in barcode
-                var poScannedCount = scannedBoxActivities.Count(sa => 
-                    sessionBoxBarcodes.Any(bc => bc.Contains(modelProduct.Replace(" ", "")) && bc == sa.BarcodeValue));
+                // Get scan count for this specific PO from BarcodeRegistry (more accurate)
+                var poScannedCount = await _context.BarcodeRegistries
+                    .CountAsync(b => b.SessionId == sessionId && 
+                               b.POId == po.POId && 
+                               b.BarcodeType == "BOX" && 
+                               b.IsActive && 
+                               b.Status == "SCANNED");
                 
                 var poScanPercentage = po.QtyBox > 0 ? 
                     Math.Round((decimal)poScannedCount / po.QtyBox * 100, 1) : 0;

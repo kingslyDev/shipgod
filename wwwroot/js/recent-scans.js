@@ -315,40 +315,47 @@ class RecentScansManager {
   extractBarcodeDisplayText(fullBarcode) {
     if (!fullBarcode) return 'N/A';
 
-    // Find BOX pattern and extract the meaningful part
-    // Example: QR_3_20250825115813_BOX_RP-2400DBG-K_001 -> BOX_RP-2400DBG-K_001
-    const boxIndex = fullBarcode.toLowerCase().indexOf('_box_');
-    if (boxIndex >= 0) {
-      // Return from BOX onwards (skip the first underscore)
-      return fullBarcode.substring(boxIndex + 1);
-    }
-
-    // Handle other patterns like PALLET or PCS
-    const palletIndex = fullBarcode.toLowerCase().indexOf('pallet');
-    if (palletIndex >= 0) {
-      const parts = fullBarcode.split('_');
-      // Find the part with PALLET and return from there
-      const palletPartIndex = parts.findIndex((part) => part.toLowerCase().includes('pallet'));
-      if (palletPartIndex >= 0) {
-        return parts.slice(palletPartIndex).join('_');
+    // New format: QR_{sessionId}_{NoPO}_{Model}_BOX_{number}
+    // We want to display: {NoPO(max6)}_{Model}_BOX_{number}
+    const parts = fullBarcode.split('_');
+    
+    if (parts.length >= 5 && fullBarcode.includes('_BOX_')) {
+      // Find BOX index
+      const boxIndex = parts.findIndex(part => part === 'BOX');
+      if (boxIndex >= 2) {
+        // Extract parts: [QR, sessionId, NoPO, Model, BOX, number]
+        let noPO = parts[2];
+        const model = parts[3];
+        const boxNumber = parts[parts.length - 1];
+        
+        // Limit NoPO to maximum 6 characters
+        if (noPO.length > 6) {
+          noPO = noPO.substring(0, 6);
+        }
+        
+        return `${noPO}_${model}_BOX_${boxNumber}`;
       }
     }
 
-    const pcsIndex = fullBarcode.toLowerCase().indexOf('pcs');
-    if (pcsIndex >= 0) {
+    // Handle PALLET pattern 
+    if (fullBarcode.includes('_PALLET_')) {
       const parts = fullBarcode.split('_');
-      // Find the part with PCS and return from there
-      const pcsPartIndex = parts.findIndex((part) => part.toLowerCase().includes('pcs'));
-      if (pcsPartIndex >= 0) {
-        return parts.slice(pcsPartIndex).join('_');
+      const palletIndex = parts.findIndex(part => part === 'PALLET');
+      if (palletIndex >= 2) {
+        return parts.slice(2).join('_');
       }
+    }
+
+    // Handle PCS pattern (starts with %Q)
+    if (fullBarcode.startsWith('%Q')) {
+      return fullBarcode; // PCS codes are already in final format
     }
 
     // Fallback: if no specific pattern, try to find last meaningful part
-    const parts = fullBarcode.split('_');
-    if (parts.length >= 3) {
+    const fallbackParts = fullBarcode.split('_');
+    if (fallbackParts.length >= 3) {
       // Return last 2-3 parts joined
-      const lastParts = parts.slice(-Math.min(3, parts.length));
+      const lastParts = fallbackParts.slice(-Math.min(3, fallbackParts.length));
       return lastParts.join('_');
     }
 
@@ -364,9 +371,21 @@ class RecentScansManager {
     try {
       if (!this.isVisible || !this.sessionId) return;
 
-      // Normalize type
+      // Normalize type and detect based on new format
       const upperType = (scanType || '').toUpperCase();
-      const detectedType = upperType || (barcodeValue.startsWith('%Q') ? 'PCS' : 'ITEM');
+      let detectedType = upperType;
+      
+      if (!detectedType) {
+        if (barcodeValue.startsWith('%Q')) {
+          detectedType = 'PCS';
+        } else if (barcodeValue.includes('_BOX_')) {
+          detectedType = 'BOX';
+        } else if (barcodeValue.includes('_PALLET_')) {
+          detectedType = 'PALLET';
+        } else {
+          detectedType = 'ITEM';
+        }
+      }
 
       // Avoid duplicates (already present at top)
       if (this.currentScans.length > 0 && this.currentScans[0].barcodeValue === barcodeValue) {

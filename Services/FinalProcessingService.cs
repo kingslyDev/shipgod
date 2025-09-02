@@ -184,7 +184,7 @@ namespace ShipmentFinishGood.Services
             {
                 for (int i = 1; i <= poMaster.QtyBox; i++)
                 {
-                    var barcode = $"{qrIdentity}_BOX_{poMaster.ModelProduk}_{i:D3}";
+                    var barcode = $"QR_{session.SessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_BOX_{i:D3}";
                     barcodeList.Add(barcode);
                 }
             }
@@ -250,7 +250,7 @@ namespace ShipmentFinishGood.Services
                 var barcodeList = new List<string>();
                 for (int i = 1; i <= newPOMaster.QtyBox; i++)
                 {
-                    var barcode = $"{qrIdentity}_BOX_{newPOMaster.ModelProduk}_{i:D3}";
+                    var barcode = $"QR_{session.SessionId}_{newPOMaster.NoPO}_{newPOMaster.ModelProduk}_BOX_{i:D3}";
                     barcodeList.Add(barcode);
                     
                     // Save to BarcodeRegistry

@@ -76,8 +76,8 @@ namespace ShipmentFinishGood.Services
                     // ✅ SEQUENTIAL GENERATION: Ensure all boxes are generated
                     for (int boxNumber = 1; boxNumber <= poMaster.QtyBox; boxNumber++)
                     {
-                        // 🆕 NEW FORMAT: QR_{SessionId}_{NoPO}_{Model}_{BoxNumber}
-                        var barcode = $"QR_{sessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_{boxNumber:D3}";
+                        // 🆕 NEW FORMAT: QR_{SessionId}_{NoPO}_{Model}_BOX_{BoxNumber}
+                        var barcode = $"QR_{sessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_BOX_{boxNumber:D3}";
                         
                         // ✅ DUPLICATE CHECK: Prevent duplicates in memory
                         if (barcodesToInsert.Any(b => b.BarcodeValue == barcode))
@@ -200,8 +200,8 @@ namespace ShipmentFinishGood.Services
                 var barcodesToInsert = new List<BarcodeRegistry>();
                 for (int i = 1; i <= poMaster.QtyBox; i++)
                 {
-                    // 🆕 NEW FORMAT: QR_{SessionId}_{NoPO}_{Model}_{BoxNumber}
-                    var barcode = $"QR_{session.SessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_{i:D3}";
+                    // 🆕 NEW FORMAT: QR_{SessionId}_{NoPO}_{Model}_BOX_{BoxNumber}
+                    var barcode = $"QR_{session.SessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_BOX_{i:D3}";
                     barcodesToInsert.Add(new BarcodeRegistry
                     {
                         BarcodeValue = barcode,
@@ -260,7 +260,7 @@ namespace ShipmentFinishGood.Services
                     var barcodesToAdd = new List<BarcodeRegistry>();
                     for (int i = currentCount + 1; i <= newQtyBox; i++)
                     {
-                        var barcode = $"{session.IdentityQRCode}_BOX_{poMaster.ModelProduk}_{i:D3}";
+                        var barcode = $"QR_{session.SessionId}_{poMaster.NoPO}_{poMaster.ModelProduk}_BOX_{i:D3}";
                         barcodesToAdd.Add(new BarcodeRegistry
                         {
                             BarcodeValue = barcode,
