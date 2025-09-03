@@ -2,7 +2,10 @@
 @{
     ViewData["Title"] = "Scan History";
 }
-@section Styles {<link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />}
+@section Styles {<link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />
+<style>
+.bg-purple { background-color: #6f42c1 !important; }
+</style>}
 
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -50,6 +53,34 @@
                 </div>
             </div>
             <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="h5 mb-0">@Model.Count(h => h.Action == "SCAN_PALLET")</div>
+                                <div class="small">Pallet Scans</div>
+                            </div>
+                            <i class="fas fa-pallet fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-purple text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="h5 mb-0">@Model.Count(h => h.Action == "SCAN_PCS")</div>
+                                <div class="small">PCS Scans</div>
+                            </div>
+                            <i class="fas fa-cubes fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-3">
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
@@ -92,6 +123,7 @@
                                 <th>Time</th>
                                 <th>Action</th>
                                 <th>Barcode/QR</th>
+                                <th>PO Information</th>
                                 <th>User</th>
                                 <th>Result</th>
                                 <th>Details</th>
@@ -118,6 +150,16 @@
                                                     <i class="fas fa-box me-1"></i>Box Scan
                                                 </span>
                                                 break;
+                                            case "SCAN_PALLET":
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="fas fa-pallet me-1"></i>Pallet Scan
+                                                </span>
+                                                break;
+                                            case "SCAN_PCS":
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-cubes me-1"></i>PCS Scan
+                                                </span>
+                                                break;
                                             default:
                                                 <span class="badge bg-secondary">@activity.Action</span>
                                                 break;
@@ -132,6 +174,31 @@
                                             <button class="btn btn-outline-secondary btn-sm mt-1" onclick="copyToClipboard('@activity.BarcodeValue')" title="Copy">
                                                 <i class="fas fa-copy"></i>
                                             </button>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(activity.NoPO))
+                                        {
+                                            <div class="small">
+                                                <strong>PO:</strong> 
+                                                <span class="badge bg-light text-dark">@activity.NoPO</span>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(activity.ModelProduct))
+                                            {
+                                                <div class="small text-muted">
+                                                    <strong>Model:</strong> @activity.ModelProduct
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(activity.ItemType))
+                                            {
+                                                <div class="small">
+                                                    <span class="badge bg-secondary">@activity.ItemType</span>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
                                         }
                                     </td>
                                     <td>
@@ -229,7 +296,8 @@
                 },
                 columnDefs: [
                     { targets: [2], orderable: false }, // Barcode column
-                    { targets: [5], orderable: false }  // Details column
+                    { targets: [3], orderable: false }, // PO Information column
+                    { targets: [6], orderable: false }  // Details column
                 ]
             });
 

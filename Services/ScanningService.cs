@@ -608,16 +608,41 @@ namespace ShipmentFinishGood.Services
                 .Take(100)
                 .ToListAsync();
 
-            return activities.Select(a => new ScanHistoryDto
+            var historyList = new List<ScanHistoryDto>();
+
+            foreach (var activity in activities)
             {
-                ActivityId = a.ActivityId,
-                BarcodeValue = a.BarcodeValue,
-                Action = a.Action,
-                UserId = a.UserId,
-                Timestamp = a.Timestamp,
-                Result = a.Result,
-                ErrorMessage = a.ErrorMessage
-            }).ToList();
+                var historyItem = new ScanHistoryDto
+                {
+                    ActivityId = activity.ActivityId,
+                    BarcodeValue = activity.BarcodeValue,
+                    Action = activity.Action,
+                    UserId = activity.UserId,
+                    Timestamp = activity.Timestamp,
+                    Result = activity.Result,
+                    ErrorMessage = activity.ErrorMessage
+                };
+
+                // For PALLET, PCS, and BOX scans, try to get PO information from POItemRegistries
+                if (activity.Action == "SCAN_PALLET" || activity.Action == "SCAN_PCS" || activity.Action == "SCAN_BOX")
+                {
+                    var poItemRegistry = await _context.POItemRegistries
+                        .Include(pir => pir.POMaster)
+                        .FirstOrDefaultAsync(pir => pir.BarcodeValue == activity.BarcodeValue && pir.IsActive);
+
+                    if (poItemRegistry != null)
+                    {
+                        historyItem.POId = poItemRegistry.POId;
+                        historyItem.NoPO = poItemRegistry.POMaster?.NoPO;
+                        historyItem.ModelProduct = poItemRegistry.POMaster?.ModelProduk;
+                        historyItem.ItemType = poItemRegistry.ItemType;
+                    }
+                }
+
+                historyList.Add(historyItem);
+            }
+
+            return historyList;
         }
 
         public async Task<ScanSessionDetailDto?> GetSessionDetailAsync(int sessionId)

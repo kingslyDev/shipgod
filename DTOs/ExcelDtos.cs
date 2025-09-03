@@ -549,6 +549,10 @@ namespace ShipmentFinishGood.DTOs
         public DateTime Timestamp { get; set; }
         public string Result { get; set; } = string.Empty;
         public string? ErrorMessage { get; set; }
+        public int? POId { get; set; }
+        public string? NoPO { get; set; }
+        public string? ModelProduct { get; set; }
+        public string? ItemType { get; set; }
     }
 
     public class ScanSessionDetailDto
