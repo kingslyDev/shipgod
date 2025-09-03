@@ -611,6 +611,17 @@ namespace ShipmentFinishGood.Services
                     existingItem.ScannedBy = scannedBy;
                 }
 
+                // Step 6.5: Record to ScanningActivities for audit trail and recent scans
+                var scanActivity = new ScanningActivity
+                {
+                    BarcodeValue = barcode,
+                    Action = $"SCAN_{itemType}", // SCAN_BOX, SCAN_PALLET, SCAN_PCS
+                    UserId = scannedBy,
+                    Timestamp = DateTime.Now,
+                    Result = "SUCCESS"
+                };
+                _context.ScanningActivities.Add(scanActivity);
+
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation($"✅ {itemType} scan recorded: {barcode} for PO {po!.NoPO}");
@@ -870,9 +881,9 @@ namespace ShipmentFinishGood.Services
                     return Result<bool>.Success(true);
                 }
 
-                _logger.LogInformation($"🔍 Barcode not found in POItemRegistry, checking PO pattern...");
+                _logger.LogInformation($"🔍 Barcode not found in POItemRegistry, checking PO validation...");
 
-                // If not in registry, check if barcode pattern matches PO
+                // Get PO details
                 var po = await _context.POMasters.FindAsync(poId);
                 if (po == null)
                 {
@@ -884,38 +895,121 @@ namespace ShipmentFinishGood.Services
 
                 var upperBarcode = barcode?.ToUpperInvariant() ?? "";
 
-                // Ensure PO number is not null or empty
-                if (string.IsNullOrEmpty(po.NoPO))
+                // Determine item type first
+                string itemType = "";
+                if (upperBarcode.Contains("PALLET"))
+                    itemType = "PALLET";
+                else if (upperBarcode.StartsWith("%Q"))
+                    itemType = "PCS";
+                else if (upperBarcode.Contains("BOX"))
+                    itemType = "BOX";
+                else
                 {
-                    _logger.LogWarning($"❌ PO {poId} has null or empty NoPO field");
-                    return Result<bool>.Failure($"PO {poId} has invalid PO number");
+                    _logger.LogWarning($"❌ Cannot determine item type for barcode '{barcode}'");
+                    return Result<bool>.Failure($"Cannot determine item type for barcode {barcode}");
                 }
 
-                _logger.LogInformation($"🔍 Checking patterns for barcode: '{upperBarcode}' against PO: '{po.NoPO}'");
+                _logger.LogInformation($"🔍 Detected item type: {itemType}");
 
-                // Check BOX pattern
-                if (upperBarcode.Contains("BOX") && !string.IsNullOrEmpty(barcode) && barcode.Contains(po.NoPO))
+                // Validate based on item type
+                switch (itemType)
                 {
-                    _logger.LogInformation($"✅ BOX pattern matched");
-                    return Result<bool>.Success(true);
+                    case "BOX":
+                        // BOX must contain PO number
+                        if (!barcode.Contains(po.NoPO))
+                        {
+                            _logger.LogWarning($"❌ BOX barcode must contain PO number '{po.NoPO}'");
+                            return Result<bool>.Failure($"BOX barcode must contain PO number {po.NoPO}");
+                        }
+                        break;
+
+                    case "PALLET":
+                        // PALLET validation: Check if PO has PALLET quota and not exceeded
+                        if (po.QtyPallet <= 0)
+                        {
+                            _logger.LogWarning($"❌ PO {po.NoPO} does not have PALLET items (QtyPallet: {po.QtyPallet})");
+                            return Result<bool>.Failure($"PO {po.NoPO} does not contain PALLET items");
+                        }
+
+                        // Check if PALLET quota exceeded
+                        var scannedPallets = await _context.POItemRegistries
+                            .CountAsync(pir => pir.POId == poId && 
+                                              pir.ItemType == "PALLET" && 
+                                              pir.Status == "SCANNED" && 
+                                              pir.IsActive);
+
+                        if (scannedPallets >= po.QtyPallet)
+                        {
+                            _logger.LogWarning($"❌ PALLET quota exceeded for PO {po.NoPO} (Scanned: {scannedPallets}, Quota: {po.QtyPallet})");
+                            return Result<bool>.Failure($"PALLET quota exceeded for PO {po.NoPO}. Already scanned {scannedPallets}/{po.QtyPallet} pallets");
+                        }
+
+                        // Check for duplicate PALLET barcode in same session
+                        var sessionLock = await _context.UserSessionLocks
+                            .FirstOrDefaultAsync(sl => sl.POLocks.Any(pl => pl.POId == poId && pl.IsActive));
+
+                        if (sessionLock != null)
+                        {
+                            var duplicatePallet = await _context.POItemRegistries
+                                .AnyAsync(pir => pir.BarcodeValue == barcode && 
+                                               pir.ItemType == "PALLET" && 
+                                               pir.IsActive &&
+                                               _context.UserSessionLocks.Any(sl => sl.SessionId == sessionLock.SessionId && 
+                                                                                   sl.POLocks.Any(pl => pl.POId == pir.POId && pl.IsActive)));
+
+                            if (duplicatePallet)
+                            {
+                                _logger.LogWarning($"❌ PALLET barcode '{barcode}' already exists in session {sessionLock.SessionId}");
+                                return Result<bool>.Failure($"PALLET barcode '{barcode}' already scanned in this session");
+                            }
+                        }
+                        break;
+
+                    case "PCS":
+                        // PCS validation: Check if PO has PCS quota and not exceeded
+                        if (po.QtyPcs <= 0)
+                        {
+                            _logger.LogWarning($"❌ PO {po.NoPO} does not have PCS items (QtyPcs: {po.QtyPcs})");
+                            return Result<bool>.Failure($"PO {po.NoPO} does not contain PCS items");
+                        }
+
+                        // Check if PCS quota exceeded
+                        var scannedPcs = await _context.POItemRegistries
+                            .CountAsync(pir => pir.POId == poId && 
+                                              pir.ItemType == "PCS" && 
+                                              pir.Status == "SCANNED" && 
+                                              pir.IsActive);
+
+                        if (scannedPcs >= po.QtyPcs)
+                        {
+                            _logger.LogWarning($"❌ PCS quota exceeded for PO {po.NoPO} (Scanned: {scannedPcs}, Quota: {po.QtyPcs})");
+                            return Result<bool>.Failure($"PCS quota exceeded for PO {po.NoPO}. Already scanned {scannedPcs}/{po.QtyPcs} pieces");
+                        }
+
+                        // Check for duplicate PCS barcode in same session
+                        var sessionLockPcs = await _context.UserSessionLocks
+                            .FirstOrDefaultAsync(sl => sl.POLocks.Any(pl => pl.POId == poId && pl.IsActive));
+
+                        if (sessionLockPcs != null)
+                        {
+                            var duplicatePcs = await _context.POItemRegistries
+                                .AnyAsync(pir => pir.BarcodeValue == barcode && 
+                                               pir.ItemType == "PCS" && 
+                                               pir.IsActive &&
+                                               _context.UserSessionLocks.Any(sl => sl.SessionId == sessionLockPcs.SessionId && 
+                                                                                   sl.POLocks.Any(pl => pl.POId == pir.POId && pl.IsActive)));
+
+                            if (duplicatePcs)
+                            {
+                                _logger.LogWarning($"❌ PCS barcode '{barcode}' already exists in session {sessionLockPcs.SessionId}");
+                                return Result<bool>.Failure($"PCS barcode '{barcode}' already scanned in this session");
+                            }
+                        }
+                        break;
                 }
 
-                // Check PALLET pattern
-                if (upperBarcode.Contains("PALLET") && !string.IsNullOrEmpty(barcode) && barcode.Contains(po.NoPO))
-                {
-                    _logger.LogInformation($"✅ PALLET pattern matched");
-                    return Result<bool>.Success(true);
-                }
-
-                // Check PCS pattern
-                if (upperBarcode.StartsWith("%Q") && !string.IsNullOrEmpty(barcode) && barcode.Contains(po.NoPO))
-                {
-                    _logger.LogInformation($"✅ PCS pattern matched");
-                    return Result<bool>.Success(true);
-                }
-
-                _logger.LogWarning($"❌ No pattern matched for barcode '{barcode}' and PO '{po.NoPO}'");
-                return Result<bool>.Failure($"Barcode {barcode} does not belong to PO {po.NoPO}");
+                _logger.LogInformation($"✅ {itemType} validation passed for barcode '{barcode}' in PO {po.NoPO}");
+                return Result<bool>.Success(true);
             }
             catch (Exception ex)
             {

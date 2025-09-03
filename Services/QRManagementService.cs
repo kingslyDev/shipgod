@@ -87,6 +87,29 @@ namespace ShipmentFinishGood.Services
             // Get complete scan progress including all types (BOX, PALLET, PCS)
             var scanProgress = await _scanningService.GetScanProgressAsync(sessionId);
 
+            // NEW: Also check POItemRegistries for hierarchical lock scanning data
+            var scannedItemsFromRegistry = await _context.POItemRegistries
+                .Where(pir => poMasters.Select(po => po.POId).Contains(pir.POId) &&
+                             pir.Status == "SCANNED" &&
+                             pir.IsActive)
+                .ToListAsync();
+
+            // Use POItemRegistries data if available (hierarchical lock system)
+            int actualScannedBoxes = 0, actualScannedPallets = 0, actualScannedPcs = 0;
+            if (scannedItemsFromRegistry.Count > 0)
+            {
+                actualScannedBoxes = scannedItemsFromRegistry.Count(pir => pir.ItemType == "BOX");
+                actualScannedPallets = scannedItemsFromRegistry.Count(pir => pir.ItemType == "PALLET");
+                actualScannedPcs = scannedItemsFromRegistry.Count(pir => pir.ItemType == "PCS");
+            }
+            else if (scanProgress != null)
+            {
+                // Fallback to old scanning service data
+                actualScannedBoxes = scanProgress.ScannedBoxes;
+                actualScannedPallets = scanProgress.ScannedPallets;
+                actualScannedPcs = scanProgress.ScannedPcs;
+            }
+
             // Ensure scanProgress is not null and has valid values
             if (scanProgress == null)
             {
@@ -96,11 +119,21 @@ namespace ShipmentFinishGood.Services
                     TotalBoxes = totalBoxes,
                     TotalPallets = totalPallets,
                     TotalPcs = totalPcs,
-                    ScannedBoxes = 0,
-                    ScannedPallets = 0,
-                    ScannedPcs = 0,
+                    ScannedBoxes = actualScannedBoxes,
+                    ScannedPallets = actualScannedPallets,
+                    ScannedPcs = actualScannedPcs,
                     CanComplete = false
                 };
+            }
+            else
+            {
+                // Update scanProgress with actual data from POItemRegistries if available
+                if (scannedItemsFromRegistry.Count > 0)
+                {
+                    scanProgress.ScannedBoxes = actualScannedBoxes;
+                    scanProgress.ScannedPallets = actualScannedPallets;
+                    scanProgress.ScannedPcs = actualScannedPcs;
+                }
             }
 
             // Use comprehensive scanning data from ScanningService (already fixed)
@@ -116,7 +149,7 @@ namespace ShipmentFinishGood.Services
             Console.WriteLine($"  ✅ Total Scanned: {totalScanned} (Box: {scanProgress.ScannedBoxes}, Pallet: {scanProgress.ScannedPallets}, PCS: {scanProgress.ScannedPcs})");
             Console.WriteLine($"  📈 Scan Percentage: {scanPercentage}%");
 
-            // Create PO summaries with scan count per PO (use BarcodeRegistry for accuracy)
+            // Create PO summaries with scan count per PO (use POItemRegistries for hierarchical lock accuracy)
             var poSummaries = new List<POSummaryInfo>();
             foreach (var po in poMasters)
             {
@@ -125,16 +158,45 @@ namespace ShipmentFinishGood.Services
                 var poNumber = po.NoPO ?? "";
                 var status = po.Status ?? "PENDING";
                 
-                // Get scan count for this specific PO from BarcodeRegistry (more accurate)
-                var poScannedCount = await _context.BarcodeRegistries
-                    .CountAsync(b => b.SessionId == sessionId && 
-                               b.POId == po.POId && 
-                               b.BarcodeType == "BOX" && 
-                               b.IsActive && 
-                               b.Status == "SCANNED");
+                // Get ACCURATE scan count for this specific PO from POItemRegistries (hierarchical lock data)
+                var poScannedBoxes = await _context.POItemRegistries
+                    .CountAsync(pir => pir.POId == po.POId && 
+                                      pir.ItemType == "BOX" && 
+                                      pir.Status == "SCANNED" && 
+                                      pir.IsActive);
                 
-                var poScanPercentage = po.QtyBox > 0 ? 
-                    Math.Round((decimal)poScannedCount / po.QtyBox * 100, 1) : 0;
+                var poScannedPallets = await _context.POItemRegistries
+                    .CountAsync(pir => pir.POId == po.POId && 
+                                      pir.ItemType == "PALLET" && 
+                                      pir.Status == "SCANNED" && 
+                                      pir.IsActive);
+                
+                var poScannedPcs = await _context.POItemRegistries
+                    .CountAsync(pir => pir.POId == po.POId && 
+                                      pir.ItemType == "PCS" && 
+                                      pir.Status == "SCANNED" && 
+                                      pir.IsActive);
+
+                // Total scanned for this PO (all types combined)
+                var poTotalScanned = poScannedBoxes + poScannedPallets + poScannedPcs;
+                
+                // Total expected for this PO (all types combined)
+                var poTotalExpected = po.QtyBox + po.QtyPallet + po.QtyPcs;
+                
+                // Calculate accurate percentage based on actual PO data
+                var poScanPercentage = poTotalExpected > 0 ? 
+                    Math.Round((decimal)poTotalScanned / poTotalExpected * 100, 1) : 0;
+
+                // Determine PO status based on scanning progress
+                var poStatusFinal = status;
+                if (poTotalScanned == poTotalExpected && poTotalExpected > 0)
+                {
+                    poStatusFinal = "COMPLETED";
+                }
+                else if (poTotalScanned > 0)
+                {
+                    poStatusFinal = "IN PROGRESS";
+                }
 
                 poSummaries.Add(new POSummaryInfo
                 {
@@ -144,10 +206,12 @@ namespace ShipmentFinishGood.Services
                     QtyPallet = po.QtyPallet,
                     QtyBox = po.QtyBox,
                     QtyPcs = po.QtyPcs,
-                    Status = status,
-                    ScannedCount = poScannedCount,
+                    Status = poStatusFinal,
+                    ScannedCount = poTotalScanned,
                     ScannedPercentage = poScanPercentage
                 });
+                
+                Console.WriteLine($"  📦 PO {poNumber}: {poTotalScanned}/{poTotalExpected} items scanned ({poScanPercentage}%) - Boxes: {poScannedBoxes}/{po.QtyBox}, Pallets: {poScannedPallets}/{po.QtyPallet}, PCS: {poScannedPcs}/{po.QtyPcs}");
             }
 
             // Generate QR code image as base64
