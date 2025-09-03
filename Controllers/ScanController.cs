@@ -15,13 +15,20 @@ namespace ShipmentFinishGood.Controllers
         private readonly IScanningService _scanService;
         private readonly IExcelProcessingService _excelService;
         private readonly IBarcodeService _barcodeService;
+        private readonly IPOValidationService _poValidationService; // Phase 2 addition
         private readonly AppDbContext _context;
 
-        public ScanController(IScanningService scanService, IExcelProcessingService excelService, IBarcodeService barcodeService, AppDbContext context)
+        public ScanController(
+            IScanningService scanService, 
+            IExcelProcessingService excelService, 
+            IBarcodeService barcodeService, 
+            IPOValidationService poValidationService, // Phase 2 addition
+            AppDbContext context)
         {
             _scanService = scanService;
             _excelService = excelService;
             _barcodeService = barcodeService;
+            _poValidationService = poValidationService; // Phase 2 addition
             _context = context;
         }
 
@@ -150,7 +157,7 @@ namespace ShipmentFinishGood.Controllers
         /// Automatically determines item type based on barcode content
         /// </summary>
         [HttpPost]
-        public async Task<IActionResult> ScanItem(int sessionId, string barcode)
+        public async Task<IActionResult> ScanItem(int sessionId, string barcode, int? selectedPOId = null)
         {
             try
             {
@@ -162,17 +169,19 @@ namespace ShipmentFinishGood.Controllers
                     return Json(new { success = false, message = "Barcode cannot be empty" });
                 }
                 
-                // Enhanced debug logging
+                // Enhanced debug logging with PO Context
                 Console.WriteLine($"=== SCAN ITEM DEBUG ===");
                 Console.WriteLine($"SessionId: {sessionId}");
                 Console.WriteLine($"Barcode: {barcode}");
                 Console.WriteLine($"User: {userName}");
+                Console.WriteLine($"Selected PO: {selectedPOId}");
                 Console.WriteLine($"Barcode Length: {barcode.Length}");
                 Console.WriteLine($"Contains PALLET: {barcode.ToUpperInvariant().Contains("PALLET")}");
                 Console.WriteLine($"Starts with %Q (PCS): {barcode.ToUpperInvariant().StartsWith("%Q")}");
                 Console.WriteLine($"Contains BOX: {barcode.ToUpperInvariant().Contains("BOX")}");
                 
-                var result = await _scanService.ScanItemBarcodeAsync(sessionId, barcode, userName);
+                // PHASE 2: Pass selectedPOId to service for hierarchical lock tracking
+                var result = await _scanService.ScanItemBarcodeAsync(sessionId, barcode, userName, selectedPOId);
                 
                 Console.WriteLine($"Scan Result Success: {result.IsSuccess}");
                 if (!result.IsSuccess)
@@ -534,6 +543,280 @@ namespace ShipmentFinishGood.Controllers
             {
                 return Json(new { success = false, message = ex.Message });
             }
+        }
+
+        // ===== PHASE 2: HIERARCHICAL LOCK VALIDATION ENDPOINTS =====
+
+        /// <summary>
+        /// Validates if a session is still active and scannable
+        /// Critical for localStorage sync and zero-failure operation
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ValidateSessionState(int sessionId)
+        {
+            try
+            {
+                var result = await _poValidationService.ValidateSessionStateAsync(sessionId);
+                
+                if (result.IsSuccess && result.Value != null)
+                {
+                    return Json(new { 
+                        success = true, 
+                        data = result.Value,
+                        sessionId = sessionId,
+                        status = result.Value.Status,
+                        canScan = result.Value.CanScan,
+                        completionReason = result.Value.CompletionReason
+                    });
+                }
+                else
+                {
+                    return Json(new { 
+                        success = false, 
+                        message = result.Error ?? "Unknown validation error",
+                        sessionId = sessionId 
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { 
+                    success = false, 
+                    message = ex.Message,
+                    sessionId = sessionId 
+                });
+            }
+        }
+
+        /// <summary>
+        /// Validates if a PO is still active and has scannable items
+        /// Essential for PO context validation in hierarchical lock
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ValidatePOState(int poId)
+        {
+            try
+            {
+                var result = await _poValidationService.ValidatePOStateAsync(poId);
+                
+                if (result.IsSuccess && result.Value != null)
+                {
+                    return Json(new { 
+                        success = true, 
+                        data = result.Value,
+                        poId = poId,
+                        isCompleted = result.Value.IsCompleted,
+                        canContinueScanning = result.Value.CanContinueScanning,
+                        nextAvailableItemType = result.Value.NextAvailableItemType
+                    });
+                }
+                else
+                {
+                    return Json(new { 
+                        success = false, 
+                        message = result.Error ?? "Unknown validation error",
+                        poId = poId 
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { 
+                    success = false, 
+                    message = ex.Message,
+                    poId = poId 
+                });
+            }
+        }
+
+        /// <summary>
+        /// Gets all available POs for a session that can be scanned
+        /// Used for PO selection UI in hierarchical lock system
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetAvailablePOs(int sessionId)
+        {
+            try
+            {
+                var result = await _poValidationService.GetAvailablePOsAsync(sessionId);
+                
+                if (result.IsSuccess && result.Value != null)
+                {
+                    return Json(new { 
+                        success = true, 
+                        data = result.Value,
+                        sessionId = sessionId,
+                        totalPOs = result.Value.Count,
+                        availablePOs = result.Value.Count(po => po.IsAvailable)
+                    });
+                }
+                else
+                {
+                    return Json(new { 
+                        success = false, 
+                        message = result.Error ?? "Unknown validation error",
+                        sessionId = sessionId 
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { 
+                    success = false, 
+                    message = ex.Message,
+                    sessionId = sessionId 
+                });
+            }
+        }
+
+        /// <summary>
+        /// Enhanced recent scans with PO filtering capability
+        /// Supports both session-wide and PO-specific views
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetRecentScansEnhanced(int sessionId, int? poId = null, int limit = 50)
+        {
+            try
+            {
+                RecentScansResponseDto recentScans;
+                
+                if (poId.HasValue)
+                {
+                    // PO-specific recent scans for hierarchical lock context
+                    recentScans = await GetPOSpecificRecentScansAsync(sessionId, poId.Value, limit);
+                }
+                else
+                {
+                    // Session-wide recent scans (existing functionality)
+                    recentScans = await _scanService.GetRecentScansAsync(sessionId, limit);
+                }
+                
+                return Json(new { 
+                    success = true, 
+                    data = recentScans,
+                    sessionId = sessionId,
+                    poId = poId,
+                    isFiltered = poId.HasValue
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // ===== PRIVATE HELPER METHODS FOR PHASE 2 =====
+
+        /// <summary>
+        /// Gets recent scans specific to a PO for hierarchical lock context
+        /// Shows all BOX items (scanned + pending) and actual PALLET/PCS scans
+        /// </summary>
+        private async Task<RecentScansResponseDto> GetPOSpecificRecentScansAsync(int sessionId, int poId, int limit)
+        {
+            var po = await _context.POMasters.FindAsync(poId);
+            if (po == null)
+            {
+                return new RecentScansResponseDto
+                {
+                    RecentScans = new List<RecentScanDto>(),
+                    SessionInfo = "PO not found"
+                };
+            }
+
+            var enrichedScans = new List<RecentScanDto>();
+
+            // 1. BOX items for this PO (all boxes, scanned + pending)
+            var boxBarcodes = await _context.BarcodeRegistries
+                .Where(b => b.SessionId == sessionId && 
+                           b.POId == poId && 
+                           b.BarcodeType == "BOX" && 
+                           b.IsActive)
+                .OrderBy(b => b.BoxNumber)
+                .ToListAsync();
+
+            foreach (var box in boxBarcodes)
+            {
+                enrichedScans.Add(new RecentScanDto
+                {
+                    BarcodeValue = box.BarcodeValue,
+                    ItemType = "BOX",
+                    PONumber = po.NoPO,
+                    ModelProduct = box.ModelProduct ?? po.ModelProduk,
+                    IsCompleted = box.Status == "SCANNED",
+                    ScannedAt = box.ScannedDate ?? DateTime.MinValue,
+                    ScannedBy = box.ScannedBy ?? "",
+                    Status = box.Status,
+                    SequenceNumber = box.BoxNumber ?? 0
+                });
+            }
+
+            // 2. PALLET items for this PO (only scanned ones)
+            var palletScans = await _context.ScanningActivities
+                .Where(sa => sa.Action == "SCAN_PALLET" && 
+                            sa.Result == "SUCCESS" &&
+                            sa.POContext == $"PO_{poId}")
+                .OrderByDescending(sa => sa.Timestamp)
+                .ToListAsync();
+
+            foreach (var pallet in palletScans)
+            {
+                enrichedScans.Add(new RecentScanDto
+                {
+                    BarcodeValue = pallet.BarcodeValue,
+                    ItemType = "PALLET",
+                    PONumber = po.NoPO,
+                    ModelProduct = po.ModelProduk,
+                    IsCompleted = true,
+                    ScannedAt = pallet.Timestamp,
+                    ScannedBy = pallet.UserId ?? "",
+                    Status = "SCANNED"
+                });
+            }
+
+            // 3. PCS items for this PO (only scanned ones)
+            var pcsScans = await _context.ScanningActivities
+                .Where(sa => sa.Action == "SCAN_PCS" && 
+                            sa.Result == "SUCCESS" &&
+                            sa.POContext == $"PO_{poId}")
+                .OrderByDescending(sa => sa.Timestamp)
+                .ToListAsync();
+
+            foreach (var pcs in pcsScans)
+            {
+                enrichedScans.Add(new RecentScanDto
+                {
+                    BarcodeValue = pcs.BarcodeValue,
+                    ItemType = "PCS",
+                    PONumber = po.NoPO,
+                    ModelProduct = po.ModelProduk,
+                    IsCompleted = true,
+                    ScannedAt = pcs.Timestamp,
+                    ScannedBy = pcs.UserId ?? "",
+                    Status = "SCANNED"
+                });
+            }
+
+            // Calculate statistics
+            var totalItems = po.QtyBox + po.QtyPallet + po.QtyPcs;
+            var scannedItems = enrichedScans.Count(s => s.IsCompleted);
+
+            return new RecentScansResponseDto
+            {
+                RecentScans = enrichedScans.Take(limit).ToList(),
+                TotalCount = totalItems,
+                ScannedCount = scannedItems,
+                PendingCount = totalItems - scannedItems,
+                SessionInfo = $"PO: {po.NoPO} ({po.ModelProduk})",
+                Stats = new RecentStatsDto
+                {
+                    BoxTotal = po.QtyBox,
+                    PalletTotal = po.QtyPallet,
+                    PcsTotal = po.QtyPcs,
+                    BoxScanned = boxBarcodes.Count(b => b.Status == "SCANNED"),
+                    PalletScanned = palletScans.Count,
+                    PcsScanned = pcsScans.Count
+                }
+            };
         }
     }
 }

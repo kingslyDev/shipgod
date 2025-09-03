@@ -17,6 +17,12 @@ namespace ShipmentFinishGood.Models
         
         public string? AssignedArea { get; set; } // Area A, B, C
         
+        /// <summary>
+        /// PO Context for hierarchical lock tracking - Format: "PO_{POId}"
+        /// Used for PALLET/PCS items to link them to specific POs
+        /// </summary>
+        public string? POContext { get; set; }
+        
         public DateTime Timestamp { get; set; } = DateTime.Now;
         
         public string Result { get; set; } = "SUCCESS"; // 'SUCCESS', 'ERROR'

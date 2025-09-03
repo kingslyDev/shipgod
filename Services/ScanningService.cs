@@ -92,6 +92,24 @@ namespace ShipmentFinishGood.Services
 
                 if (masterBarcode != null)
                 {
+                    // Calculate completed POs (POs with all their barcodes scanned)
+                    var completedPOs = 0;
+                    foreach (var po in session.POMasters)
+                    {
+                        var totalBarcodes = await _context.BarcodeRegistries
+                            .CountAsync(b => b.SessionId == session.SessionId && 
+                                           b.POId == po.POId && 
+                                           b.IsActive);
+                        
+                        var scannedBarcodes = await _context.ScanningActivities
+                            .CountAsync(s => s.POContext == $"PO_{po.POId}");
+                        
+                        if (totalBarcodes > 0 && scannedBarcodes >= totalBarcodes)
+                        {
+                            completedPOs++;
+                        }
+                    }
+
                     result.Add(new ScanSessionSummaryDto
                     {
                         SessionId = session.SessionId,
@@ -101,6 +119,7 @@ namespace ShipmentFinishGood.Services
                         ShipmentDate = session.ShipmentDate,
                         TotalBoxes = session.TotalBoxes > 0 ? session.TotalBoxes : session.POMasters.Sum(p => p.QtyBox),
                         TotalPOs = session.POMasters.Count,
+                        CompletedPOs = completedPOs,
                         CreatedDate = session.UploadDate,
                         CreatedBy = session.UploadedBy,
                         Status = GetScanStatus(session.SessionId)
@@ -380,11 +399,18 @@ namespace ShipmentFinishGood.Services
         /// <summary>
         /// Universal scan method for Box, Pallet, or PCS items
         /// Determines scan type based on barcode content
+        /// PHASE 2: Enhanced with PO Context support
         /// </summary>
-        public async Task<Result<ScanResultDto>> ScanItemBarcodeAsync(int sessionId, string barcode, string scannedBy)
+        public async Task<Result<ScanResultDto>> ScanItemBarcodeAsync(int sessionId, string barcode, string scannedBy, int? selectedPOId = null)
         {
             try
             {
+                // Log PO Context for debugging
+                if (selectedPOId.HasValue)
+                {
+                    Console.WriteLine($"🎯 HIERARCHICAL SCAN: Session={sessionId}, PO={selectedPOId.Value}, Barcode={barcode}");
+                }
+
                 // Determine scan type based on barcode content
                 var scanType = DetermineScanType(barcode);
                 
@@ -394,10 +420,10 @@ namespace ShipmentFinishGood.Services
                         return await ScanBoxBarcodeAsync(sessionId, barcode, scannedBy);
                     
                     case ScanItemType.Pallet:
-                        return await ScanPalletItemAsync(sessionId, barcode, scannedBy);
+                        return await ScanPalletItemAsync(sessionId, barcode, scannedBy, selectedPOId);
                     
                     case ScanItemType.Pcs:
-                        return await ScanPcsItemAsync(sessionId, barcode, scannedBy);
+                        return await ScanPcsItemAsync(sessionId, barcode, scannedBy, selectedPOId);
                     
                     default:
                         return Result<ScanResultDto>.Failure("Invalid barcode format. Barcode must contain 'BOX', 'PALLET', or start with '%Q' for PCS");
@@ -411,8 +437,9 @@ namespace ShipmentFinishGood.Services
 
         /// <summary>
         /// Scan a pallet item - simplified for any barcode containing "PALLET"
+        /// PHASE 2: Enhanced with PO Context tracking
         /// </summary>
-        private async Task<Result<ScanResultDto>> ScanPalletItemAsync(int sessionId, string barcode, string scannedBy)
+        private async Task<Result<ScanResultDto>> ScanPalletItemAsync(int sessionId, string barcode, string scannedBy, int? selectedPOId = null)
         {
             // Basic validation - must be locked to a session first
             var userLockResult = await CheckUserLockAsync(scannedBy);
@@ -423,6 +450,16 @@ namespace ShipmentFinishGood.Services
             var poData = await GetPODataForSessionAsync(sessionId);
             if (!poData.Any())
                 return Result<ScanResultDto>.Failure("No PO data found for this session");
+
+            // If PO is selected, validate it exists in this session
+            if (selectedPOId.HasValue)
+            {
+                var selectedPO = poData.FirstOrDefault(po => po.POId == selectedPOId.Value);
+                if (selectedPO == null)
+                    return Result<ScanResultDto>.Failure($"Selected PO {selectedPOId.Value} not found in this session");
+                
+                Console.WriteLine($"🎯 PALLET SCAN with PO Context: Session={sessionId}, PO={selectedPOId.Value}, Barcode={barcode}");
+            }
 
             // Calculate total pallets and validate session has pallets
             var totalPallets = poData.Sum(po => po.QtyPallet);
@@ -443,21 +480,21 @@ namespace ShipmentFinishGood.Services
             if (alreadyScanned)
                 return Result<ScanResultDto>.Failure("This pallet barcode has already been scanned");
 
-            // Record the scan - simplified, no complex validation
-            var scanResult = await RecordItemScanAsync(sessionId, barcode, ScanItemType.Pallet, scannedBy);
+            // Record the scan with PO Context - PHASE 2 Implementation
+            var scanResult = await RecordItemScanAsync(sessionId, barcode, ScanItemType.Pallet, scannedBy, selectedPOId);
             if (!scanResult.IsSuccess)
                 return Result<ScanResultDto>.Failure(scanResult.Error!);
 
             // Send real-time update
             await SendProgressUpdateAsync(sessionId, barcode);
 
-            Console.WriteLine($"✅ PALLET SCAN SUCCESS: Session {sessionId}, Barcode {barcode}, Progress {scannedPallets + 1}/{totalPallets}");
+            Console.WriteLine($"✅ PALLET SCAN SUCCESS: Session {sessionId}, POContext={selectedPOId}, Barcode {barcode}, Progress {scannedPallets + 1}/{totalPallets}");
 
             return Result<ScanResultDto>.Success(new ScanResultDto
             {
                 BarcodeValue = barcode,
                 ScanType = ScanItemType.Pallet,
-                Message = $"Pallet scanned successfully ({scannedPallets + 1}/{totalPallets})",
+                Message = $"Pallet scanned successfully ({scannedPallets + 1}/{totalPallets})" + (selectedPOId.HasValue ? $" [PO {selectedPOId.Value}]" : ""),
                 Timestamp = DateTime.Now,
                 ScannedBy = scannedBy
             });
@@ -465,8 +502,9 @@ namespace ShipmentFinishGood.Services
 
         /// <summary>
         /// Scan a PCS item - simplified for any barcode starting with "%Q"
+        /// PHASE 2: Enhanced with PO Context tracking
         /// </summary>
-        private async Task<Result<ScanResultDto>> ScanPcsItemAsync(int sessionId, string barcode, string scannedBy)
+        private async Task<Result<ScanResultDto>> ScanPcsItemAsync(int sessionId, string barcode, string scannedBy, int? selectedPOId = null)
         {
             // Basic validation - must be locked to a session first
             var userLockResult = await CheckUserLockAsync(scannedBy);
@@ -477,6 +515,16 @@ namespace ShipmentFinishGood.Services
             var poData = await GetPODataForSessionAsync(sessionId);
             if (!poData.Any())
                 return Result<ScanResultDto>.Failure("No PO data found for this session");
+
+            // If PO is selected, validate it exists in this session
+            if (selectedPOId.HasValue)
+            {
+                var selectedPO = poData.FirstOrDefault(po => po.POId == selectedPOId.Value);
+                if (selectedPO == null)
+                    return Result<ScanResultDto>.Failure($"Selected PO {selectedPOId.Value} not found in this session");
+                
+                Console.WriteLine($"🎯 PCS SCAN with PO Context: Session={sessionId}, PO={selectedPOId.Value}, Barcode={barcode}");
+            }
 
             // Calculate total pcs and validate session has PCS
             var totalPcs = poData.Sum(po => po.QtyPcs);
@@ -497,21 +545,21 @@ namespace ShipmentFinishGood.Services
             if (alreadyScanned)
                 return Result<ScanResultDto>.Failure("This PCS barcode has already been scanned");
 
-            // Record the scan - simplified, no complex validation
-            var scanResult = await RecordItemScanAsync(sessionId, barcode, ScanItemType.Pcs, scannedBy);
+            // Record the scan with PO Context - PHASE 2 Implementation
+            var scanResult = await RecordItemScanAsync(sessionId, barcode, ScanItemType.Pcs, scannedBy, selectedPOId);
             if (!scanResult.IsSuccess)
                 return Result<ScanResultDto>.Failure(scanResult.Error!);
 
             // Send real-time update
             await SendProgressUpdateAsync(sessionId, barcode);
 
-            Console.WriteLine($"✅ PCS SCAN SUCCESS: Session {sessionId}, Barcode {barcode}, Progress {scannedPcs + 1}/{totalPcs}");
+            Console.WriteLine($"✅ PCS SCAN SUCCESS: Session {sessionId}, POContext={selectedPOId}, Barcode {barcode}, Progress {scannedPcs + 1}/{totalPcs}");
 
             return Result<ScanResultDto>.Success(new ScanResultDto
             {
                 BarcodeValue = barcode,
                 ScanType = ScanItemType.Pcs,
-                Message = $"PCS item scanned successfully ({scannedPcs + 1}/{totalPcs})",
+                Message = $"PCS item scanned successfully ({scannedPcs + 1}/{totalPcs})" + (selectedPOId.HasValue ? $" [PO {selectedPOId.Value}]" : ""),
                 Timestamp = DateTime.Now,
                 ScannedBy = scannedBy
             });
@@ -1054,7 +1102,7 @@ namespace ShipmentFinishGood.Services
         /// <summary>
         /// Records an item scan in the database
         /// </summary>
-        private async Task<Result<bool>> RecordItemScanAsync(int sessionId, string barcode, ScanItemType itemType, string scannedBy)
+        private async Task<Result<bool>> RecordItemScanAsync(int sessionId, string barcode, ScanItemType itemType, string scannedBy, int? selectedPOId = null)
         {
             try
             {
@@ -1066,11 +1114,15 @@ namespace ShipmentFinishGood.Services
                     Timestamp = DateTime.Now,
                     Result = "SUCCESS",
                     // Store session info using AssignedArea field for session tracking
-                    AssignedArea = $"Session_{sessionId}"
+                    AssignedArea = $"Session_{sessionId}",
+                    // Store PO Context for hierarchical lock tracking - PHASE 1 Implementation
+                    POContext = selectedPOId.HasValue ? $"PO_{selectedPOId.Value}" : null
                 };
 
                 _context.ScanningActivities.Add(scanActivity);
                 await _context.SaveChangesAsync();
+
+                Console.WriteLine($"📊 SCAN RECORDED: Session={sessionId}, Type={itemType}, POContext={scanActivity.POContext}, Barcode={barcode}");
 
                 return Result<bool>.Success(true);
             }

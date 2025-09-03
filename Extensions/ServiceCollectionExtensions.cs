@@ -47,6 +47,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISmartBarcodeManager, SmartBarcodeManager>();
         services.AddScoped<IScanningProtectionService, ScanningProtectionService>();
         
+        // 🔒 HIERARCHICAL LOCK VALIDATION SERVICES - Phase 2
+        services.AddScoped<IPOValidationService, POValidationService>();
+        
         return services;
     }    public static IServiceCollection AddAppAuthentication(this IServiceCollection services, IConfiguration config)
     {

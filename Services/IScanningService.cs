@@ -9,7 +9,7 @@ namespace ShipmentFinishGood.Services
         Task<ScanSessionDto?> GetScanSessionAsync(int sessionId);
         Task<Result<ScanResultDto>> ScanMasterQRAsync(int sessionId, string qrCode, string scannedBy);
         Task<Result<ScanResultDto>> ScanBoxBarcodeAsync(int sessionId, string barcode, string scannedBy);
-        Task<Result<ScanResultDto>> ScanItemBarcodeAsync(int sessionId, string barcode, string scannedBy);
+        Task<Result<ScanResultDto>> ScanItemBarcodeAsync(int sessionId, string barcode, string scannedBy, int? selectedPOId = null);
         Task<ScanProgressDto> GetScanProgressAsync(int sessionId);
         Task<List<BarcodeItemDto>> GetBarcodeListAsync(int sessionId);
         Task<List<ScanHistoryDto>> GetScanHistoryAsync();

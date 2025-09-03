@@ -1,6 +1,6 @@
 @model List<ShipmentFinishGood.DTOs.ScanSessionSummaryDto>
 @{
-    ViewData["Title"] = "Scanner Dashboard";
+    ViewData["Title"] = "Scanner Dashboard - Hierarchical Lock System";
 }
 @section Styles {
 <link rel="stylesheet" href="~/css/scan.css" asp-append-version="true" />
@@ -9,16 +9,17 @@
 }
 
 <div class="container py-4">
+    <!-- Clean Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0 text-primary">
-            <i class="fas fa-barcode me-2"></i>Scanner Dashboard
+        <h2 class="mb-0 text-dark fw-bold">
+            <i class="fas fa-qrcode me-2 text-primary"></i>Hierarchical Lock Scanner
         </h2>
         <div class="d-flex gap-2">
-            <button class="btn btn-outline-primary" onclick="refreshSessions()">
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshHierarchicalState()">
                 <i class="fas fa-sync-alt me-1"></i>Refresh
             </button>
-            <a asp-action="History" class="btn btn-outline-info">
-                <i class="fas fa-history me-1"></i>Scan History
+            <a asp-action="History" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-history me-1"></i>History
             </a>
         </div>
     </div>
@@ -48,43 +49,79 @@
         </div>
     }
 
-    <!-- Main Scanning Input -->
+    <!-- ===== CLEAN HIERARCHICAL LOCK UI ===== -->
+    
+    <!-- Status and Session Selection Row -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-3">
+            <div id="hierarchical-lock-status"></div>
+        </div>
+        <div class="col-lg-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h6 class="mb-0 text-dark fw-semibold">
+                        <i class="fas fa-database me-2 text-primary"></i>Session Selection
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <select class="form-select mb-3" id="sessionSelectEnhanced">
+                        <option value="">-- Select Session to Lock --</option>
+                    </select>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" id="initializeSessionBtn" disabled>
+                            <i class="fas fa-play me-2"></i>Initialize Session
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="refreshSessionList()">
+                            <i class="fas fa-sync-alt me-2"></i>Refresh Sessions
+                        </button>
+                    </div>
+                    <div class="mt-3" id="sessionPreview" style="display: none;">
+                        <!-- Session details will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clean Main Scanning Interface -->
     <div class="row mb-3">
     <div class="col-12">
-        <div class="card shadow-lg scanner-card" id="scannerCard">
-            <div class="card-header bg-gradient-primary text-white py-2 scanner-header">
+        <div class="card border-0 shadow" id="scannerCard">
+            <div class="card-header bg-light border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
-                    <div class="header-title-section">
-                        <div class="scanner-pulse"></div>
-                        <small class="mb-0 fw-bold scanner-title">
-                            <i class="fas fa-qrcode me-2 scanner-icon"></i>Smart Scanner
-                        </small>
-                        <div class="scanner-status-line" id="scannerStatusLine">
-                            <span id="headerScannerStatus">Ready to scan</span>
-                            <span id="headerLockStatus" style="display: none;"></span>
+                    <div>
+                        <h6 class="mb-0 text-dark fw-semibold">
+                            <i class="fas fa-qrcode me-2 text-primary"></i>Scanner Interface
+                        </h6>
+                        <small class="text-muted" id="scanHelpText">Initialize session to begin scanning</small>
+                    </div>
+                            <span id="headerLockStatus" class="ms-2"></span>
                         </div>
                     </div>
                     <div class="d-flex gap-1 scanner-controls">
-                        <button class="btn btn-outline-light btn-sm scanner-control-btn" onclick="manualRefreshSessions()" 
-                                title="Refresh QR data" data-bs-toggle="tooltip">
+                        <button class="btn btn-outline-light btn-sm scanner-control-btn" id="selectPOButton" 
+                                onclick="showPOSelector()" title="Select PO for scanning" style="display: none;">
+                            <i class="fas fa-list-check"></i>
+                        </button>
+                        <button class="btn btn-outline-light btn-sm scanner-control-btn" onclick="refreshHierarchicalState()" 
+                                title="Refresh hierarchical state">
                             <i class="fas fa-sync-alt"></i>
                         </button>
-                        <button class="btn btn-outline-light btn-sm scanner-control-btn" onclick="debugScanSystem()" 
-                                title="Debug scan system" data-bs-toggle="tooltip">
-                            <i class="fas fa-bug"></i>
-                        </button>
-                        <button class="btn btn-outline-warning btn-sm scanner-control-btn" onclick="emergencyUnlock()" 
-                                title="Emergency unlock if stuck in session" data-bs-toggle="tooltip"
-                                style="display: none;" id="emergencyUnlockBtn">
+                        <button class="btn btn-outline-warning btn-sm scanner-control-btn" onclick="resetHierarchicalLock()" 
+                                title="Reset hierarchical lock" style="display: none;" id="resetLockBtn">
                             <i class="fas fa-unlock"></i>
+                        </button>
+                        <button class="btn btn-outline-info btn-sm scanner-control-btn" onclick="logCurrentState()" 
+                                title="Debug: Show current state" id="debugStateBtn">
+                            <i class="fas fa-bug"></i>
                         </button>
                     </div>
                 </div>
             </div>
             <div class="card-body py-3 scanner-body">
                 <div class="row align-items-center main-scanner-section">
-                    <!-- Input Section - Prioritized for tablet -->
-                    <div class="col-xl-4 col-lg-5 col-md-12 mb-3">
+                    <!-- Enhanced Input Section -->
+                    <div class="col-xl-6 col-lg-7 col-md-12 mb-3">
                         <div class="scanner-input-group">
                             <div class="input-group input-group-lg">
                                 <span class="input-group-text scanner-icon-bg">
@@ -93,66 +130,68 @@
                                 <input type="text" 
                                        id="mainScanInput" 
                                        class="form-control scanner-input" 
-                                       placeholder="📱 Scan QR or barcode here..." 
+                                       placeholder="� Initialize session first..." 
                                        autocomplete="off" 
                                        spellcheck="false"
                                        inputmode="text"
                                        aria-label="Scan input"
                                        aria-describedby="scanHelp"
-                                       autofocus>
-                                <button class="btn btn-primary scan-submit-btn" type="button" onclick="processScan()" aria-label="Process scan">
+                                       disabled>
+                                <button class="btn btn-primary scan-submit-btn" type="button" onclick="processHierarchicalScan()" 
+                                        aria-label="Process scan" disabled id="scanSubmitBtn">
                                     <i class="fas fa-check scan-check-icon"></i>
                                     <span class="scan-button-text d-none d-lg-inline">Scan</span>
                                 </button>
                             </div>
                             <div id="scanHelp" class="form-text scanner-help">
                                 <i class="fas fa-info-circle me-1"></i>
-                                <span id="scanHelpText">First scan QR Identity, then scan Box, Pallet, or PCS barcodes.</span>
+                                <span id="scanHelpText">Initialize session → Scan Master QR → Select PO → Scan Items</span>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Session Selector - Compact for tablet -->
-                    <div class="col-xl-3 col-lg-3 col-md-5 mb-3">
-                        <div class="session-selector-group">
-                            <label class="form-label session-label d-none d-lg-flex">
-                                <i class="fas fa-list me-1"></i>Quick Session Lock
-                            </label>
-                            <div class="input-group session-input-group">
-                                <select class="form-select session-dropdown" id="sessionSelect" onchange="onQuickSessionChange()">
-                                    <option value="">-- Select Session --</option>
-                                </select>
-                                <button class="btn btn-outline-success session-lock-btn" type="button" onclick="quickLockSession()" id="quickLockBtn" disabled title="Lock to selected session">
-                                    <i class="fas fa-lock"></i>
-                                </button>
-                                <button class="btn btn-outline-warning session-lock-btn" type="button" onclick="quickUnlockSession()" id="quickUnlockBtn" style="display: none;" title="Unlock current session">
-                                    <i class="fas fa-unlock"></i>
-                                </button>
-                            </div>
-                            <div class="session-info-mini" id="sessionInfoMini" style="display: none;">
-                                <!-- Session info will be displayed here -->
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Status Panel - Enhanced for tablet -->
-                    <div class="col-xl-5 col-lg-4 col-md-7 mb-3">
-                        <div id="scanStatus" class="scanner-status-panel tablet-enhanced" role="status" aria-live="polite">
-                            <div class="status-header-tablet">
+                    <!-- Enhanced Status Panel -->
+                    <div class="col-xl-6 col-lg-5 col-md-12 mb-3">
+                        <div id="scanStatus" class="scanner-status-panel hierarchical-enhanced" role="status" aria-live="polite">
+                            <div class="status-header-hierarchical">
                                 <div class="status-icon-section">
-                                    <i class="fas fa-info-circle status-icon-large"></i>
+                                    <i class="fas fa-shield-alt status-icon-large text-primary"></i>
                                 </div>
                                 <div class="status-content-section">
-                                    <div class="status-label-large">Locked to</div>
+                                    <div class="status-label-large">Lock Status</div>
                                     <div class="status-badge-container-large">
-                                        <span class="badge status-badge-large" id="statusBadge">Ready to Scan</span>
+                                        <span class="badge status-badge-large bg-secondary" id="statusBadge">Not Initialized</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="status-details-tablet" id="statusDetail">
-                                <div id="lockStatusIndicator" class="lock-status-large">Scan QR Identity to begin</div>
+                            <div class="status-details-hierarchical" id="statusDetail">
+                                <div id="lockStatusIndicator" class="lock-status-large">
+                                    Select session to initialize hierarchical lock system
+                                </div>
+                                <div id="poStatusIndicator" class="po-status-large" style="display: none;">
+                                    <!-- PO status will be shown here -->
+                                </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- Hierarchical Progress Bar -->
+                <div class="hierarchical-progress-container" id="hierarchicalProgress" style="display: none;">
+                    <div class="progress-header">
+                        <span class="progress-title">
+                            <i class="fas fa-chart-line me-2"></i>Scanning Progress
+                        </span>
+                        <span class="progress-percentage" id="overallProgressPercentage">0%</span>
+                    </div>
+                    <div class="progress-bar-hierarchical">
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: 0%" id="overallProgressBar"></div>
+                        </div>
+                    </div>
+                    <div class="progress-details mt-2" id="progressBreakdown">
+                        <!-- Progress breakdown will be shown here -->
                     </div>
                 </div>
             </div>
@@ -160,9 +199,14 @@
     </div>
 </div>
 
-    <!-- Recent Scans Container - Shows when locked to session -->
-    <div id="recent-scans-container" class="recent-scans-container" style="display: none;">
-        <!-- Content will be populated by JavaScript -->
+    <!-- PO Selector Modal Container -->
+    <div id="po-selector-container"></div>
+
+    <!-- Enhanced Recent Scans with PO Filtering -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div id="enhanced-recent-scans"></div>
+        </div>
     </div>
 
     @if (Model?.Any() == true)
@@ -200,16 +244,996 @@
 </div>
 
 @section Scripts {
-    <script src="~/js/recent-scans.js" asp-append-version="true"></script>
-    <script>
-        let currentUserLock = null;
-        let activeSessions = [];
-        let resolvedBarcodes = new Map(); // Cache for resolved barcodes
-        let signalRConnection = null; // SignalR connection
-        let currentSessionGroup = null; // Track current session group
-        let recentScansManager = null; // Recent scans manager
+    <!-- SignalR for real-time updates (CDN with local fallback via onerror) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js" crossorigin="anonymous" 
+            onerror="(function(){var s=document.createElement('script');s.src='/lib/microsoft/signalr/dist/browser/signalr.js';s.defer=true;document.head.appendChild(s);})();"></script>
+    
+    <!-- Hierarchical Lock System Components -->
+    <script src="~/js/hierarchical-lock-manager.js" asp-append-version="true"></script>
+    <script src="~/js/po-selector-component.js" asp-append-version="true"></script>
+    <script src="~/js/enhanced-recent-scans-component.js" asp-append-version="true"></script>
+    <script src="~/js/hierarchical-lock-status-component.js" asp-append-version="true"></script>
 
-        // Session Lock Control Functions - Simplified
+    <script>
+        // ===== PHASE 4: HIERARCHICAL LOCK SYSTEM INTEGRATION =====
+        
+        // Global instances
+        let lockManager;
+        let poSelector;
+        let recentScansComponent;
+        let statusComponent;
+        let recentScansManager; // Add missing declaration
+        
+        // Session data from server
+        let activeSessions = [
+            @foreach (var session in Model)
+            {
+                @Html.Raw($"{{ sessionId: {session.SessionId}, qrIdentity: '{session.QRIdentity}', status: '{session.Status}', totalPOs: {session.TotalPOs}, completedPOs: {session.CompletedPOs} }},")
+            }
+        ];
+
+        // Application state
+        let currentSessionId = null;
+        let currentPOId = null;
+        let currentUserLock = null; // Add missing declaration
+        let scanningEnabled = false;
+        let resolvedBarcodes = new Map(); // Cache for barcode resolution to improve performance
+        
+        // Debug mode for development
+        let debugMode = true; // Set to false in production
+        
+        // Enhanced debug logging
+        function debugLog(message, data = null) {
+            if (debugMode) {
+                console.log(`🔧 [DEBUG] ${message}`, data || '');
+            }
+        }
+        
+        // State monitoring function with UI feedback
+        function logCurrentState() {
+            const state = {
+                sessionId: currentSessionId,
+                poId: currentPOId,
+                userLock: currentUserLock,
+                scanningEnabled: scanningEnabled,
+                lockManagerAvailable: !!lockManager,
+                poSelectorAvailable: !!poSelector,
+                activeSessions: activeSessions.length,
+                inputDisabled: document.getElementById('mainScanInput')?.disabled,
+                submitDisabled: document.getElementById('scanSubmitBtn')?.disabled
+            };
+            
+            console.log('📊 CURRENT STATE:', state);
+            
+            // Show state in UI alert
+            const stateInfo = Object.entries(state)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join('\n');
+            
+            showHierarchicalAlert(`Current State:\n${stateInfo}`, 'info');
+            
+            return state;
+        }
+
+        // ===== INITIALIZATION =====
+        $(document).ready(function() {
+            console.log('🚀 Initializing Hierarchical Lock System...');
+            
+            // Check if user is already locked to a session
+            checkExistingUserLock();
+            
+            // Wait for hierarchical-lock-manager to be available
+            function waitForLockManager() {
+                if (typeof window.hierarchicalLockManager !== 'undefined') {
+                    initializeHierarchicalLockSystem();
+                    populateSessionSelector();
+                    bindEventHandlers();
+                    console.log('✅ Hierarchical Lock System initialized');
+                } else {
+                    console.log('⏳ Waiting for hierarchical-lock-manager...');
+                    setTimeout(waitForLockManager, 100);
+                }
+            }
+            
+            waitForLockManager();
+        });
+
+        /**
+         * Check if user is already locked to a session
+         */
+        async function checkExistingUserLock() {
+            try {
+                const response = await $.ajax({
+                    url: '@Url.Action("GetUserLockedSession", "Scan")',
+                    type: 'GET'
+                });
+                
+                if (response.success && response.data) {
+                    console.log('🔒 User already locked to session:', response.data);
+                    
+                    // Find the session
+                    const lockedSession = activeSessions.find(s => s.qrIdentity === response.data);
+                    if (lockedSession) {
+                        currentUserLock = response.data;
+                        currentSessionId = lockedSession.sessionId;
+                        
+                        // Update UI to show locked state
+                        updateUIForExistingLock(lockedSession);
+                        
+                        // Enable scanning interface
+                        enableScanningInterface();
+                        
+                        showHierarchicalAlert(`You are already locked to session ${response.data}. You can continue scanning.`, 'info');
+                    }
+                }
+            } catch (error) {
+                console.log('ℹ️ No existing lock found or error checking:', error);
+            }
+        }
+
+        /**
+         * Update UI for existing lock
+         */
+        function updateUIForExistingLock(session) {
+            // Update session selector to show locked session
+            const selector = document.getElementById('sessionSelectEnhanced');
+            selector.value = session.sessionId;
+            selector.disabled = true;
+            
+            // Update initialize button
+            const initBtn = document.getElementById('initializeSessionBtn');
+            initBtn.innerHTML = '🔒 Session Locked';
+            initBtn.disabled = true;
+            initBtn.classList.remove('btn-primary');
+            initBtn.classList.add('btn-success');
+            
+            // Update status
+            updateScanStatus('Session Locked', 'bg-success', `Locked to: ${session.qrIdentity}`);
+        }
+
+        /**
+         * Enable scanning interface
+         */
+        function enableScanningInterface() {
+            const scanInput = document.getElementById('mainScanInput');
+            const scanBtn = document.getElementById('scanSubmitBtn');
+            
+            scanInput.disabled = false;
+            scanInput.placeholder = '📱 Scan Master QR or continue with items...';
+            scanInput.focus();
+            scanBtn.disabled = false;
+            
+            // Update help text
+            document.getElementById('scanHelpText').textContent = 'Ready to scan! Scan Master QR → Select PO → Scan Items';
+            
+            // Show controls
+            document.getElementById('selectPOButton').style.display = 'inline-block';
+            document.getElementById('resetLockBtn').style.display = 'inline-block';
+            
+            // Show progress container
+            document.getElementById('hierarchicalProgress').style.display = 'block';
+        }
+
+        /**
+         * Initialize all hierarchical lock components
+         */
+        function initializeHierarchicalLockSystem() {
+            try {
+                // Check if hierarchical lock manager is available
+                if (!window.hierarchicalLockManager) {
+                    console.warn('⚠️ HierarchicalLockManager not yet available, retrying...');
+                    setTimeout(initializeHierarchicalLockSystem, 100);
+                    return;
+                }
+                
+                // Initialize lock manager
+                lockManager = window.hierarchicalLockManager;
+                
+                // Initialize PO selector
+                poSelector = new POSelectorComponent('po-selector-container', lockManager);
+                
+                // Initialize recent scans component
+                recentScansComponent = new EnhancedRecentScansComponent('enhanced-recent-scans', lockManager);
+                
+                // Initialize status component
+                statusComponent = new HierarchicalLockStatusComponent('hierarchical-lock-status', lockManager);
+                
+                // Make components globally available
+                window.poSelector = poSelector;
+                window.recentScansComponent = recentScansComponent;
+                window.statusComponent = statusComponent;
+                
+                // Bind PO selector events
+                poSelector.onPOSelected((po) => {
+                    onPOSelected(po);
+                });
+                
+                // Bind lock manager events
+                lockManager.onStateChange((event, data) => {
+                    onLockManagerStateChange(event, data);
+                });
+                
+                lockManager.onError((type, message) => {
+                    showHierarchicalAlert(message, 'danger');
+                });
+                
+                console.log('🔧 All components initialized successfully');
+                
+            } catch (error) {
+                console.error('❌ Failed to initialize hierarchical lock system:', error);
+                showHierarchicalAlert(`Initialization failed: ${error.message}`, 'danger');
+                
+                // Retry after delay
+                setTimeout(() => {
+                    console.log('🔄 Retrying hierarchical lock system initialization...');
+                    initializeHierarchicalLockSystem();
+                }, 1000);
+            }
+        }
+
+        /**
+         * Populate session selector dropdown
+         */
+        function populateSessionSelector() {
+            const selector = document.getElementById('sessionSelectEnhanced');
+            
+            selector.innerHTML = '<option value="">-- Select Session to Lock --</option>' +
+                activeSessions.map(session => `
+                    <option value="${session.sessionId}">
+                        Session ${session.sessionId} - ${session.qrIdentity} (${session.totalPOs} POs)
+                    </option>
+                `).join('');
+        }
+
+        /**
+         * Bind event handlers
+         */
+        function bindEventHandlers() {
+            // Session selection
+            document.getElementById('sessionSelectEnhanced').addEventListener('change', onSessionSelectionChange);
+            document.getElementById('initializeSessionBtn').addEventListener('click', initializeSelectedSession);
+            
+            // Main scan input
+            document.getElementById('mainScanInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    processHierarchicalScan();
+                }
+            });
+            
+            // Anti-forgery token for AJAX
+            $.ajaxSetup({
+                beforeSend: function(xhr, settings) {
+                    if (!settings.crossDomain) {
+                        xhr.setRequestHeader("RequestVerificationToken", 
+                            $('input[name="__RequestVerificationToken"]').val());
+                    }
+                }
+            });
+        }
+
+        // ===== SESSION MANAGEMENT =====
+
+        /**
+         * Handle session selection change
+         */
+        function onSessionSelectionChange() {
+            const selector = document.getElementById('sessionSelectEnhanced');
+            const initBtn = document.getElementById('initializeSessionBtn');
+            const preview = document.getElementById('sessionPreview');
+            
+            if (selector.value) {
+                const sessionId = parseInt(selector.value);
+                const session = activeSessions.find(s => s.sessionId === sessionId);
+                
+                if (session) {
+                    // Show session preview
+                    preview.innerHTML = `
+                        <div class="alert alert-info">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>QR Identity:</strong> ${session.qrIdentity}<br>
+                                    <strong>Status:</strong> ${session.status}<br>
+                                    <strong>POs:</strong> ${session.completedPOs}/${session.totalPOs} completed
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('${session.qrIdentity}')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    preview.style.display = 'block';
+                    initBtn.disabled = false;
+                } else {
+                    preview.style.display = 'none';
+                    initBtn.disabled = true;
+                }
+            } else {
+                preview.style.display = 'none';
+                initBtn.disabled = true;
+            }
+        }
+
+        /**
+         * Initialize selected session
+         */
+        async function initializeSelectedSession() {
+            const selector = document.getElementById('sessionSelectEnhanced');
+            const sessionId = parseInt(selector.value);
+            
+            if (!sessionId) {
+                showHierarchicalAlert('Please select a session first', 'warning');
+                return;
+            }
+            
+            // Check if lock manager is available
+            if (!lockManager) {
+                showHierarchicalAlert('System not ready. Please wait and try again.', 'warning');
+                return;
+            }
+            
+            try {
+                showHierarchicalAlert('Initializing session...', 'info');
+                
+                const result = await lockManager.initializeSession(sessionId);
+                if (result.success) {
+                    currentSessionId = sessionId;
+                    updateUIForSessionInitialized();
+                    showHierarchicalAlert('Session initialized successfully! You can now scan Master QR.', 'success');
+                } else {
+                    throw new Error(result.error || 'Failed to initialize session');
+                }
+                
+            } catch (error) {
+                console.error('❌ Session initialization failed:', error);
+                showHierarchicalAlert(`Failed to initialize session: ${error.message}`, 'danger');
+            }
+        }
+
+        /**
+         * Update UI when session is initialized
+         */
+        function updateUIForSessionInitialized() {
+            // Enable scanning input
+            const scanInput = document.getElementById('mainScanInput');
+            const scanBtn = document.getElementById('scanSubmitBtn');
+            
+            scanInput.disabled = false;
+            scanInput.placeholder = '📱 Scan Master QR to lock session...';
+            scanBtn.disabled = false;
+            
+            // Focus and select all for better UX
+            setTimeout(() => {
+                scanInput.focus();
+                scanInput.select();
+            }, 100);
+            
+            // Update help text
+            document.getElementById('scanHelpText').textContent = 'Scan Master QR → Select PO → Scan BOX/PALLET/PCS items';
+            
+            // Update status
+            updateScanStatus('Session Initialized', 'bg-info', 'Scan Master QR to continue');
+            
+            // Show controls
+            document.getElementById('selectPOButton').style.display = 'none'; // Will show after master scan
+            document.getElementById('resetLockBtn').style.display = 'inline-block';
+            
+            // Show progress container
+            document.getElementById('hierarchicalProgress').style.display = 'block';
+            
+            console.log('✅ UI updated for session initialization');
+        }
+
+        // ===== SCANNING LOGIC =====
+
+        /**
+         * Process hierarchical scan
+         */
+        async function processHierarchicalScan() {
+            const input = document.getElementById('mainScanInput');
+            const scannedValue = input.value.trim();
+            
+            console.log(`🔍 processHierarchicalScan called with: "${scannedValue}"`);
+            console.log(`📊 Current state - SessionId: ${currentSessionId}, POId: ${currentPOId}, UserLock: ${currentUserLock}`);
+            
+            if (!scannedValue) {
+                showHierarchicalAlert('Please scan or enter a barcode', 'warning');
+                return;
+            }
+            
+            // If no session but user is locked, try to recover session
+            if (!currentSessionId && currentUserLock) {
+                const lockedSession = activeSessions.find(s => s.qrIdentity === currentUserLock);
+                if (lockedSession) {
+                    currentSessionId = lockedSession.sessionId;
+                    console.log('🔄 Recovered session ID from user lock:', currentSessionId);
+                }
+            }
+            
+            if (!currentSessionId) {
+                showHierarchicalAlert('Please initialize a session first', 'warning');
+                return;
+            }
+            
+            try {
+                console.log(`🔍 Processing scan: ${scannedValue}`);
+                
+                // Show processing indicator
+                const scanBtn = document.getElementById('scanSubmitBtn');
+                const originalText = scanBtn.innerHTML;
+                scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                scanBtn.disabled = true;
+                
+                // Determine scan type and process accordingly
+                if (isMasterQR(scannedValue)) {
+                    console.log('🎯 Detected Master QR');
+                    await processMasterQRScan(scannedValue);
+                } else if (isBoxBarcode(scannedValue)) {
+                    console.log('📦 Detected BOX barcode');
+                    await processBoxScan(scannedValue);
+                } else {
+                    // For PALLET/PCS, check if PO is selected
+                    if (!currentPOId) {
+                        console.log('❌ No PO selected for PALLET/PCS scan');
+                        showHierarchicalAlert('Please select a PO before scanning PALLET or PCS items', 'warning');
+                        showPOSelector();
+                        return;
+                    }
+                    
+                    if (isPalletBarcode(scannedValue)) {
+                        console.log('🚛 Detected PALLET barcode');
+                        await processPalletScan(scannedValue);
+                    } else if (isPCSBarcode(scannedValue)) {
+                        console.log('🔢 Detected PCS barcode');
+                        await processPCSScan(scannedValue);
+                    } else {
+                        console.log('❓ Unknown barcode format');
+                        showHierarchicalAlert('Unknown barcode format. Please scan a valid QR or barcode.', 'warning');
+                    }
+                }
+                
+                // Restore scan button
+                scanBtn.innerHTML = originalText;
+                scanBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('❌ Scan processing failed:', error);
+                showHierarchicalAlert(`Scan failed: ${error.message}`, 'danger');
+                
+                // Restore scan button
+                const scanBtn = document.getElementById('scanSubmitBtn');
+                scanBtn.innerHTML = '<i class="fas fa-check scan-check-icon"></i><span class="scan-button-text d-none d-lg-inline">Scan</span>';
+                scanBtn.disabled = false;
+            } finally {
+                // Clear input for next scan
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        /**
+         * Process Master QR scan with enhanced state management
+         */
+        async function processMasterQRScan(qrCode) {
+            try {
+                console.log(`🎯 Processing Master QR: ${qrCode}`);
+                
+                const response = await $.post('@Url.Action("ScanMasterQR", "Scan")', {
+                    sessionId: currentSessionId,
+                    qrCode: qrCode
+                });
+                
+                console.log('🔍 Master QR Response:', response);
+                
+                if (response.success) {
+                    // Update global state
+                    currentUserLock = qrCode;
+                    
+                    // Update lock manager state if available
+                    if (lockManager) {
+                        lockManager.state.lockLevel = 'MASTER';
+                        lockManager.state.sessionStatus = 'LOCKED';
+                    }
+                    
+                    // Update UI
+                    updateScanStatus('Master QR Locked', 'bg-success', 'Session locked! Select PO to continue');
+                    document.getElementById('selectPOButton').style.display = 'inline-block';
+                    document.getElementById('mainScanInput').placeholder = '🔒 Select PO then scan items...';
+                    
+                    // Enable scanning
+                    const scanInput = document.getElementById('mainScanInput');
+                    const scanBtn = document.getElementById('scanSubmitBtn');
+                    scanInput.disabled = false;
+                    scanBtn.disabled = false;
+                    
+                    showHierarchicalAlert(`Master QR scanned successfully! Please select a PO to continue.`, 'success');
+                    
+                    // Auto-show PO selector after short delay
+                    setTimeout(() => {
+                        if (poSelector) {
+                            showPOSelector();
+                        } else {
+                            console.warn('⚠️ PO Selector not available');
+                        }
+                    }, 1500);
+                    
+                } else {
+                    throw new Error(response.message || 'Master QR scan failed');
+                }
+                
+            } catch (error) {
+                console.error('❌ Master QR scan failed:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * Process BOX scan with enhanced validation
+         */
+        async function processBoxScan(barcode) {
+            try {
+                console.log(`📦 Processing BOX scan: ${barcode}`);
+                
+                // Check if user is locked to session
+                if (!currentUserLock) {
+                    showHierarchicalAlert('Please scan Master QR first to lock to session', 'warning');
+                    return;
+                }
+                
+                const response = await $.post('@Url.Action("ScanItem", "Scan")', {
+                    sessionId: currentSessionId,
+                    barcode: barcode
+                });
+                
+                console.log('🔍 BOX Scan Response:', response);
+                
+                if (response.success) {
+                    const data = response.data;
+                    
+                    updateProgressDisplay(data);
+                    showHierarchicalAlert(`BOX scanned successfully! Progress: ${data.progressPercentage.toFixed(1)}%`, 'success');
+                    
+                    // Check if scan is complete
+                    if (data.canComplete) {
+                        await handleScanCompletion();
+                    }
+                    
+                    // Refresh recent scans if available
+                    if (recentScansComponent && typeof recentScansComponent.refreshScans === 'function') {
+                        await recentScansComponent.refreshScans();
+                    }
+                    
+                } else {
+                    throw new Error(response.message || 'BOX scan failed');
+                }
+                
+            } catch (error) {
+                console.error('❌ BOX scan failed:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * Process PALLET scan with hierarchical lock context and PO validation
+         * PHASE 3: Enhanced with PO Context tracking and validation
+         */
+        async function processPalletScan(barcode) {
+            try {
+                console.log(`🚛 Processing PALLET scan: ${barcode}`);
+                
+                // Get selected PO from hierarchical lock manager with fallback
+                let selectedPO = null;
+                let selectedPOId = currentPOId;
+                
+                if (window.hierarchicalLockManager && typeof window.hierarchicalLockManager.getSelectedPO === 'function') {
+                    selectedPO = window.hierarchicalLockManager.getSelectedPO();
+                    selectedPOId = selectedPO ? selectedPO.id : currentPOId;
+                }
+                
+                // Validate PO has PALLET items
+                if (selectedPO && selectedPO.progress && selectedPO.progress.totalPallets === 0) {
+                    showHierarchicalAlert(`PO ${selectedPO.noPO} does not contain any PALLET items. Cannot scan PALLET barcode.`, 'warning');
+                    debugLog('PALLET scan rejected - PO has no PALLET items', selectedPO);
+                    return;
+                }
+                
+                // Additional validation: check if current PO supports PALLET scanning
+                if (!selectedPOId) {
+                    showHierarchicalAlert('Please select a PO before scanning PALLET items', 'warning');
+                    showPOSelector();
+                    return;
+                }
+                
+                console.log(`🎯 PALLET scan with PO Context: ${selectedPOId}`);
+                
+                const response = await $.post('@Url.Action("ScanItem", "Scan")', {
+                    sessionId: currentSessionId,
+                    barcode: barcode,
+                    selectedPOId: selectedPOId  // PHASE 3: Pass PO Context
+                });
+                
+                if (response.success) {
+                    const data = response.data;
+                    
+                    updateProgressDisplay(data);
+                    showHierarchicalAlert(`PALLET scanned successfully! Progress: ${data.progressPercentage.toFixed(1)}%`, 'success');
+                    
+                    // Check if scan is complete
+                    if (data.canComplete) {
+                        await handleScanCompletion();
+                    }
+                    
+                    // Refresh recent scans
+                    await recentScansComponent.refreshScans();
+                    
+                } else {
+                    throw new Error(response.message || 'PALLET scan failed');
+                }
+                
+            } catch (error) {
+                console.error('❌ PALLET scan failed:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * Process PCS scan with hierarchical lock context and PO validation
+         * PHASE 3: Enhanced with PO Context tracking and validation
+         */
+        async function processPCSScan(barcode) {
+            try {
+                console.log(`🔢 Processing PCS scan: ${barcode}`);
+                
+                // Get selected PO from hierarchical lock manager with fallback
+                let selectedPO = null;
+                let selectedPOId = currentPOId;
+                
+                if (window.hierarchicalLockManager && typeof window.hierarchicalLockManager.getSelectedPO === 'function') {
+                    selectedPO = window.hierarchicalLockManager.getSelectedPO();
+                    selectedPOId = selectedPO ? selectedPO.id : currentPOId;
+                }
+                
+                // Validate PO has PCS items
+                if (selectedPO && selectedPO.progress && selectedPO.progress.totalPcs === 0) {
+                    showHierarchicalAlert(`PO ${selectedPO.noPO} does not contain any PCS items. Cannot scan PCS barcode.`, 'warning');
+                    debugLog('PCS scan rejected - PO has no PCS items', selectedPO);
+                    return;
+                }
+                
+                // Additional validation: check if current PO supports PCS scanning
+                if (!selectedPOId) {
+                    showHierarchicalAlert('Please select a PO before scanning PCS items', 'warning');
+                    showPOSelector();
+                    return;
+                }
+                
+                console.log(`🎯 PCS scan with PO Context: ${selectedPOId}`);
+                
+                const response = await $.post('@Url.Action("ScanItem", "Scan")', {
+                    sessionId: currentSessionId,
+                    barcode: barcode,
+                    selectedPOId: selectedPOId  // PHASE 3: Pass PO Context
+                });
+                
+                if (response.success) {
+                    const data = response.data;
+                    
+                    updateProgressDisplay(data);
+                    showHierarchicalAlert(`PCS scanned successfully! Progress: ${data.progressPercentage.toFixed(1)}%`, 'success');
+                    
+                    // Check if scan is complete
+                    if (data.canComplete) {
+                        await handleScanCompletion();
+                    }
+                    
+                    // Refresh recent scans
+                    await recentScansComponent.refreshScans();
+                    
+                } else {
+                    throw new Error(response.message || 'PCS scan failed');
+                }
+                
+            } catch (error) {
+                console.error('❌ PCS scan failed:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * Handle scan completion
+         */
+        async function handleScanCompletion() {
+            try {
+                console.log('🎉 Scan completion detected, calling CompleteScan...');
+                
+                const response = await $.post('@Url.Action("CompleteScan", "Scan")', {
+                    sessionId: currentSessionId
+                });
+                
+                if (response.success) {
+                    showHierarchicalAlert('🎉 Session completed successfully! You are now unlocked.', 'success');
+                    
+                    // Reset UI to unlocked state
+                    setTimeout(() => {
+                        resetHierarchicalLock();
+                    }, 2000);
+                    
+                } else {
+                    console.warn('CompleteScan failed:', response.message);
+                    showHierarchicalAlert('Session appears complete but completion failed. Please try resetting.', 'warning');
+                }
+                
+            } catch (error) {
+                console.error('❌ CompleteScan error:', error);
+                showHierarchicalAlert('Error completing scan. Please try resetting.', 'danger');
+            }
+        }
+
+        // ===== PO MANAGEMENT =====
+
+        /**
+         * Handle PO selection with enhanced state management
+         */
+        function onPOSelected(po) {
+            console.log('🎯 PO Selected:', po);
+            
+            currentPOId = po.id;
+            
+            // Update hierarchical lock manager state if available
+            if (lockManager) {
+                lockManager.state.selectedPO = po;
+                lockManager.state.lockLevel = 'PO';
+            }
+            
+            // Update UI
+            updateScanStatus(`PO Selected: ${po.noPO}`, 'bg-primary', `Scanning ${po.modelProduct} - Next: ${po.nextAvailableItemType}`);
+            
+            // Update input placeholder with more specific guidance
+            const scanInput = document.getElementById('mainScanInput');
+            scanInput.placeholder = `🎯 Scan ${po.nextAvailableItemType} items for ${po.modelProduct}...`;
+            
+            // Auto-focus input for immediate scanning
+            setTimeout(() => {
+                scanInput.focus();
+                scanInput.select();
+            }, 100);
+            
+            // Update PO status indicator
+            const poStatus = document.getElementById('poStatusIndicator');
+            poStatus.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><strong>PO:</strong> ${po.noPO}</span>
+                    <span><strong>Model:</strong> ${po.modelProduct}</span>
+                    <span class="badge bg-info">${po.nextAvailableItemType}</span>
+                </div>
+            `;
+            poStatus.style.display = 'block';
+            
+            showHierarchicalAlert(`PO ${po.noPO} selected! You can now scan ${po.nextAvailableItemType} items.`, 'success');
+            
+            console.log('✅ PO selection completed, ready for scanning');
+        }
+
+        /**
+         * Show PO selector modal
+         */
+        function showPOSelector() {
+            if (poSelector) {
+                poSelector.show();
+            } else {
+                showHierarchicalAlert('PO selector not initialized', 'warning');
+            }
+        }
+
+        // ===== STATE MANAGEMENT =====
+
+        /**
+         * Handle lock manager state changes
+         */
+        function onLockManagerStateChange(event, data) {
+            console.log(`🔄 State change: ${event}`, data);
+            
+            switch (event) {
+                case 'SESSION_INITIALIZED':
+                    // Already handled in initializeSelectedSession
+                    break;
+                    
+                case 'PO_SELECTED':
+                    // Already handled in onPOSelected
+                    break;
+                    
+                case 'PO_PROGRESS_UPDATED':
+                    updateProgressDisplay(data.selectedPO.progress);
+                    break;
+                    
+                case 'SESSION_RESET':
+                    resetHierarchicalLock();
+                    break;
+            }
+        }
+
+        /**
+         * Update progress display
+         */
+        function updateProgressDisplay(progressData) {
+            if (!progressData) return;
+            
+            // Update overall progress
+            const percentage = Math.round(progressData.progressPercentage || progressData.overallProgressPercentage || 0);
+            document.getElementById('overallProgressPercentage').textContent = `${percentage}%`;
+            document.getElementById('overallProgressBar').style.width = `${percentage}%`;
+            
+            // Update progress breakdown
+            const breakdown = document.getElementById('progressBreakdown');
+            if (progressData.scannedCount !== undefined) {
+                breakdown.innerHTML = `
+                    <div class="d-flex justify-content-between text-sm">
+                        <span>Scanned: ${progressData.scannedCount}</span>
+                        <span>Total: ${progressData.totalBarcodes}</span>
+                        <span>Remaining: ${progressData.totalBarcodes - progressData.scannedCount}</span>
+                    </div>
+                `;
+            }
+        }
+
+        /**
+         * Update scan status display
+         */
+        function updateScanStatus(badgeText, badgeClass, statusText) {
+            const badge = document.getElementById('statusBadge');
+            const indicator = document.getElementById('lockStatusIndicator');
+            
+            badge.textContent = badgeText;
+            badge.className = `badge status-badge-large ${badgeClass}`;
+            indicator.textContent = statusText;
+        }
+
+        // ===== UTILITY FUNCTIONS =====
+
+        /**
+         * Enhanced barcode validation functions with cache support
+         */
+        function isMasterQR(value) {
+            return activeSessions.some(session => session.qrIdentity === value);
+        }
+
+        function isBoxBarcode(value) {
+            if (!value || !value.includes('BOX')) return false;
+            
+            // If cache has it, it's valid
+            if (resolvedBarcodes.has(value)) {
+                console.log('✅ Box barcode found in cache');
+                return true;
+            }
+            
+            // If user is locked and barcode starts with locked QR, it's likely valid
+            if (currentUserLock && value.includes('_BOX_')) {
+                console.log('✅ Box barcode matches current lock pattern');
+                return true;
+            }
+            
+            return false;
+        }
+
+        function isPalletBarcode(value) {
+            if (!value) return false;
+            const upperValue = value.toUpperCase();
+            return upperValue.includes('PALLET') || upperValue.includes('PLT');
+        }
+
+        function isPCSBarcode(value) {
+            if (!value) return false;
+            const upperValue = value.toUpperCase();
+            return upperValue.startsWith('%Q') || upperValue.includes('PCS') || upperValue.includes('PC');
+        }
+
+        /**
+         * Reset hierarchical lock system
+         */
+        function resetHierarchicalLock() {
+            if (confirm('Are you sure you want to reset the hierarchical lock? All progress will be lost.')) {
+                // Call backend to unlock user
+                $.ajax({
+                    url: '@Url.Action("UnlockUser", "Scan")',
+                    type: 'POST',
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            console.log('✅ Server unlock successful');
+                            performClientSideReset();
+                        } else {
+                            console.warn('⚠️ Server unlock failed, performing local reset anyway');
+                            performClientSideReset();
+                            showHierarchicalAlert('Server unlock failed, but local state reset. You may need to refresh the page.', 'warning');
+                        }
+                    },
+                    error: function() {
+                        console.warn('❌ Server unlock error, performing local reset');
+                        performClientSideReset();
+                        showHierarchicalAlert('Server unlock failed, but local state reset. You may need to refresh the page.', 'warning');
+                    }
+                });
+            }
+        }
+
+        function performClientSideReset() {
+            // Reset state
+            currentSessionId = null;
+            currentPOId = null;
+            scanningEnabled = false;
+            
+            // Reset lock manager
+            if (lockManager) {
+                lockManager.resetSession();
+            }
+            
+            // Reset UI
+            const scanInput = document.getElementById('mainScanInput');
+            const scanBtn = document.getElementById('scanSubmitBtn');
+            
+            scanInput.disabled = true;
+            scanInput.placeholder = '🔒 Initialize session first...';
+            scanBtn.disabled = true;
+            
+            updateScanStatus('Not Initialized', 'bg-secondary', 'Select session to initialize hierarchical lock system');
+            
+            document.getElementById('selectPOButton').style.display = 'none';
+            document.getElementById('resetLockBtn').style.display = 'none';
+            document.getElementById('hierarchicalProgress').style.display = 'none';
+            document.getElementById('poStatusIndicator').style.display = 'none';
+            
+            // Reset session selector
+            document.getElementById('sessionSelectEnhanced').value = '';
+            document.getElementById('sessionPreview').style.display = 'none';
+            document.getElementById('initializeSessionBtn').disabled = true;
+            
+            showHierarchicalAlert('Hierarchical lock system reset successfully', 'info');
+        }
+
+        /**
+         * Copy to clipboard utility
+         */
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                showHierarchicalAlert('Text copied to clipboard! 📋', 'success');
+            }, function(err) {
+                console.error('Could not copy text: ', err);
+                showHierarchicalAlert('Failed to copy to clipboard', 'danger');
+            });
+        }
+
+        /**
+         * Show hierarchical alert with enhanced debugging
+         */
+        function showHierarchicalAlert(message, type) {
+            console.log(`🔔 Alert [${type.toUpperCase()}]: ${message}`);
+            
+            const alertContainer = document.querySelector('.container');
+            const alertElement = document.createElement('div');
+
+            alertElement.className = `alert alert-${type} alert-dismissible fade show`;
+            alertElement.setAttribute('role', 'alert');
+            alertElement.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            alertContainer.insertBefore(alertElement, alertContainer.children[1]);
+
+            setTimeout(() => {
+                if (alertElement.parentNode) {
+                    alertElement.remove();
+                }
+            }, 5000);
+        }
+
+        // Make functions globally available for onclick handlers
+        window.processHierarchicalScan = processHierarchicalScan;
+        window.showPOSelector = showPOSelector;
+        window.resetHierarchicalLock = resetHierarchicalLock;
+        window.copyToClipboard = copyToClipboard;
+        
         function populateSessionDropdown() {
             const select = document.getElementById('sessionSelect');
             select.innerHTML = '<option value="">-- Select Session --</option>';
@@ -813,6 +1837,12 @@
 
         // Initialize SignalR connection
         function initializeSignalR() {
+            if (typeof signalR === 'undefined') {
+                console.warn('SignalR not loaded yet, retrying in 100ms...');
+                setTimeout(initializeSignalR, 100);
+                return;
+            }
+            
             signalRConnection = new signalR.HubConnectionBuilder()
                 .withUrl("/progressHub")
                 .build();
@@ -1053,6 +2083,34 @@
 
         // Initialize on page load
         $(document).ready(function() {
+            // Define simple RecentScansManager class if not available
+            if (typeof RecentScansManager === 'undefined') {
+                window.RecentScansManager = class {
+                    constructor(options) {
+                        this.containerId = options.containerId || '#recent-scans-container';
+                        this.maxItems = options.maxItems || 8;
+                        console.log('📊 Simple RecentScansManager initialized');
+                    }
+                    
+                    show(sessionId) {
+                        console.log(`📊 RecentScansManager.show(${sessionId})`);
+                        // Simple implementation - show recent scans container
+                        $(this.containerId).show();
+                    }
+                    
+                    hide() {
+                        console.log('📊 RecentScansManager.hide()');
+                        // Simple implementation - hide recent scans container
+                        $(this.containerId).hide();
+                    }
+                    
+                    addImmediateScan(scanData) {
+                        console.log('📊 RecentScansManager.addImmediateScan:', scanData);
+                        // Simple implementation - could add scan to display
+                    }
+                };
+            }
+            
             // Initialize Recent Scans Manager - Simplified
             recentScansManager = new RecentScansManager({
                 containerId: '#recent-scans-container',
@@ -1166,68 +2224,37 @@
             input.val('').focus();
         }
 
-        // Check if scanned value is Master QR (simplified)
+        // ===== BARCODE TYPE DETECTION (UNIFIED) =====
+        
+        // Check if scanned value is Master QR
         function isMasterQR(value) {
-            // Basic format check: starts with QR_ and doesn't contain item indicators
-            if (!value.startsWith('QR_')) return false;
+            if (!value || !value.startsWith('QR_')) return false;
             if (value.includes('_BOX_') || value.includes('PALLET') || value.startsWith('%Q')) return false;
             
-            // If we have activeSessions loaded, try exact match
+            // Check against active sessions
             if (activeSessions.length > 0) {
                 const exactMatch = activeSessions.some(session => session.qrIdentity === value);
-                console.log('Master QR exact match in activeSessions:', exactMatch);
                 if (exactMatch) return true;
             }
             
             // If cache has it, it's valid
             if (resolvedBarcodes.has(value)) {
-                console.log('Master QR found in cache');
+                console.log('✅ Master QR found in cache');
                 return true;
             }
             
-            // If it looks like a master QR format, treat it as such
-            // Let the backend validate the actual existence
-            console.log('Master QR format detected, treating as Master QR');
-            return true; // Changed from false to true
+            // Format looks like Master QR, let backend validate
+            console.log('🎯 Master QR format detected');
+            return true;
         }
 
-        // Check if scanned value is Box Barcode (simplified)
-        function isBoxBarcode(value) {
-            // Basic format check
-            if (!value.includes('_BOX_')) return false;
-            
-            // If cache has it, it's valid
-            if (resolvedBarcodes.has(value)) {
-                console.log('Box barcode found in cache');
-                return true;
-            }
-            
-            // If user is locked and barcode starts with locked QR, it's likely valid
-            if (currentUserLock && value.startsWith(currentUserLock + '_BOX_')) {
-                console.log('Box barcode matches current lock');
-                return true;
-            }
-            
-            // Check against activeSessions if available
-            if (activeSessions.length > 0) {
-                const isValid = activeSessions.some(session => {
-                    return value.startsWith(session.qrIdentity + '_BOX_');
-                });
-                console.log('Box barcode validation against activeSessions:', isValid);
-                if (isValid) return true;
-            }
-            
-            console.log('Box barcode needs server validation');
-            return false; // Let it go to server resolution
-        }
-
-        // Check if scanned value is an item barcode (simplified)
+        // Check if scanned value is an item barcode (BOX, PALLET, PCS)
         function isItemBarcode(value) {
             if (!value) return false;
             
             const upperValue = value.toUpperCase();
             
-            // Basic format checks
+            // Check for item type indicators
             const hasItemType = upperValue.includes('BOX') || 
                                upperValue.includes('PALLET') || 
                                upperValue.startsWith('%Q');
@@ -1237,6 +2264,17 @@
             // Check cache first - most reliable
             if (resolvedBarcodes.has(value)) {
                 console.log('✅ Item barcode found in cache');
+                return true;
+            }
+            
+            // For BOX items, check if matches current session pattern
+            if (upperValue.includes('BOX') && currentUserLock && value.includes('_BOX_')) {
+                console.log('✅ BOX barcode matches current session lock');
+                return true;
+            }
+            
+            return true; // Let backend validate the specifics
+        }
                 return true;
             }
             
@@ -2570,5 +3608,3 @@
         }, 30000);
     </script>
 }
-
-@* Removed per-session color helper as the session list UI was removed *@

@@ -459,6 +459,7 @@ namespace ShipmentFinishGood.DTOs
         public DateTime? ShipmentDate { get; set; }
         public int TotalBoxes { get; set; }
         public int TotalPOs { get; set; }
+        public int CompletedPOs { get; set; } = 0; // Add for hierarchical lock system
         public DateTime CreatedDate { get; set; }
         public string? CreatedBy { get; set; }
         public string Status { get; set; } = string.Empty; // Pending, Ready, In Progress, Completed
