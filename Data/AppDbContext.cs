@@ -15,6 +15,11 @@ public class AppDbContext : DbContext
     public DbSet<PODetail> PODetails => Set<PODetail>();
     public DbSet<BarcodeRegistry> BarcodeRegistries => Set<BarcodeRegistry>();
     public DbSet<ScanningActivity> ScanningActivities => Set<ScanningActivity>();
+    
+    // Hierarchical Lock Tables
+    public DbSet<UserSessionLock> UserSessionLocks => Set<UserSessionLock>();
+    public DbSet<UserPOLock> UserPOLocks => Set<UserPOLock>();
+    public DbSet<POItemRegistry> POItemRegistries => Set<POItemRegistry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,5 +69,40 @@ public class AppDbContext : DbContext
             
         modelBuilder.Entity<BarcodeRegistry>()
             .HasIndex(b => new { b.POId, b.BoxNumber });
+            
+        // Configure Hierarchical Lock relationships
+        modelBuilder.Entity<UserSessionLock>()
+            .HasOne(usl => usl.Session)
+            .WithMany()
+            .HasForeignKey(usl => usl.SessionId);
+            
+        modelBuilder.Entity<UserPOLock>()
+            .HasOne(upl => upl.SessionLock)
+            .WithMany(usl => usl.POLocks)
+            .HasForeignKey(upl => upl.SessionLockId);
+            
+        modelBuilder.Entity<UserPOLock>()
+            .HasOne(upl => upl.POMaster)
+            .WithMany()
+            .HasForeignKey(upl => upl.POId);
+            
+        modelBuilder.Entity<POItemRegistry>()
+            .HasOne(pir => pir.POMaster)
+            .WithMany()
+            .HasForeignKey(pir => pir.POId);
+            
+        // Add indexes for Hierarchical Lock tables
+        modelBuilder.Entity<UserSessionLock>()
+            .HasIndex(usl => new { usl.UserId, usl.IsActive });
+            
+        modelBuilder.Entity<UserPOLock>()
+            .HasIndex(upl => new { upl.UserId, upl.IsActive });
+            
+        modelBuilder.Entity<POItemRegistry>()
+            .HasIndex(pir => new { pir.POId, pir.ItemType, pir.Status });
+            
+        modelBuilder.Entity<POItemRegistry>()
+            .HasIndex(pir => pir.BarcodeValue)
+            .IsUnique();
     }
 }

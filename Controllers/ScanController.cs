@@ -15,31 +15,42 @@ namespace ShipmentFinishGood.Controllers
         private readonly IScanningService _scanService;
         private readonly IExcelProcessingService _excelService;
         private readonly IBarcodeService _barcodeService;
+        private readonly IHierarchicalLockService _hierarchicalLockService;
         private readonly AppDbContext _context;
 
-        public ScanController(IScanningService scanService, IExcelProcessingService excelService, IBarcodeService barcodeService, AppDbContext context)
+        public ScanController(
+            IScanningService scanService, 
+            IExcelProcessingService excelService, 
+            IBarcodeService barcodeService, 
+            IHierarchicalLockService hierarchicalLockService,
+            AppDbContext context)
         {
             _scanService = scanService;
             _excelService = excelService;
             _barcodeService = barcodeService;
+            _hierarchicalLockService = hierarchicalLockService;
             _context = context;
         }
 
         public async Task<IActionResult> Index()
         {
             var activeSessions = await _scanService.GetActiveSessionsAsync();
-            
-            // Check if current user is locked to a session
             var userName = User.Identity?.Name ?? "Unknown";
-            var userLockResult = await _scanService.CheckUserLockAsync(userName);
             
-            if (userLockResult.IsSuccess)
+            // Get hierarchical lock status
+            var lockStatusResult = await _hierarchicalLockService.GetUserLockStatusAsync(userName);
+            if (lockStatusResult.IsSuccess)
             {
-                var lockedSessionResult = await _scanService.GetUserLockedSessionAsync(userName);
-                if (lockedSessionResult.IsSuccess)
+                ViewBag.HierarchicalLockStatus = lockStatusResult.Value;
+                
+                if (lockStatusResult.Value.IsSessionLocked)
                 {
-                    ViewBag.UserLockedSession = lockedSessionResult.Value;
-                    TempData["Info"] = $"You are currently locked to session: {lockedSessionResult.Value}. Complete this session to unlock.";
+                    TempData["Info"] = $"You are locked to session: {lockStatusResult.Value.SessionLock?.SessionName}";
+                    
+                    if (lockStatusResult.Value.IsPOLocked)
+                    {
+                        TempData["Info"] += $" and PO: {lockStatusResult.Value.POLock?.NoPO}";
+                    }
                 }
             }
             
@@ -535,5 +546,272 @@ namespace ShipmentFinishGood.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
+
+        #region Hierarchical Lock Endpoints
+
+        [HttpPost]
+        public async Task<IActionResult> LockToSession([FromBody] LockToSessionRequest request)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                
+                // Use the new method that only requires Master QR
+                var result = await _hierarchicalLockService.LockUserToSessionByMasterQRAsync(userName, request.MasterQR);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = $"Successfully locked to session: {result.Value.SessionName}",
+                        data = result.Value
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error locking to session: {ex.Message}" });
+            }
+        }
+
+        public class LockToSessionRequest
+        {
+            public string MasterQR { get; set; } = string.Empty;
+            
+            // Backward compatibility - will be ignored
+            public int SessionId { get; set; }
+            public string QrCode { get; set; } = string.Empty;
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UnlockFromSession(int sessionId)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _hierarchicalLockService.UnlockUserFromSessionAsync(userName, sessionId);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = "Successfully unlocked from session"
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error unlocking from session: {ex.Message}" });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAvailablePOs(int sessionId)
+        {
+            try
+            {
+                var result = await _hierarchicalLockService.GetAvailablePOsForSessionAsync(sessionId);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { success = true, data = result.Value });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error getting available POs: {ex.Message}" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> LockToPO([FromBody] LockToPORequest request)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _hierarchicalLockService.LockUserToPOAsync(userName, request.PoId);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = $"Successfully locked to PO: {result.Value.NoPO}",
+                        data = result.Value
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error locking to PO: {ex.Message}" });
+            }
+        }
+
+        public class LockToPORequest
+        {
+            public int PoId { get; set; }
+            public string? NoPO { get; set; }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UnlockFromPO(int poLockId)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _hierarchicalLockService.UnlockUserFromPOAsync(userName, poLockId);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = "Successfully unlocked from PO"
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error unlocking from PO: {ex.Message}" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ScanItemHierarchical([FromBody] ScanItemRequest request)
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _hierarchicalLockService.ScanItemWithHierarchicalValidationAsync(
+                    userName, request.Barcode, userName);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = result.Value.Message,
+                        data = result.Value
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error scanning item: {ex.Message}" });
+            }
+        }
+
+        public class ScanItemRequest
+        {
+            public string Barcode { get; set; } = string.Empty;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetHierarchicalLockStatus()
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _hierarchicalLockService.GetUserLockStatusAsync(userName);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { success = true, data = result.Value });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error getting lock status: {ex.Message}" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> EmergencyUnlockHierarchical()
+        {
+            try
+            {
+                var userName = User.Identity?.Name ?? "Unknown";
+                var result = await _hierarchicalLockService.EmergencyUnlockUserAsync(userName, userName);
+                
+                if (result.IsSuccess)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = "Emergency unlock successful"
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Error });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error during emergency unlock: {ex.Message}" });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DebugMasterQR(string qr)
+        {
+            try
+            {
+                var barcodes = await _context.BarcodeRegistries
+                    .Where(b => b.BarcodeType == "MASTER" && b.IsActive == true)
+                    .Select(b => new { 
+                        b.BarcodeId, 
+                        b.BarcodeValue, 
+                        b.SessionId, 
+                        b.Status,
+                        b.GeneratedBy,
+                        b.GeneratedDate
+                    })
+                    .Take(10)
+                    .ToListAsync();
+                
+                var matchingBarcode = barcodes.FirstOrDefault(b => 
+                    b.BarcodeValue == qr || 
+                    b.BarcodeValue.Contains(qr) || 
+                    qr.Contains(b.BarcodeValue));
+                
+                return Json(new { 
+                    success = true, 
+                    searchedQR = qr,
+                    allMasterQRs = barcodes,
+                    matchingBarcode = matchingBarcode
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        #endregion
     }
 }

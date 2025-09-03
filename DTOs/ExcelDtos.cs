@@ -586,4 +586,130 @@ namespace ShipmentFinishGood.DTOs
         public string Message { get; set; } = string.Empty;
         public UploadPreviewDto? PreviewData { get; set; }
     }
+
+    // Hierarchical Lock DTOs
+    public class HierarchicalLockStatusDto
+    {
+        public bool IsSessionLocked { get; set; }
+        public bool IsPOLocked { get; set; }
+        public UserSessionLockDto? SessionLock { get; set; }
+        public UserPOLockDto? POLock { get; set; }
+        public List<POSelectionDto> AvailablePOs { get; set; } = new();
+    }
+
+    public class UserSessionLockDto
+    {
+        public int LockId { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public int SessionId { get; set; }
+        public string MasterQRCode { get; set; } = string.Empty;
+        public string SessionName { get; set; } = string.Empty;
+        public DateTime LockedAt { get; set; }
+        public bool IsActive { get; set; }
+        public int TotalPOs { get; set; }
+        public int CompletedPOs { get; set; }
+        public double SessionProgress { get; set; }
+    }
+
+    public class UserPOLockDto
+    {
+        public int POLockId { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public int SessionLockId { get; set; }
+        public int POId { get; set; }
+        public string NoPO { get; set; } = string.Empty;
+        public string ModelProduk { get; set; } = string.Empty;
+        public DateTime LockedAt { get; set; }
+        public bool IsActive { get; set; }
+        
+        // PO Statistics
+        public int TotalBoxes { get; set; }
+        public int TotalPallets { get; set; }
+        public int TotalPcs { get; set; }
+        public int ScannedBoxes { get; set; }
+        public int ScannedPallets { get; set; }
+        public int ScannedPcs { get; set; }
+        
+        // Progress
+        public double POProgress { get; set; }
+        public bool IsCompleted { get; set; }
+        public DateTime? CompletedAt { get; set; }
+    }
+
+    public class POSelectionDto
+    {
+        public int POId { get; set; }
+        public string NoPO { get; set; } = string.Empty;
+        public string ModelProduk { get; set; } = string.Empty;
+        public string ShipmentDetail { get; set; } = string.Empty;
+        public string Container { get; set; } = string.Empty;
+        
+        // Item Quantities
+        public int QtyBox { get; set; }
+        public int QtyPallet { get; set; }
+        public int QtyPcs { get; set; }
+        public int QtyTotal { get; set; }
+        
+        // Progress
+        public int ScannedBoxes { get; set; }
+        public int ScannedPallets { get; set; }
+        public int ScannedPcs { get; set; }
+        public double Progress { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool IsAvailable { get; set; } = true;
+        
+        // Validation flags
+        public bool HasBoxes => QtyBox > 0;
+        public bool HasPallets => QtyPallet > 0;
+        public bool HasPcs => QtyPcs > 0;
+    }
+
+    public class POItemScanResultDto
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string BarcodeValue { get; set; } = string.Empty;
+        public string ItemType { get; set; } = string.Empty;
+        public int POId { get; set; }
+        public string NoPO { get; set; } = string.Empty;
+        public DateTime ScannedAt { get; set; }
+        public string ScannedBy { get; set; } = string.Empty;
+        
+        // Updated progress after scan
+        public POProgressUpdateDto? ProgressUpdate { get; set; }
+        
+        // Auto-unlock flags
+        public bool POCompleted { get; set; }
+        public bool SessionCompleted { get; set; }
+    }
+
+    public class POProgressUpdateDto
+    {
+        public int POId { get; set; }
+        public string NoPO { get; set; } = string.Empty;
+        
+        // Current counts
+        public int ScannedBoxes { get; set; }
+        public int ScannedPallets { get; set; }
+        public int ScannedPcs { get; set; }
+        public int TotalScanned { get; set; }
+        
+        // Target counts
+        public int TotalBoxes { get; set; }
+        public int TotalPallets { get; set; }
+        public int TotalPcs { get; set; }
+        public int TotalItems { get; set; }
+        
+        // Progress percentages
+        public double BoxProgress { get; set; }
+        public double PalletProgress { get; set; }
+        public double PcsProgress { get; set; }
+        public double OverallProgress { get; set; }
+        
+        // Completion flags
+        public bool IsBoxComplete { get; set; }
+        public bool IsPalletComplete { get; set; }
+        public bool IsPcsComplete { get; set; }
+        public bool IsFullyComplete { get; set; }
+    }
 }

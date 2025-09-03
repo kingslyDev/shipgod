@@ -3,20 +3,17 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShipmentFinishGood.Repositories;
 
 #nullable disable
 
-namespace ShipmentFinishGood.Data.Migrations
+namespace ShipmentFinishGood.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250812104209_AddCountrySupport")]
-    partial class AddCountrySupport
+    partial class AppDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -41,7 +38,28 @@ namespace ShipmentFinishGood.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int?>("BoxNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("GeneratedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("GeneratedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ModelProduct")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("POId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ScannedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ScannedDate")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("SessionId")
@@ -49,14 +67,17 @@ namespace ShipmentFinishGood.Data.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("BarcodeId");
 
                     b.HasIndex("BarcodeValue")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
 
-                    b.HasIndex("SessionId");
+                    b.HasIndex("POId", "BoxNumber");
+
+                    b.HasIndex("SessionId", "Status", "IsActive");
 
                     b.ToTable("BarcodeRegistries");
                 });
@@ -559,6 +580,69 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.ToTable("PODetails");
                 });
 
+            modelBuilder.Entity("ShipmentFinishGood.Models.POItemRegistry", b =>
+                {
+                    b.Property<int>("ItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ItemId"));
+
+                    b.Property<string>("BarcodeValue")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Container")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ExpectedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ItemDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ItemSequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("POId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ScannedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ScannedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("ValidatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ValidatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ItemId");
+
+                    b.HasIndex("BarcodeValue")
+                        .IsUnique();
+
+                    b.HasIndex("POId", "ItemType", "Status");
+
+                    b.ToTable("POItemRegistries");
+                });
+
             modelBuilder.Entity("ShipmentFinishGood.Models.POMaster", b =>
                 {
                     b.Property<int>("POId")
@@ -797,13 +881,113 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("ShipmentFinishGood.Models.UserPOLock", b =>
+                {
+                    b.Property<int>("POLockId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("POLockId"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("LockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NoPO")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("POId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SessionLockId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UnlockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("POLockId");
+
+                    b.HasIndex("POId");
+
+                    b.HasIndex("SessionLockId");
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.ToTable("UserPOLocks");
+                });
+
+            modelBuilder.Entity("ShipmentFinishGood.Models.UserSessionLock", b =>
+                {
+                    b.Property<int>("LockId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LockId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("LockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MasterQRCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UnlockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("LockId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.ToTable("UserSessionLocks");
+                });
+
             modelBuilder.Entity("ShipmentFinishGood.Models.BarcodeRegistry", b =>
                 {
+                    b.HasOne("ShipmentFinishGood.Models.POMaster", "POMaster")
+                        .WithMany()
+                        .HasForeignKey("POId");
+
                     b.HasOne("ShipmentFinishGood.Models.UploadSession", "Session")
                         .WithMany()
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("POMaster");
 
                     b.Navigation("Session");
                 });
@@ -817,6 +1001,17 @@ namespace ShipmentFinishGood.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("PO");
+                });
+
+            modelBuilder.Entity("ShipmentFinishGood.Models.POItemRegistry", b =>
+                {
+                    b.HasOne("ShipmentFinishGood.Models.POMaster", "POMaster")
+                        .WithMany()
+                        .HasForeignKey("POId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("POMaster");
                 });
 
             modelBuilder.Entity("ShipmentFinishGood.Models.POMaster", b =>
@@ -848,6 +1043,36 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.Navigation("Session");
                 });
 
+            modelBuilder.Entity("ShipmentFinishGood.Models.UserPOLock", b =>
+                {
+                    b.HasOne("ShipmentFinishGood.Models.POMaster", "POMaster")
+                        .WithMany()
+                        .HasForeignKey("POId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ShipmentFinishGood.Models.UserSessionLock", "SessionLock")
+                        .WithMany("POLocks")
+                        .HasForeignKey("SessionLockId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("POMaster");
+
+                    b.Navigation("SessionLock");
+                });
+
+            modelBuilder.Entity("ShipmentFinishGood.Models.UserSessionLock", b =>
+                {
+                    b.HasOne("ShipmentFinishGood.Models.UploadSession", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+                });
+
             modelBuilder.Entity("ShipmentFinishGood.Models.POMaster", b =>
                 {
                     b.Navigation("Details");
@@ -860,6 +1085,11 @@ namespace ShipmentFinishGood.Data.Migrations
                     b.Navigation("Details");
 
                     b.Navigation("POMasters");
+                });
+
+            modelBuilder.Entity("ShipmentFinishGood.Models.UserSessionLock", b =>
+                {
+                    b.Navigation("POLocks");
                 });
 #pragma warning restore 612, 618
         }
