@@ -1871,7 +1871,7 @@
                 // Automatically trigger calculations on page load
                 setTimeout(() => {
                     updateMode(); // This will calculate quantities without requiring manual radio button click
-                }, 300); // Small delay to ensure country switch is complete
+                }, 2000); // Small delay to ensure country switch is complete
             }
 
             // Initialize all rows as locked
@@ -2156,7 +2156,7 @@
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-                }, 400); // 400ms delay – adjust if needed
+                }, 2000); // 400ms delay – adjust if needed
             } catch (e) {
                 console.warn('Auto download PDF failed:', e);
             }

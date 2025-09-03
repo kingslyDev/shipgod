@@ -809,18 +809,17 @@ namespace ShipmentFinishGood.Controllers
             {
                 try
                 {
-                    // Get scan progress for this session
-                    var scanProgress = await _scanService.GetScanProgressAsync(session.SessionId);
+                    // Use same logic as QR Management - get data via QRManagementService
+                    var qrData = await GetQRDataForDashboard(session.SessionId, modelConfigs);
+                    
+                    if (qrData == null) continue;
                     
                     // Get country from first PO (sessions are usually single country)
                     var sessionCountry = session.POMasters.FirstOrDefault()?.Country ?? "Unknown";
                     
-                    // Calculate model breakdowns with smart QTY conversion
-                    var modelBreakdowns = await CalculateModelBreakdownsAsync(session, modelConfigs, scanProgress);
-                    
-                    // Calculate total QTY based on ModelConfig conversions
-                    var totalQtyTarget = modelBreakdowns.Sum(m => m.TotalPcsEquivalent);
-                    var totalQtyScanned = modelBreakdowns.Sum(m => m.ScannedPcsEquivalent);
+                    // Use QR Management calculations (already includes ModelConfig conversions)
+                    var totalQtyTarget = qrData.TotalQty; // This is sum of QtyTotal from POMasters
+                    var totalQtyScanned = CalculateScannedQtyWithModelConfig(qrData, modelConfigs, session.ShipmentType);
                     var totalQtyRemaining = totalQtyTarget - totalQtyScanned;
                     
                     var progressPercentage = totalQtyTarget > 0 ? (double)totalQtyScanned / totalQtyTarget * 100 : 0;
@@ -857,24 +856,24 @@ namespace ShipmentFinishGood.Controllers
                         Country = sessionCountry,
                         ShipmentType = session.ShipmentType ?? "Unknown",
                         CreatedDate = session.UploadDate,
-                        LastScanDate = scanProgress.LastScanTime,
+                        LastScanDate = qrData.LastScannedDate,
                         
                         // Basic PO information
                         TotalPOs = session.POMasters.Count,
                         
-                        // Smart QTY calculations based on ModelConfig
+                        // QTY calculations using same logic as QR Management
                         TotalQtyTarget = totalQtyTarget,
                         TotalQtyScanned = totalQtyScanned,
                         TotalQtyRemaining = totalQtyRemaining,
                         ProgressPercentage = Math.Round(progressPercentage, 1),
                         
-                        // Raw breakdown
-                        TotalPallets = scanProgress.TotalPallets,
-                        ScannedPallets = scanProgress.ScannedPallets,
-                        TotalBoxes = scanProgress.TotalBoxes,
-                        ScannedBoxes = scanProgress.ScannedBoxes,
-                        TotalPcs = scanProgress.TotalPcs,
-                        ScannedPcs = scanProgress.ScannedPcs,
+                        // Raw breakdown from QR Management data
+                        TotalPallets = qrData.TotalPallets,
+                        ScannedPallets = qrData.ScannedPallets,
+                        TotalBoxes = qrData.TotalBoxes,
+                        ScannedBoxes = qrData.ScannedBoxes,
+                        TotalPcs = qrData.TotalPcs,
+                        ScannedPcs = qrData.ScannedPcs,
                         
                         // Status indicators
                         Status = status,
@@ -885,8 +884,8 @@ namespace ShipmentFinishGood.Controllers
                         ScanningVelocity = scanningVelocity,
                         EstimatedCompletion = estimatedCompletion,
                         
-                        // Model breakdown details
-                        ModelBreakdowns = modelBreakdowns
+                        // No model breakdown for now - keep it simple like QR Management
+                        ModelBreakdowns = new List<ModelBreakdown>()
                     });
                 }
                 catch (Exception ex)
@@ -945,67 +944,6 @@ namespace ShipmentFinishGood.Controllers
         }
         
         /// <summary>
-        /// Calculate model breakdowns with smart QTY conversion using ModelConfiguration
-        /// </summary>
-        private async Task<List<ModelBreakdown>> CalculateModelBreakdownsAsync(
-            UploadSession session, 
-            List<ModelConfiguration> modelConfigs,
-            ScanProgressDto scanProgress)
-        {
-            var modelBreakdowns = new List<ModelBreakdown>();
-            
-            // Filter ModelConfigs by session ShipmentType (LOOSE or PALLET)
-            var sessionType = session.ShipmentType ?? "LOOSE"; // Default to LOOSE if null
-            var filteredModelConfigs = modelConfigs
-                .Where(m => m.Type == sessionType)
-                .GroupBy(m => m.ModelName)
-                .ToDictionary(g => g.Key, g => g.First());
-            
-            // Group POMasters by model
-            var posByModel = session.POMasters.GroupBy(p => p.ModelProduk);
-            
-            foreach (var modelGroup in posByModel)
-            {
-                var modelName = modelGroup.Key;
-                var modelPOs = modelGroup.ToList();
-                
-                // Get model configuration for smart calculation
-                filteredModelConfigs.TryGetValue(modelName, out var modelConfig);
-                var pcsPerPallet = modelConfig?.PcsPerPallet ?? 1;
-                var pcsPerBox = modelConfig?.PcsPerBox ?? 1;
-                var type = modelConfig?.Type ?? "LOOSE";
-                
-                // Calculate totals for this model
-                var totalPallets = modelPOs.Sum(p => p.QtyPallet);
-                var totalBoxes = modelPOs.Sum(p => p.QtyBox);
-                var totalPcs = modelPOs.Sum(p => p.QtyPcs);
-                
-                // Calculate scanned quantities for this specific model
-                var scannedPallets = await GetScannedCountForModelAsync(session.SessionId, modelName, "SCAN_PALLET");
-                var scannedBoxes = await GetScannedCountForModelAsync(session.SessionId, modelName, "SCAN_BOX");
-                var scannedPcs = await GetScannedCountForModelAsync(session.SessionId, modelName, "SCAN_PCS");
-                
-                modelBreakdowns.Add(new ModelBreakdown
-                {
-                    ModelName = modelName,
-                    PcsPerPallet = pcsPerPallet,
-                    PcsPerBox = pcsPerBox,
-                    Type = type,
-                    
-                    TotalPallets = totalPallets,
-                    TotalBoxes = totalBoxes,
-                    TotalPcs = totalPcs,
-                    
-                    ScannedPallets = scannedPallets,
-                    ScannedBoxes = scannedBoxes,
-                    ScannedPcs = scannedPcs
-                });
-            }
-            
-            return modelBreakdowns;
-        }
-        
-        /// <summary>
         /// Calculate scanning velocity (items per hour)
         /// </summary>
         private double CalculateScanningVelocity(UploadSession session, int totalScanned)
@@ -1028,16 +966,136 @@ namespace ShipmentFinishGood.Controllers
         }
 
         /// <summary>
-        /// Get scanned count for specific model and action type
+        /// Get QR data for dashboard using same logic as QR Management
         /// </summary>
-        private async Task<int> GetScannedCountForModelAsync(int sessionId, string modelName, string action)
+        private async Task<QRManagementDto?> GetQRDataForDashboard(int sessionId, List<ModelConfiguration> modelConfigs)
         {
-            var sessionTag = $"QR_{sessionId}_";
-            return await _context.ScanningActivities
-                .CountAsync(sa => sa.Action == action && 
-                                sa.Result == "SUCCESS" &&
-                                sa.BarcodeValue.StartsWith(sessionTag) &&
-                                sa.BarcodeValue.Contains($"_{modelName}_"));
+            try
+            {
+                var session = await _context.UploadSessions
+                    .Include(s => s.POMasters)
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+
+                if (session == null)
+                    return null;
+
+                // Get PO Master data for this session
+                var poMasters = await _context.POMasters
+                    .Where(po => po.SourceSessionId == sessionId)
+                    .ToListAsync();
+
+                if (!poMasters.Any())
+                    return null;
+
+                // Calculate totals from PO Masters (same as QR Management)
+                var totalPallets = poMasters.Sum(po => po.QtyPallet);
+                var totalBoxes = poMasters.Sum(po => po.QtyBox);
+                var totalPcs = poMasters.Sum(po => po.QtyPcs);
+                var totalQty = poMasters.Sum(po => po.QtyTotal);
+
+                // Get ACCURATE scan count from POItemRegistries (hierarchical lock data) - same as QR Management
+                var scannedItemsFromRegistry = await _context.POItemRegistries
+                    .Where(pir => poMasters.Select(po => po.POId).Contains(pir.POId) &&
+                                 pir.Status == "SCANNED" &&
+                                 pir.IsActive)
+                    .ToListAsync();
+
+                // Use POItemRegistries data if available (hierarchical lock system)
+                int actualScannedBoxes = 0, actualScannedPallets = 0, actualScannedPcs = 0;
+                if (scannedItemsFromRegistry.Count > 0)
+                {
+                    actualScannedBoxes = scannedItemsFromRegistry.Count(pir => pir.ItemType == "BOX");
+                    actualScannedPallets = scannedItemsFromRegistry.Count(pir => pir.ItemType == "PALLET");
+                    actualScannedPcs = scannedItemsFromRegistry.Count(pir => pir.ItemType == "PCS");
+                }
+                else
+                {
+                    // Fallback to scanning service data
+                    var scanProgress = await _scanService.GetScanProgressAsync(sessionId);
+                    if (scanProgress != null)
+                    {
+                        actualScannedBoxes = scanProgress.ScannedBoxes;
+                        actualScannedPallets = scanProgress.ScannedPallets;
+                        actualScannedPcs = scanProgress.ScannedPcs;
+                    }
+                }
+
+                // Get last scanned date from ScanningActivities
+                var lastScanned = await _context.ScanningActivities
+                    .Where(sa => sa.Result == "SUCCESS")
+                    .OrderByDescending(sa => sa.Timestamp)
+                    .FirstOrDefaultAsync();
+
+                return new QRManagementDto
+                {
+                    SessionId = sessionId,
+                    FileName = session.FileName ?? "",
+                    Country = session.Country,
+                    ShipmentDate = session.ShipmentDate,
+                    TotalBoxes = totalBoxes,
+                    TotalPallets = totalPallets,
+                    TotalPcs = totalPcs,
+                    TotalQty = totalQty,
+                    ScannedBoxes = actualScannedBoxes,
+                    ScannedPallets = actualScannedPallets,
+                    ScannedPcs = actualScannedPcs,
+                    LastScannedDate = lastScanned?.Timestamp
+                };
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Calculate scanned qty with model configuration conversion (same as QR Management)
+        /// </summary>
+        private int CalculateScannedQtyWithModelConfig(QRManagementDto qrData, List<ModelConfiguration> modelConfigs, string? shipmentType)
+        {
+            try
+            {
+                // Get session's PO masters to determine models
+                var poMasters = _context.POMasters
+                    .Where(po => po.SourceSessionId == qrData.SessionId)
+                    .ToList();
+
+                var totalScannedQty = 0;
+
+                // Group by model and calculate
+                var modelGroups = poMasters.GroupBy(po => po.ModelProduk);
+                
+                foreach (var modelGroup in modelGroups)
+                {
+                    var modelName = modelGroup.Key;
+                    
+                    // Get model configuration for this shipment type
+                    var modelConfig = modelConfigs.FirstOrDefault(mc => 
+                        mc.ModelName == modelName && mc.Type == (shipmentType ?? "LOOSE"));
+                    
+                    if (modelConfig != null)
+                    {
+                        // Convert scanned pallets and boxes to qty using model config
+                        var scannedPalletQty = qrData.ScannedPallets * modelConfig.PcsPerPallet;
+                        var scannedBoxQty = qrData.ScannedBoxes * modelConfig.PcsPerBox;
+                        var scannedPcsQty = qrData.ScannedPcs; // PCS is 1:1
+                        
+                        totalScannedQty += scannedPalletQty + scannedBoxQty + scannedPcsQty;
+                    }
+                    else
+                    {
+                        // Fallback: if no model config, treat as 1:1
+                        totalScannedQty += qrData.ScannedPallets + qrData.ScannedBoxes + qrData.ScannedPcs;
+                    }
+                }
+
+                return totalScannedQty;
+            }
+            catch (Exception)
+            {
+                // Fallback calculation without model config
+                return qrData.ScannedPallets + qrData.ScannedBoxes + qrData.ScannedPcs;
+            }
         }
     }
 }

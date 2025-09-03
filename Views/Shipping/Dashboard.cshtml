@@ -396,6 +396,25 @@
         line-height: 1.6;
     }
     
+    .qty-breakdown {
+        text-align: center;
+        line-height: 1.4;
+    }
+    
+    .qty-breakdown .qty-number {
+        font-weight: 700;
+        font-size: 16px;
+        color: #1976d2;
+        display: block;
+        margin-bottom: 2px;
+    }
+    
+    .qty-breakdown small {
+        font-size: 12px;
+        color: #666;
+        margin-top: 2px;
+    }
+    
     .file-name {
         font-weight: 700;
         color: #333;
@@ -774,13 +793,15 @@
             <table class="table-simple">
                 <thead>
                     <tr>
-                        <th style="width: 20%;">File Name</th>
-                        <th style="width: 10%;">Country</th>
-                        <th style="width: 12%;">Shipment Type</th>
-                        <th style="width: 10%;">Total QTY</th>
-                        <th style="width: 10%;">Scanned QTY</th>
-                        <th style="width: 10%;">Remaining QTY</th>
-                        <th style="width: 28%;">Progress</th>
+                        <th style="width: 18%;">File Name</th>
+                        <th style="width: 8%;">Country</th>
+                        <th style="width: 10%;">Shipment Type</th>
+                        <th style="width: 8%;">Pallets</th>
+                        <th style="width: 8%;">Boxes</th>
+                        <th style="width: 8%;">Total QTY</th>
+                        <th style="width: 8%;">Scanned QTY</th>
+                        <th style="width: 8%;">Remaining QTY</th>
+                        <th style="width: 26%;">Progress</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -817,6 +838,34 @@
                                 }
                             </td>
                             <td>
+                                <div class="qty-breakdown">
+                                    @if (session.TotalPallets > 0)
+                                    {
+                                        <span class="qty-number">@session.ScannedPallets/@session.TotalPallets</span>
+                                        <small style="display: block; color: #666;">🚛 Pallets</small>
+                                    }
+                                    else
+                                    {
+                                        <span class="qty-number">-</span>
+                                        <small style="display: block; color: #666;">No Pallets</small>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                <div class="qty-breakdown">
+                                    @if (session.TotalBoxes > 0)
+                                    {
+                                        <span class="qty-number">@session.ScannedBoxes/@session.TotalBoxes</span>
+                                        <small style="display: block; color: #666;">📦 Boxes</small>
+                                    }
+                                    else
+                                    {
+                                        <span class="qty-number">-</span>
+                                        <small style="display: block; color: #666;">No Boxes</small>
+                                    }
+                                </div>
+                            </td>
+                            <td>
                                 <span class="qty-number">@session.TotalQtyTarget.ToString("N0")</span>
                             </td>
                             <td>
@@ -840,6 +889,20 @@
                 <tfoot>
                     <tr class="total-row">
                         <th colspan="3">📊 TOTAL SUMMARY:</th>
+                        <th>
+                            @{
+                                var totalPallets = Model.SessionDetails.Sum(s => s.TotalPallets);
+                                var scannedPallets = Model.SessionDetails.Sum(s => s.ScannedPallets);
+                            }
+                            @scannedPallets/@totalPallets
+                        </th>
+                        <th>
+                            @{
+                                var totalBoxes = Model.SessionDetails.Sum(s => s.TotalBoxes);
+                                var scannedBoxes = Model.SessionDetails.Sum(s => s.ScannedBoxes);
+                            }
+                            @scannedBoxes/@totalBoxes
+                        </th>
                         <th>@Model.TotalQtyTarget.ToString("N0")</th>
                         <th>@Model.TotalQtyScanned.ToString("N0")</th>
                         <th>@Model.TotalQtyRemaining.ToString("N0")</th>

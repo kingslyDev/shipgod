@@ -548,7 +548,7 @@ namespace ShipmentFinishGood.Services
                     if (barcodeIndex < qrData.BarcodeList.Count)
                     {
                         var barcode = qrData.BarcodeList[barcodeIndex];
-                        string displayText = ExtractBarcodeDisplayText(barcode);
+                        string displayText = barcode; // Tampilkan full barcode value
 
                         try
                         {
